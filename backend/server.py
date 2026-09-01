@@ -17,7 +17,7 @@ import bcrypt
 import jwt
 import stripe
 
-from email_utils import send_order_email, send_waitlist_email, send_low_stock_email
+from email_utils import send_order_email, send_waitlist_email, send_low_stock_email, send_announce_email
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -489,6 +489,32 @@ async def drop_config():
 
 
 # ---------- admin: stats & key assignment ----------
+
+class AnnounceIn(BaseModel):
+    subject: str = "The Desync drop is LIVE"
+    message: str = "It's here. The next Desync release just went live — keys are in the shop right now. First come, first served."
+
+
+@api_router.post("/admin/announce")
+async def admin_announce(body: AnnounceIn, admin: dict = Depends(get_admin)):
+    emails = await db.waitlist.find({}, {"_id": 0, "email": 1}).to_list(5000)
+    if not emails:
+        raise HTTPException(400, "Waitlist is empty")
+    sent, failed = 0, 0
+    for row in emails:
+        try:
+            await send_announce_email(row["email"], body.subject.strip(), body.message.strip())
+            sent += 1
+        except Exception as e:
+            logger.error("Announce to %s failed: %s", row["email"], e)
+            failed += 1
+    await db.settings.update_one(
+        {"id": "main"},
+        {"$set": {"last_announce_at": datetime.now(timezone.utc).isoformat(),
+                  "last_announce_sent": sent}},
+        upsert=True,
+    )
+    return {"sent": sent, "failed": failed, "total": len(emails)}
 
 @api_router.get("/admin/stats")
 async def admin_stats(admin: dict = Depends(get_admin)):

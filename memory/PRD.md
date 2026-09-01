@@ -89,6 +89,10 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Test coupon LAUNCH20 (20% off, max 5 uses) exists in admin
 - Discord invite corrected to https://discord.gg/GapTZMAY7v everywhere (navbar, hero, footer). NOTE: live deployed site needs a redeploy to pick this up (preview is instant)
 
+## Implemented (2026-09-01, round 13)
+- Announce bot: Launch tab "Announce the drop" card — editable subject + message, confirm dialog, one click emails the entire waitlist with a shop link; records last-sent time; POST /api/admin/announce (tested: 1/1 delivered)
+- Fixed coupon-create response serialization (insert_one _id leak)
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state

@@ -225,3 +225,19 @@ async def send_low_stock_email(to: str, product_name: str, duration_label: str, 
         subject="Low stock: " + product_name + " (" + duration_label + ") - " + str(remaining) + " left",
         html=_shell("Low Stock Alert", inner),
     )
+
+
+async def send_announce_email(to: str, subject: str, message: str) -> None:
+    body_html = "<br>".join(escape(message).splitlines())
+    link_html = ""
+    if STORE_URL:
+        link_html = (
+            '<p style="margin:22px 0 0"><a href="' + STORE_URL + '" '
+            'style="display:inline-block;background:#2E6BFF;color:#ffffff;text-decoration:none;'
+            'font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px">Open the shop</a></p>'
+        )
+    inner = (
+        '<p style="color:#F1F5F9;font-size:15px;line-height:1.6;margin:0">' + body_html + '</p>'
+        + link_html
+    )
+    await send_email(to=to, subject=subject, html=_shell("Announcement", inner))

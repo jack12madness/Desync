@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, Circle, Rocket } from "lucide-react";
+import { CheckCircle2, Circle, Rocket, Megaphone } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { api, apiError } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
@@ -17,6 +17,12 @@ export default function LaunchTab() {
   const [products, setProducts] = useState([]);
   const [counts, setCounts] = useState({});
   const [saving, setSaving] = useState(false);
+  const [waitlistCount, setWaitlistCount] = useState(0);
+  const [announceSubject, setAnnounceSubject] = useState("The Desync drop is LIVE");
+  const [announceMessage, setAnnounceMessage] = useState(
+    "It's here. The next Desync release just went live — keys are in the shop right now. First come, first served."
+  );
+  const [announcing, setAnnouncing] = useState(false);
 
   useEffect(() => {
     api.get("/admin/settings").then(({ data }) => {
@@ -26,6 +32,7 @@ export default function LaunchTab() {
     }).catch(() => {});
     api.get("/admin/products").then(({ data }) => setProducts(data)).catch(() => {});
     api.get("/admin/keystock/counts").then(({ data }) => setCounts(data)).catch(() => {});
+    api.get("/admin/stats").then(({ data }) => setWaitlistCount(data.waitlist || 0)).catch(() => {});
   }, []);
 
   const saveDrop = async () => {
@@ -51,6 +58,27 @@ export default function LaunchTab() {
       await api.put("/admin/settings", { checklist });
     } catch (e) {
       toast.error(apiError(e));
+    }
+  };
+
+  const announce = async () => {
+    if (!announceMessage.trim()) {
+      toast.error("Write a message first");
+      return;
+    }
+    if (!window.confirm(`Email all ${waitlistCount} people on the drop list?`)) return;
+    setAnnouncing(true);
+    try {
+      const { data } = await api.post("/admin/announce", {
+        subject: announceSubject,
+        message: announceMessage,
+      });
+      toast.success(`Announcement sent to ${data.sent} subscriber${data.sent === 1 ? "" : "s"}${data.failed ? ` (${data.failed} failed)` : ""}`);
+      setSettings((s) => ({ ...s, last_announce_at: new Date().toISOString() }));
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setAnnouncing(false);
     }
   };
 
@@ -105,6 +133,49 @@ export default function LaunchTab() {
         >
           {saving ? "Saving..." : "Save Drop Settings"}
         </button>
+      </div>
+
+      <div className="p-5 bg-[#0F1F38] border border-[#1E2D4A] rounded-xl" data-testid="announce-card">
+        <div className="flex items-center gap-2 mb-1">
+          <Megaphone className="w-4 h-4 text-[#5B8CFF]" />
+          <div className="text-sm font-semibold text-white">Announce the drop</div>
+        </div>
+        <p className="text-xs text-slate-500 mb-5">
+          Emails everyone on the waitlist ({waitlistCount} {waitlistCount === 1 ? "person" : "people"}) with a link to the shop
+          {settings?.last_announce_at && (
+            <span className="block mt-1">Last sent: {new Date(settings.last_announce_at).toLocaleString()}</span>
+          )}
+        </p>
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm text-slate-300 block mb-2">Subject</label>
+            <Input
+              value={announceSubject}
+              onChange={(e) => setAnnounceSubject(e.target.value)}
+              data-testid="announce-subject-input"
+              className={fieldCls}
+            />
+          </div>
+          <div>
+            <label className="text-sm text-slate-300 block mb-2">Message</label>
+            <textarea
+              value={announceMessage}
+              onChange={(e) => setAnnounceMessage(e.target.value)}
+              rows={4}
+              data-testid="announce-message-input"
+              className="w-full rounded-lg bg-[#050B18] border border-[#1E2D4A] focus:border-[#2E6BFF] focus:outline-none text-sm p-3 text-slate-100 placeholder:text-slate-600"
+            />
+          </div>
+          <button
+            onClick={announce}
+            disabled={announcing || waitlistCount === 0}
+            data-testid="announce-send-button"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold shadow-[0_8px_24px_rgba(46,107,255,0.35)] disabled:opacity-40 transition-all duration-200 active:scale-95"
+          >
+            <Megaphone className="w-4 h-4" />
+            {announcing ? "Sending..." : `Send to ${waitlistCount} subscriber${waitlistCount === 1 ? "" : "s"}`}
+          </button>
+        </div>
       </div>
 
       <div className="p-5 bg-[#0F1F38] border border-[#1E2D4A] rounded-xl">
