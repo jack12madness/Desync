@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
 import { Trash2, Plus, KeyRound } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api, apiError } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
+import { DURATION_LABELS } from "@/context/CartContext";
+
+const DURATIONS = ["day", "week", "month", "lifetime"];
 
 export default function KeyManager({ product, onClose, onChanged }) {
   const [keys, setKeys] = useState(null);
   const [input, setInput] = useState("");
+  const [duration, setDuration] = useState("day");
   const [adding, setAdding] = useState(false);
 
   const load = () =>
@@ -21,8 +26,8 @@ export default function KeyManager({ product, onClose, onChanged }) {
     if (!input.trim()) return;
     setAdding(true);
     try {
-      const { data } = await api.post("/admin/keystock", { product_id: product.id, keys: input });
-      toast.success(`${data.added} key${data.added === 1 ? "" : "s"} added${data.skipped ? `, ${data.skipped} duplicates skipped` : ""}`);
+      const { data } = await api.post("/admin/keystock", { product_id: product.id, duration, keys: input });
+      toast.success(`${data.added} key${data.added === 1 ? "" : "s"} added to ${DURATION_LABELS[duration]}${data.skipped ? `, ${data.skipped} duplicates skipped` : ""}`);
       setInput("");
       load();
       onChanged && onChanged();
@@ -44,7 +49,9 @@ export default function KeyManager({ product, onClose, onChanged }) {
     }
   };
 
-  const available = (keys || []).filter((k) => k.status === "available").length;
+  const countFor = (d) => (keys || []).filter((k) => k.status === "available" && k.duration === d).length;
+  const productDurations = DURATIONS.filter((d) => product.prices && product.prices[d] != null);
+  const sorted = [...(keys || [])].sort((a, b) => (a.duration || "").localeCompare(b.duration || ""));
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -55,15 +62,37 @@ export default function KeyManager({ product, onClose, onChanged }) {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex items-center gap-3 mt-1">
-          <span className="px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/30 text-emerald-300 text-xs font-medium" data-testid="keys-count">
-            {available} in stock
-          </span>
-          <span className="text-xs text-slate-500">One key is pulled per sale, first in first out</span>
+        <div className="flex flex-wrap items-center gap-2 mt-1" data-testid="keys-count">
+          {productDurations.map((d) => (
+            <span
+              key={d}
+              data-testid={`keys-count-${d}`}
+              className={`px-3 py-1 rounded-full border text-xs font-medium ${
+                countFor(d) > 0
+                  ? "bg-emerald-400/10 border-emerald-400/30 text-emerald-300"
+                  : "bg-amber-400/10 border-amber-400/30 text-amber-300"
+              }`}
+            >
+              {DURATION_LABELS[d]}: {countFor(d)}
+            </span>
+          ))}
+          <span className="text-xs text-slate-500 ml-1">One key per sale, first in first out</span>
         </div>
 
         <div className="mt-5">
-          <label className="text-sm text-slate-300 block mb-2">Add keys — one per line</label>
+          <label className="text-sm text-slate-300 block mb-2">Add keys — one per line, into a duration pool</label>
+          <div className="flex gap-3 mb-3">
+            <Select value={duration} onValueChange={setDuration}>
+              <SelectTrigger data-testid="keys-duration-select" className="w-44 bg-[#050B18] border-[#1E2D4A]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0A1628] border-[#1E2D4A] text-slate-100">
+                {productDurations.map((d) => (
+                  <SelectItem key={d} value={d} data-testid={`keys-duration-${d}`}>{DURATION_LABELS[d]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -78,7 +107,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
             data-testid="keys-add-button"
             className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold disabled:opacity-40 transition-all duration-200 active:scale-95"
           >
-            <Plus className="w-4 h-4" /> {adding ? "Adding..." : "Add to Stock"}
+            <Plus className="w-4 h-4" /> {adding ? "Adding..." : `Add to ${DURATION_LABELS[duration]} pool`}
           </button>
         </div>
 
@@ -89,12 +118,15 @@ export default function KeyManager({ product, onClose, onChanged }) {
               No keys yet — paste your supplier keys above
             </div>
           )}
-          {(keys || []).map((k) => (
+          {sorted.map((k) => (
             <div
               key={k.id}
               data-testid={`key-row-${k.id}`}
               className="flex items-center gap-3 p-3 bg-[#050B18] border border-[#1E2D4A] rounded-lg"
             >
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#2E6BFF]/10 border border-[#2E6BFF]/30 text-[#8FB8E8] uppercase tracking-wider shrink-0">
+                {DURATION_LABELS[k.duration] || k.duration || "—"}
+              </span>
               <code className="font-mono text-sm text-slate-100 flex-1 truncate">{k.key}</code>
               {k.status === "available" ? (
                 <>

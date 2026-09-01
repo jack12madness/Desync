@@ -120,7 +120,7 @@ export default function Hero() {
               Search Products <ArrowRight className="w-4 h-4" />
             </a>
             <a
-              href="https://discord.gg/voidware"
+              href="https://discord.gg/qh3aUNKcYc"
               target="_blank"
               rel="noopener noreferrer"
               data-testid="hero-cta-discord"

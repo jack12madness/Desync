@@ -12,7 +12,7 @@ import bcrypt
 import jwt
 import stripe
 
-from email_utils import send_order_email, send_waitlist_email
+from email_utils import send_order_email, send_waitlist_email, send_low_stock_email
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -379,6 +379,7 @@ async def admin_waitlist(admin: dict = Depends(get_admin)):
 
 class KeyStockIn(BaseModel):
     product_id: str
+    duration: str = "day"
     keys: str
 
 
@@ -386,10 +387,17 @@ class KeyStockIn(BaseModel):
 async def keystock_counts(admin: dict = Depends(get_admin)):
     pipeline = [
         {"$match": {"status": "available"}},
-        {"$group": {"_id": "$product_id", "count": {"$sum": 1}}},
+        {"$group": {"_id": {"product_id": "$product_id", "duration": "$duration"}, "count": {"$sum": 1}}},
     ]
-    rows = await db.keystock.aggregate(pipeline).to_list(500)
-    return {r["_id"]: r["count"] for r in rows}
+    rows = await db.keystock.aggregate(pipeline).to_list(2000)
+    out = {}
+    for r in rows:
+        pid = r["_id"]["product_id"]
+        dur = r["_id"].get("duration") or "day"
+        out.setdefault(pid, {"total": 0})
+        out[pid][dur] = r["count"]
+        out[pid]["total"] += r["count"]
+    return out
 
 
 @api_router.get("/admin/keystock/{product_id}")
@@ -402,6 +410,8 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
     product = await db.products.find_one({"id": body.product_id}, {"_id": 0, "id": 1})
     if not product:
         raise HTTPException(404, "Product not found")
+    if body.duration not in DURATIONS:
+        raise HTTPException(400, "Invalid duration")
     lines = [k.strip() for k in body.keys.replace("\r", "").split("\n")]
     lines = [k for k in lines if k]
     if not lines:
@@ -414,13 +424,13 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
             skipped += 1
             continue
         seen.add(key)
-        exists = await db.keystock.find_one({"product_id": body.product_id, "key": key})
+        exists = await db.keystock.find_one({"product_id": body.product_id, "duration": body.duration, "key": key})
         if exists:
             skipped += 1
             continue
         await db.keystock.insert_one({
-            "id": str(uuid.uuid4()), "product_id": body.product_id, "key": key,
-            "status": "available", "assigned_order_id": None, "assigned_at": None,
+            "id": str(uuid.uuid4()), "product_id": body.product_id, "duration": body.duration,
+            "key": key, "status": "available", "assigned_order_id": None, "assigned_at": None,
             "created_at": now,
         })
         added += 1
@@ -433,6 +443,28 @@ async def keystock_delete(key_id: str, admin: dict = Depends(get_admin)):
     if res.deleted_count == 0:
         raise HTTPException(400, "Key not found or already assigned")
     return {"deleted": True}
+
+
+# ---------- admin: settings ----------
+
+class SettingsIn(BaseModel):
+    notify_email: Optional[EmailStr] = None
+
+
+@api_router.get("/admin/settings")
+async def get_settings(admin: dict = Depends(get_admin)):
+    doc = await db.settings.find_one({"id": "main"}, {"_id": 0})
+    return doc or {"id": "main", "notify_email": None}
+
+
+@api_router.put("/admin/settings")
+async def put_settings(body: SettingsIn, admin: dict = Depends(get_admin)):
+    await db.settings.update_one(
+        {"id": "main"},
+        {"$set": {"id": "main", "notify_email": body.notify_email}},
+        upsert=True,
+    )
+    return {"id": "main", "notify_email": body.notify_email}
 
 
 # ---------- admin: users ----------
@@ -482,7 +514,7 @@ async def fulfill_order(session_id: str) -> Optional[dict]:
     for item in items:
         if not item.get("license_key"):
             key_doc = await db.keystock.find_one_and_update(
-                {"product_id": item["product_id"], "status": "available"},
+                {"product_id": item["product_id"], "duration": item["duration"], "status": "available"},
                 {"$set": {
                     "status": "assigned",
                     "assigned_order_id": order["id"],
@@ -492,6 +524,19 @@ async def fulfill_order(session_id: str) -> Optional[dict]:
             )
             if key_doc:
                 item["license_key"] = key_doc["key"]
+                remaining = await db.keystock.count_documents(
+                    {"product_id": item["product_id"], "duration": item["duration"], "status": "available"}
+                )
+                if remaining in (0, 4):
+                    settings = await db.settings.find_one({"id": "main"}, {"_id": 0})
+                    notify = (settings or {}).get("notify_email")
+                    if notify:
+                        try:
+                            await send_low_stock_email(
+                                notify, item["name"], DURATIONS[item["duration"]], remaining
+                            )
+                        except Exception as e:
+                            logger.error("Low stock email failed: %s", e)
             else:
                 item["key_pending"] = True
                 keys_pending = True

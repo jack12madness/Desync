@@ -142,6 +142,7 @@ export default function AdminDashboard() {
   const [editing, setEditing] = useState(null); // null | {} (new) | product
   const [keysFor, setKeysFor] = useState(null); // product whose keys are being managed
   const [stockCounts, setStockCounts] = useState({});
+  const [notifyEmail, setNotifyEmail] = useState("");
   const [newUser, setNewUser] = useState({ username: "", password: "", role: "admin" });
   const navigate = useNavigate();
 
@@ -151,6 +152,7 @@ export default function AdminDashboard() {
         setAdmin(data);
         loadProducts();
         loadOrders();
+        loadSettings();
         if (data.role === "owner") loadUsers();
       })
       .catch(() => {
@@ -167,6 +169,15 @@ export default function AdminDashboard() {
   const loadStockCounts = () =>
     api.get("/admin/keystock/counts").then(({ data }) => setStockCounts(data)).catch(() => {});
   const loadOrders = () => api.get("/admin/orders").then(({ data }) => setOrders(data)).catch(() => {});
+  const loadSettings = () => api.get("/admin/settings").then(({ data }) => setNotifyEmail(data.notify_email || "")).catch(() => {});
+  const saveSettings = async () => {
+    try {
+      await api.put("/admin/settings", { notify_email: notifyEmail });
+      toast.success("Alert email saved");
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
   const loadUsers = () => api.get("/admin/users").then(({ data }) => setUsers(data)).catch(() => {});
 
   const saveProduct = async (payload) => {
@@ -288,12 +299,12 @@ export default function AdminDashboard() {
                     onClick={() => setKeysFor(p)}
                     data-testid={`admin-keys-button-${p.id}`}
                     className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                      (stockCounts[p.id] || 0) > 0
+                      (stockCounts[p.id]?.total || 0) > 0
                         ? "border-[#1E2D4A] text-slate-300 hover:border-[#2E6BFF]/50 hover:text-white"
                         : "border-amber-400/40 text-amber-300 hover:border-amber-400"
                     }`}
                   >
-                    {stockCounts[p.id] || 0} keys · Manage
+                    {stockCounts[p.id]?.total || 0} keys · Manage
                   </button>
                   <div className="flex gap-2">
                     <button onClick={() => setEditing(p)} data-testid={`admin-edit-product-${p.id}`} className="p-2 border border-blue-500/30 text-blue-300 hover:bg-blue-400/10 rounded transition-colors">
@@ -309,6 +320,27 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="orders">
+            <div className="mb-6 p-4 bg-[#0F1F38] border border-[#1E2D4A] rounded-lg flex flex-col sm:flex-row sm:items-center gap-3" data-testid="low-stock-settings">
+              <div className="flex-1">
+                <div className="text-sm font-semibold text-white">Low-stock alerts</div>
+                <div className="text-xs text-slate-500">Get emailed when any product + duration pool drops to 4 keys, and again at 0</div>
+              </div>
+              <Input
+                type="email"
+                value={notifyEmail}
+                onChange={(e) => setNotifyEmail(e.target.value)}
+                placeholder="you@example.com"
+                data-testid="notify-email-input"
+                className="sm:w-72 bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] h-10"
+              />
+              <button
+                onClick={saveSettings}
+                data-testid="notify-email-save"
+                className="px-5 py-2.5 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold transition-all duration-200"
+              >
+                Save
+              </button>
+            </div>
             <h2 className="font-display text-xl font-bold uppercase tracking-tight mb-6">{orders.length} Orders</h2>
             <div className="space-y-3" data-testid="admin-orders-list">
               {orders.length === 0 && (

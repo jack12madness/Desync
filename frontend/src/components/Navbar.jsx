@@ -52,7 +52,7 @@ export default function Navbar() {
             )
           )}
           <a
-            href="https://discord.gg/voidware"
+            href="https://discord.gg/qh3aUNKcYc"
             target="_blank"
             rel="noopener noreferrer"
             data-testid="nav-link-discord"

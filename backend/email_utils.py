@@ -183,3 +183,22 @@ async def send_waitlist_email(email: str) -> None:
         subject="You're on the " + EMAIL_FROM_NAME + " drop list",
         html=_shell("Next Drop // Classified", inner),
     )
+
+
+async def send_low_stock_email(to: str, product_name: str, duration_label: str, remaining: int) -> None:
+    inner = (
+        '<p style="color:#F1F5F9;font-size:15px;margin:0 0 10px">Key stock is running low.</p>'
+        '<p style="color:#94A3B8;font-size:13px;margin:0 0 4px">Product: <strong style="color:#F1F5F9">'
+        + escape(product_name) + '</strong></p>'
+        '<p style="color:#94A3B8;font-size:13px;margin:0 0 4px">Duration: <strong style="color:#F1F5F9">'
+        + escape(duration_label) + '</strong></p>'
+        '<p style="color:#94A3B8;font-size:13px;margin:0">Remaining keys: <strong style="color:#F5C158">'
+        + str(remaining) + '</strong></p>'
+        '<p style="color:#94A3B8;font-size:12px;margin-top:16px">Top up the pool from the admin console '
+        '(Products &rarr; key stock) before it sells out.</p>'
+    )
+    await send_email(
+        to=to,
+        subject="Low stock: " + product_name + " (" + duration_label + ") - " + str(remaining) + " left",
+        html=_shell("Low Stock Alert", inner),
+    )

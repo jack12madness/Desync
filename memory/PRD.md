@@ -67,6 +67,11 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Admin login fully redesigned: split-screen with brand panel ("Run the whole operation."), GTA art backdrop, clean card form
 - Restored 5 missing products (were deleted during testing) with their new artwork
 
+## Implemented (2026-09-01, round 9)
+- Per-duration key pools: keys are added into day/week/month/lifetime pools per product; sales pull from the matching pool only; key manager shows per-duration counts and duration tags on each key; existing keys migrated to day pool
+- Low-stock alerts: when a pool drops to 4 keys (and again at 0), an alert email fires to the notification email set in admin (Orders tab -> Low-stock alerts card). Tested live to resend test inbox
+- Real Discord invite https://discord.gg/qh3aUNKcYc wired into every Join Discord link (navbar, hero, footer, drop page)
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state
