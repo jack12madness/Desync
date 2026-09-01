@@ -52,7 +52,7 @@ export default function Navbar() {
             )
           )}
           <a
-            href="https://discord.gg/qh3aUNKcYc"
+            href="https://discord.gg/GapTZMAY7v"
             target="_blank"
             rel="noopener noreferrer"
             data-testid="nav-link-discord"

@@ -87,6 +87,7 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Removed fake reviews section from home; hero stats replaced with factual ones (24/7 Support, Instant Delivery, 7 Games)
 - Live-site 520 confirmed fixed by user after redeploy
 - Test coupon LAUNCH20 (20% off, max 5 uses) exists in admin
+- Discord invite corrected to https://discord.gg/GapTZMAY7v everywhere (navbar, hero, footer). NOTE: live deployed site needs a redeploy to pick this up (preview is instant)
 
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list

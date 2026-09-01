@@ -32,7 +32,7 @@ export default function Footer() {
         <div>
           <div className="text-sm font-semibold text-white mb-4">Support</div>
           <ul className="space-y-2.5 text-sm text-slate-400">
-            <li><a href="https://discord.gg/qh3aUNKcYc" target="_blank" rel="noopener noreferrer" data-testid="footer-link-discord" className="hover:text-white transition-colors">Discord Server</a></li>
+            <li><a href="https://discord.gg/GapTZMAY7v" target="_blank" rel="noopener noreferrer" data-testid="footer-link-discord" className="hover:text-white transition-colors">Discord Server</a></li>
             <li><Link to="/admin" data-testid="footer-link-staff" className="hover:text-white transition-colors">Staff Login</Link></li>
           </ul>
         </div>
