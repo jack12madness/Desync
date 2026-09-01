@@ -1,13 +1,18 @@
+import os, sys
 from dotenv import load_dotenv
-load_dotenv()
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _HERE)
+load_dotenv(os.path.join(_HERE, ".env"))
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict
-import os, uuid, logging, secrets, string
+import uuid, logging, secrets, string
 from datetime import datetime, timezone, timedelta
+
 import bcrypt
 import jwt
 import stripe
