@@ -27,14 +27,14 @@ export default function Faq() {
   return (
     <section className="py-16 sm:py-24" data-testid="faq-section">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-xs font-mono uppercase tracking-[0.25em] text-cyan-400 mb-2 text-center">// Intel</div>
+        <div className="text-xs font-mono uppercase tracking-[0.25em] text-blue-400 mb-2 text-center">// Intel</div>
         <h2 className="font-display text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-center mb-10">
           Questions, Answered Straight
         </h2>
         <Accordion type="single" collapsible>
           {FAQS.map((f, i) => (
-            <AccordionItem key={i} value={`faq-${i}`} className="border-cyan-500/10" data-testid={`faq-item-${i}`}>
-              <AccordionTrigger className="text-left text-sm sm:text-base font-semibold text-slate-200 hover:text-cyan-300 hover:no-underline">
+            <AccordionItem key={i} value={`faq-${i}`} className="border-blue-500/10" data-testid={`faq-item-${i}`}>
+              <AccordionTrigger className="text-left text-sm sm:text-base font-semibold text-slate-200 hover:text-blue-300 hover:no-underline">
                 {f.q}
               </AccordionTrigger>
               <AccordionContent className="text-sm text-slate-400 leading-relaxed">

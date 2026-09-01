@@ -41,7 +41,7 @@ export default function Home() {
             transition={{ duration: 0.6 }}
             className="mb-10"
           >
-            <div className="text-xs font-mono uppercase tracking-[0.25em] text-cyan-400 mb-2">// The Armoury</div>
+            <div className="text-xs font-mono uppercase tracking-[0.25em] text-blue-400 mb-2">// The Armoury</div>
             <h2 className="font-display text-3xl sm:text-4xl font-extrabold uppercase tracking-tight">
               Choose Your Weapon
             </h2>
@@ -55,8 +55,8 @@ export default function Home() {
                 data-testid={`filter-tab-${g.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
                 className={`clip-tag-sm px-4 py-2 text-xs font-mono uppercase tracking-[0.15em] border transition-all duration-200 ${
                   filter === g
-                    ? "bg-cyan-400 text-[#06070B] border-cyan-400 font-bold"
-                    : "border-slate-700/60 text-slate-400 hover:border-cyan-500/40 hover:text-cyan-300"
+                    ? "bg-blue-400 text-[#050B18] border-blue-400 font-bold"
+                    : "border-slate-700/60 text-slate-400 hover:border-blue-500/40 hover:text-blue-300"
                 }`}
               >
                 {g}

@@ -47,7 +47,7 @@ export default function PaymentSuccess() {
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
           {state.status === "polling" && (
             <div className="text-center py-24" data-testid="payment-polling">
-              <Loader2 className="w-10 h-10 text-cyan-400 animate-spin mx-auto mb-6" />
+              <Loader2 className="w-10 h-10 text-blue-400 animate-spin mx-auto mb-6" />
               <h1 className="font-display text-2xl font-bold uppercase tracking-tight">Confirming Payment</h1>
               <p className="text-sm text-slate-400 mt-3 font-mono uppercase tracking-widest">Talking to Stripe...</p>
             </div>
@@ -57,27 +57,27 @@ export default function PaymentSuccess() {
             <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>
               <div className="text-center mb-10">
                 <CheckCircle2 className="w-14 h-14 text-emerald-400 mx-auto mb-5" data-testid="payment-success-icon" />
-                <div className="text-xs font-mono uppercase tracking-[0.25em] text-cyan-400 mb-2">// Payment Confirmed</div>
+                <div className="text-xs font-mono uppercase tracking-[0.25em] text-blue-400 mb-2">// Payment Confirmed</div>
                 <h1 className="font-display text-3xl sm:text-4xl font-extrabold uppercase tracking-tight">
                   You're Locked In
                 </h1>
                 <p className="text-sm text-slate-400 mt-3">
-                  Keys are tied to <span className="text-cyan-300 font-mono">{state.order.email}</span> — retrieve them anytime via My Orders.
+                  Keys are tied to <span className="text-blue-300 font-mono">{state.order.email}</span> — retrieve them anytime via My Orders.
                 </p>
               </div>
 
-              <div className="p-6 bg-[#0F1422] border border-cyan-500/30 rounded-lg shadow-[0_0_60px_rgba(0,240,255,0.08)]" data-testid="license-key-display">
+              <div className="p-6 bg-[#0F1F38] border border-blue-500/30 rounded-lg shadow-[0_0_60px_rgba(46,107,255,0.08)]" data-testid="license-key-display">
                 <div className="flex items-center justify-between mb-5 text-xs font-mono uppercase tracking-widest text-slate-500">
                   <span>ORDER {state.order.id.slice(0, 8).toUpperCase()}</span>
-                  <span className="text-cyan-300">{eur(state.order.total)}</span>
+                  <span className="text-blue-300">{eur(state.order.total)}</span>
                 </div>
                 <div className="space-y-3">
                   {state.order.items.map((item) => (
                     <KeyRow key={`${item.product_id}-${item.duration}`} item={item} />
                   ))}
                 </div>
-                <div className="mt-6 p-4 border border-dashed border-cyan-500/30 rounded text-xs text-slate-400 leading-relaxed">
-                  <span className="font-mono uppercase tracking-widest text-cyan-400 block mb-2">Setup // 60 seconds</span>
+                <div className="mt-6 p-4 border border-dashed border-blue-500/30 rounded text-xs text-slate-400 leading-relaxed">
+                  <span className="font-mono uppercase tracking-widest text-blue-400 block mb-2">Setup // 60 seconds</span>
                   1. Download the loader from the Discord #downloads channel.
                   2. Run as Administrator, paste your key.
                   3. Launch your game and press INSERT to open the menu.
@@ -88,7 +88,7 @@ export default function PaymentSuccess() {
                 <Link
                   to="/orders"
                   data-testid="success-view-orders-link"
-                  className="inline-flex items-center gap-2 text-sm font-mono uppercase tracking-widest text-cyan-300 hover:text-cyan-200"
+                  className="inline-flex items-center gap-2 text-sm font-mono uppercase tracking-widest text-blue-300 hover:text-blue-200"
                 >
                   View in My Orders <ArrowRight className="w-4 h-4" />
                 </Link>
@@ -103,7 +103,7 @@ export default function PaymentSuccess() {
                 We couldn't confirm your payment yet. If you completed checkout, your keys will appear under
                 My Orders within a few minutes — or ping us on Discord.
               </p>
-              <Link to="/orders" className="mt-6 inline-flex items-center gap-2 text-sm font-mono uppercase tracking-widest text-cyan-300">
+              <Link to="/orders" className="mt-6 inline-flex items-center gap-2 text-sm font-mono uppercase tracking-widest text-blue-300">
                 Check My Orders <ArrowRight className="w-4 h-4" />
               </Link>
             </div>

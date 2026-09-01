@@ -2,7 +2,7 @@ const STATUS_STYLES = {
   undetected: { dot: "bg-emerald-400", text: "text-emerald-400", border: "border-emerald-400/40", bg: "bg-emerald-400/10", label: "Undetected" },
   updating: { dot: "bg-amber-400", text: "text-amber-400", border: "border-amber-400/40", bg: "bg-amber-400/10", label: "Updating" },
   detected: { dot: "bg-rose-500", text: "text-rose-400", border: "border-rose-500/40", bg: "bg-rose-500/10", label: "Detected" },
-  testing: { dot: "bg-cyan-400", text: "text-cyan-300", border: "border-cyan-400/40", bg: "bg-cyan-400/10", label: "Testing" },
+  testing: { dot: "bg-blue-400", text: "text-blue-300", border: "border-blue-400/40", bg: "bg-blue-400/10", label: "Testing" },
 };
 
 export default function StatusPill({ status, testid }) {

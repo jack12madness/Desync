@@ -11,6 +11,7 @@ import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
+import DropPage from "@/pages/DropPage";
 
 function App() {
   useEffect(() => {
@@ -30,12 +31,13 @@ function App() {
   return (
     <CartProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-[#06070B] text-slate-100 font-body relative">
+        <div className="min-h-screen bg-[#050B18] text-slate-100 font-body relative">
           <div className="noise-overlay" aria-hidden="true" />
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/status" element={<StatusPage />} />
             <Route path="/orders" element={<OrderLookup />} />
+            <Route path="/drop" element={<DropPage />} />
             <Route path="/payment/success" element={<PaymentSuccess />} />
             <Route path="/payment/cancel" element={<PaymentCancel />} />
             <Route path="/admin" element={<AdminLogin />} />

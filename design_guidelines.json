@@ -1,147 +1,138 @@
 {
-  "project_name": "VOIDWARE",
-  "archetype": "ELECTRIC & NEON / PERFORMANCE PRO HYBRID",
-  "tagline": "UNDETECTED. UNMATCHED. DOMINATE EVERY REALM.",
-  "theme": "Dark Gaming Aesthetic with Kinetic Micro-Interactions",
-  "app_type": "e-commerce / gaming digital-goods storefront",
-  "design_philosophy": {
-    "core_principles": [
-      "Tactical Precision & High Density: Technical grid, clipped chamfer corners, laser-cyan accents",
-      "Cinematic Storytelling: Parallax character heroes, kinetic masked text reveals, noise textures",
-      "Instant Signal Feedback: Real-time status indicators (Undetected, Updating, Detected) with pulsing glowing beacons",
-      "Zero-Friction Conversion: Direct duration selector on product cards, quick cart drawer slide-out, instant guest checkout flow"
-    ],
-    "anti_patterns": [
-      "No rounded corporate SaaS shapes; use clipped chamfer corners or subtle 4px/6px radius with crisp 1px borders",
-      "No generic blue gradients; use pure obsidian black (#06070B), deep void navy (#0B0E17), and electric icy cyan (#00F0FF) glow",
-      "No plain white body background; maintain moody dark ambient backdrop with grainy SVG overlay"
-    ]
+  "project_title": "VOIDWARE Storefront Redesign - Deep Navy GetCheats.gg Cinematic Style",
+  "app_type": "e-commerce / gaming digital-goods storefront redesign",
+  "archetype": "THE PERFORMANCE PRO / DEEP NAVY CINEMATIC",
+  "emotional_tone": "Tactical, high-tech, dominant, slick, trusted, cinematic gaming authority",
+  "theme_strategy": {
+    "default_mode": "dark",
+    "background_base": "Midnight Navy (#050B18 and #0A1628)",
+    "primary_accent": "Electric Royal Blue (#2E6BFF / #3B82F6)",
+    "glow_effects": "Deep blue ambient glows (rgba(46, 107, 255, 0.25)) with subtle radial lights",
+    "forbidden_colors": ["#7351B7 (AI Purple)", "#1B93A4 (Teal Blue/Green)", "pure #000000 black background", "cyan/turquoise primary gradient overload"]
   },
   "typography": {
-    "font_family_pairings": {
-      "headings": "Cabinet Grotesk / Unbounded / Outfit (Sans Display, bold uppercase, letter-spacing -0.03em)",
-      "body": "Outfit / Inter (Clean geometric sans for descriptions and options)",
-      "mono_readouts": "JetBrains Mono / Space Mono (For status badges, price tags, license keys, ping rates, technical specs)"
+    "heading_font": "Cabinet Grotesk (sans-serif) - 700 to 900 weight, tight tracking (tracking-tight)",
+    "body_font": "Outfit (sans-serif) - 400 to 600 weight",
+    "mono_font": "JetBrains Mono (monospace) - for prices, stats, status badges, timers, keys",
+    "font_files_import": "https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@500,700,800,900&display=swap and Google Fonts (Outfit, JetBrains Mono)",
+    "rules": [
+      "Headings MUST NOT use Inter or Roboto",
+      "Main Hero H1 maximum size: text-4xl sm:text-5xl lg:text-6xl with font-extrabold tracking-tight",
+      "Overlines/Badges MUST be uppercase with letter spacing tracking-widest",
+      "Section Headings H2: text-2xl sm:text-3xl lg:text-4xl",
+      "Price Tags & Numbers: use font-mono font-bold"
+    ]
+  },
+  "colors": {
+    "hsl_variables": {
+      "--background": "222 47% 5%",
+      "--foreground": "210 40% 98%",
+      "--card": "222 40% 9%",
+      "--card-foreground": "210 40% 98%",
+      "--popover": "222 40% 9%",
+      "--popover-foreground": "210 40% 98%",
+      "--primary": "221 100% 59%",
+      "--primary-foreground": "0 0% 100%",
+      "--secondary": "222 35% 14%",
+      "--secondary-foreground": "210 40% 98%",
+      "--muted": "222 25% 15%",
+      "--muted-foreground": "215 20% 65%",
+      "--accent": "221 100% 50%",
+      "--accent-foreground": "210 40% 98%",
+      "--destructive": "0 84% 60%",
+      "--destructive-foreground": "210 40% 98%",
+      "--border": "222 30% 18%",
+      "--input": "222 30% 20%",
+      "--ring": "221 100% 59%"
     },
-    "scale_hierarchy": {
-      "h1_hero": "text-4xl sm:text-5xl lg:text-6xl font-black uppercase tracking-tight",
-      "h2_section": "text-2xl sm:text-3xl lg:text-4xl font-extrabold uppercase tracking-tight",
-      "h3_card_title": "text-xl sm:text-2xl font-bold tracking-tight",
-      "h4_widget_header": "text-lg sm:text-xl font-semibold",
-      "body_main": "text-base text-slate-300 leading-relaxed",
-      "mono_label": "text-xs font-mono uppercase tracking-[0.2em] text-cyan-400"
+    "hex_palette": {
+      "bg_deep": "#050B18",
+      "bg_surface": "#0A1628",
+      "bg_card": "#0F1F38",
+      "border_navy": "#1E2D4A",
+      "border_glow": "rgba(46, 107, 255, 0.3)",
+      "blue_primary": "#2E6BFF",
+      "blue_hover": "#1D55E0",
+      "blue_glow": "rgba(46, 107, 255, 0.4)",
+      "text_primary": "#F1F5F9",
+      "text_secondary": "#94A3B8",
+      "accent_emerald": "#10B981",
+      "accent_amber": "#F59E0B"
     }
   },
-  "color_palette": {
-    "base": {
-      "void_black": "#06070B",
-      "dark_navy": "#0B0E17",
-      "panel_bg": "#121726",
-      "panel_border": "rgba(0, 240, 255, 0.12)",
-      "panel_hover_border": "rgba(0, 240, 255, 0.4)"
+  "layout_architecture": {
+    "header_nav": {
+      "style": "Fixed floating bar with backdrop-blur-xl bg-[#050B18]/80 border-b border-[#1E2D4A] z-50",
+      "structure": "Logo left ('VOIDWARE' with royal blue electric mark), Nav Links center ('Cheats / Products', 'Status', 'Order Lookup', 'Hype Drop'), Cart Icon + Account / Admin right",
+      "rules": "No complete transparency. Must have explicit border and blurred deep navy backdrop."
     },
-    "accents": {
-      "cyan_primary": "#00F0FF",
-      "cyan_glow": "rgba(0, 240, 255, 0.25)",
-      "emerald_undetected": "#10B981",
-      "amber_updating": "#F59E0B",
-      "rose_detected": "#EF4444",
-      "purple_accent": "#A855F7"
+    "hero_section": {
+      "style": "Cinematic GetCheats-style split layout",
+      "left_col": "Headline 'Get the Upper Hand' with a vertical or horizontal blue accent line indicator, small bold sub-heading, description text, Dual CTA buttons (Solid Blue Primary 'Explore Cheats' + Dark Navy Outlined Secondary 'Order Lookup'), and Stat Row below (Years Active, Satisfied Gamers, Undetected Products)",
+      "right_col": "Large high-res cinematic gamer / tactical character render floating on the right with dark blue spotlight duotone halo behind it",
+      "overlay": "Soft blue gradient scrim from left and bottom to prevent background text blend"
     },
-    "text": {
-      "primary": "#F1F5F9",
-      "muted": "#94A3B8",
-      "faded": "#64748B",
-      "highlight": "#00F0FF"
-    }
-  },
-  "layout_and_grid": {
-    "container_max_width": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
-    "hero_layout": "Full viewport height relative hero with layered background parallax grid, masked line reveal text, floating status HUD badge, and dual CTA",
-    "product_grid": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8",
-    "bento_features_grid": "grid grid-cols-1 md:grid-cols-12 gap-6",
-    "spacing_scale": {
-      "section_gap": "py-16 sm:py-24 lg:py-32",
-      "card_padding": "p-6 sm:p-8"
-    }
-  },
-  "surface_and_styling": {
-    "glassmorphism": "backdrop-blur-xl bg-slate-950/70 border border-cyan-500/20 shadow-[0_8px_32px_rgba(0,0,0,0.5)]",
-    "tactical_card": "bg-[#0F1422] border border-cyan-900/40 hover:border-cyan-400/60 transition-all duration-300 rounded-lg overflow-hidden group relative",
-    "spotlight_effect": "Radial cyan gradient following cursor hover on product cards",
-    "noise_overlay": "repeating-linear-gradient or SVG grain texture layer at 3% opacity across body background"
-  },
-  "key_features_and_views": {
-    "storefront_home": {
-      "hero_section": "Cinematic banner with FiveM / GTA / Shooter character art, kinetic masked headline reveal 'UNDETECTED. UNMATCHED.', live server ping counter, quick jump to games",
-      "game_filter_tabs": "Categories: All Games, FiveM / GTA, Rust, COD Warzone, Valorant, Apex Legends, Fortnite",
-      "product_cards": "Displays game cover artwork, status pill (UNDETECTED / UPDATING), feature highlights tags (Aimbot, ESP, HWID Spoofer), 'From €X.XX' price tag, quick direct 'Buy Now' trigger to direct modal or drawer",
-      "reviews_marquee": "Infinite smooth scrolling ticker with verified buyer reviews, rating stars, and customer quotes",
-      "status_banner": "Live security & system health counter (e.g., 99.8% Uptime, Last HWID Spoofer test 5 mins ago)",
-      "faq_accordion": "Interactive FAQ addressing safety, injection guides, HWID spoofing, instant key delivery"
+    "shop_grid": {
+      "card_aspect_ratio": "Tall Portrait Cards (~3:4 aspect ratio) with full-bleed game/character artwork",
+      "card_design": "Subtle dark navy card background (#0F1F38) with 1px border (#1E2D4A). On hover, border lights up to Electric Blue (#2E6BFF) with subtle -translate-y-1 lift and glow shadow. Card bottom contains gradient scrim with Game Title, Status Badge ('Undetected'), 'From €X.XX' price tag, and a circular electric blue arrow CTA button on bottom-right.",
+      "grid_layout": "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8"
     },
-    "product_detail_modal": {
-      "duration_selector": "1 Day (€4.99) / 1 Week (€19.99) / 1 Month (€39.99) / Lifetime (€89.99) option cards with active glow state",
-      "features_list": "Bullet list of features (Aimbot, Silent Aim, ESP, Skeleton, No Recoil, Radar, Config Saver)",
-      "system_requirements": "OS compatibility (Win 10/11), Processor (Intel/AMD), Anti-cheat target (EAC, BE, FiveM Guard)",
-      "action_buttons": "Add to Cart (drawer open) & Instant Checkout button"
+    "product_modal": {
+      "style": "Multi-duration selector (1 Day, 7 Days, 30 Days, Lifetime), key features list (Aimbot, ESP, Radar, HWID Spoofer), instant delivery badge, add to cart & instant buy buttons"
+    },
+    "hype_drop_page": {
+      "style": "Teaser trailer vibe with massive JetBrains Mono digital countdown timer, blurred teaser artwork, email waitlist capture form with instant email confirmation state"
     },
     "cart_drawer": {
-      "slide_out_drawer": "Right slide-out modal, selected items, subtotal calculation, discount coupon field, guest email input, direct Stripe / Crypto checkout trigger"
+      "style": "Slide-over drawer with item summary, duration choice toggle, guest checkout email field, instant Stripe integration trigger, license key delivery options"
+    }
+  },
+  "image_urls": {
+    "hero_character": "https://images.unsplash.com/photo-1636922861058-ac8d49cb5147?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHwxfHxnYW1pbmclMjBjaGFyYWN0ZXIlMjByZW5kZXIlMjBjeWJlcnB1bmslMjBhY3Rpb24lMjBzaG9vdGVyJTIwY2hhcmFjdGVyfGVufDB8fHx8MTc4ODI2MjEwMnww&ixlib=rb-4.1.0&q=85",
+    "product_fivem": "https://images.unsplash.com/photo-1700774606348-9249ec7fc882?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHwyfHxjeWJlcnB1bmslMjBzb2xkaWVyJTIwdGFjdGljYWwlMjBnYW1lciUyMG5lb24lMjBhY3Rpb24lMjB3YWxscGFwZXJ8ZW58MHx8fHwxNzg4MjYyMTA5fDA&ixlib=rb-4.1.0&q=85",
+    "product_valorant": "https://images.unsplash.com/photo-1669605140640-d5908ffe8524?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHwzfHxnYW1pbmclMjBjaGFyYWN0ZXIlMjByZW5kZXIlMjBjeWJlcnB1bmslMjBhY3Rpb24lMjBzaG9vdGVyJTIwY2hhcmFjdGVyfGVufDB8fHx8MTc4ODI2MjEwMnww&ixlib=rb-4.1.0&q=85",
+    "product_warzone": "https://images.unsplash.com/photo-1547355332-c590834bbbb4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHw0fHxjeWJlcnB1bmslMjBzb2xkaWVyJTIwdGFjdGljYWwlMjBnYW1lciUyMG5lb24lMjBhY3Rpb24lMjB3YWxscGFwZXJ8ZW58MHx8fHwxNzg4MjYyMTA5fDA&ixlib=rb-4.1.0&q=85",
+    "product_apex": "https://images.unsplash.com/photo-1704278483831-c3939b1b041b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHwzfHxjeWJlcnB1bmslMjBzb2xkaWVyJTIwdGFjdGljYWwlMjBnYW1lciUyMG5lb24lMjBhY3Rpb24lMjB3YWxscGFwZXJ8ZW58MHx8fHwxNzg4MjYyMTA5fDA&ixlib=rb-4.1.0&q=85",
+    "product_rust": "https://images.unsplash.com/flagged/photo-1560177776-295b9cd779de?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHwxfHxjeWJlcnB1bmslMjBzb2xkaWVyJTIwdGFjdGljYWwlMjBnYW1lciUyMG5lb24lMjBhY3Rpb24lMjB3YWxscGFwZXJ8ZW58MHx8fHwxNzg4MjYyMTA5fDA&ixlib=rb-4.1.0&q=85"
+  },
+  "component_usage": {
+    "buttons": {
+      "primary": "bg-[#2E6BFF] hover:bg-[#1D55E0] text-white font-semibold rounded-lg shadow-[0_0_20px_rgba(46,107,255,0.4)] transition-all duration-200 active:scale-95",
+      "secondary": "bg-[#0A1628] hover:bg-[#0F1F38] text-slate-200 border border-[#1E2D4A] hover:border-[#2E6BFF]/50 rounded-lg transition-all duration-200",
+      "arrow_button": "w-10 h-10 rounded-full bg-[#2E6BFF] hover:bg-[#1D55E0] text-white flex items-center justify-center transition-transform hover:scale-110"
     },
-    "checkout_and_confirmation": {
-      "guest_checkout": "Fast guest email field with instant Stripe test payment trigger",
-      "order_confirmation_modal": "Displays generated order ID, license key formatted like 'VOID-8829-X7K9-994A', copy-to-clipboard button, download injector link, step-by-step setup guide",
-      "order_lookup_page": "Search past orders by email to re-retrieve license keys"
+    "cards": {
+      "portrait_product_card": "relative rounded-xl overflow-hidden bg-[#0A1628] border border-[#1E2D4A] hover:border-[#2E6BFF]/60 transition-all duration-300 group hover:-translate-y-1 shadow-lg hover:shadow-[0_12px_30px_rgba(46,107,255,0.2)]"
     },
-    "status_page": {
-      "cheat_status_matrix": "Full list of all game products, current anti-cheat status (Undetected green dot, Updating yellow dot, Testing blue dot), last updated timestamp, anti-cheat target details"
-    },
-    "admin_dashboard": {
-      "authentication": "Admin login modal / view with key phrase or password",
-      "product_management": "CRUD operations for products (Add product, change status Undetected/Updating/Detected, edit pricing options, update stock counts)",
-      "license_key_inventory": "Manage license key stock pools per duration",
-      "orders_list": "View recent orders, filter by customer email, view issued keys"
+    "badges": {
+      "undetected": "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-mono uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1.5",
+      "updating": "bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-mono uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1.5"
     }
   },
   "motion_and_interactions": {
-    "libraries": ["framer-motion", "lucide-react", "canvas-confetti"],
-    "micro_interactions": [
-      "Spotlight cursor tracker on card mouse move",
-      "Pulsing status indicator dot (pinging glow effect)",
-      "Copy license key button with instant success checkmark and toast notification",
-      "Infinite ticker ribbon for customer reviews",
-      "Staggered entrance reveal for product cards on scroll"
+    "smooth_scroll": "Lenis smooth scroll enabled in App.js",
+    "framer_motion": "Framer Motion for page fade transitions, modal scale-ups, cart drawer slide-ins, and staggered grid loading",
+    "hover_states": "All buttons and interactive cards must include subtle scale/lift micro-interactions and explicitly defined text color states"
+  },
+  "testing_attributes": {
+    "rule": "ALL interactive and key informational elements MUST include a data-testid attribute in kebab-case format.",
+    "examples": [
+      "data-testid='nav-logo'",
+      "data-testid='nav-cart-button'",
+      "data-testid='hero-cta-explore'",
+      "data-testid='product-card-fivem'",
+      "data-testid='product-buy-now-button'",
+      "data-testid='hype-drop-email-input'",
+      "data-testid='cart-checkout-button'"
     ]
   },
-  "image_urls": {
-    "hero_character": "https://images.unsplash.com/photo-1622023346627-b7d48c4484a9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwxfHxjeWJlcnB1bmslMjBnYW1lJTIwY2hhcmFjdGVyJTIwZGFyayUyMGdsb3dpbmclMjBibHVlJTIwY3lhbnxlbnwwfHx8fDE3ODgyNjA1MTR8MA&ixlib=rb-4.1.0&q=85",
-    "fivem_banner": "https://images.unsplash.com/photo-1766016642153-4063f568870c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NjV8MHwxfHNlYXJjaHwzfHxzdXBlcmNhciUyMG5pZ2h0JTIwbmVvbiUyMGNpdHklMjBkYXJrJTIwY3lhbnxlbnwwfHx8fDE3ODgyNjA1MjF8MA&ixlib=rb-4.1.0&q=85",
-    "cyber_city": "https://images.unsplash.com/photo-1766016648768-254ede922ed5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NjV8MHwxfHNlYXJjaHwxfHxzdXBlcmNhciUyMG5pZ2h0JTIwbmVvbiUyMGNpdHklMjBkYXJrJTIwY3lhbnxlbnwwfHx8fDE3ODgyNjA1MjF8MA&ixlib=rb-4.1.0&q=85",
-    "controller_neon": "https://images.unsplash.com/photo-1585620385456-4759f9b5c7d9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MTN8MHwxfHNlYXJjaHwxfHxnYW1pbmclMjBwb3N0ZXIlMjBkYXJrJTIwYWN0aW9uJTIwZ2FtZXIlMjBjb250cm9sbGVyJTIwbmVvbnxlbnwwfHx8fDE3ODgyNjA1MjF8MA&ixlib=rb-4.1.0&q=85",
-    "game_products": {
-      "fivem_executor": "https://images.unsplash.com/photo-1766016642153-4063f568870c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NjV8MHwxfHNlYXJjaHwzfHxzdXBlcmNhciUyMG5pZ2h0JTIwbmVvbiUyMGNpdHklMjBkYXJrJTIwY3lhbnxlbnwwfHx8fDE3ODgyNjA1MjF8MA&ixlib=rb-4.1.0&q=85",
-      "rust_spoofer": "https://images.unsplash.com/photo-1622023346627-b7d48c4484a9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwxfHxjeWJlcnB1bmslMjBnYW1lJTIwY2hhcmFjdGVyJTIwZGFyayUyMGdsb3dpbmclMjBibHVlJTIwY3lhbnxlbnwwfHx8fDE3ODgyNjA1MTR8MA&ixlib=rb-4.1.0&q=85",
-      "warzone_suite": "https://images.unsplash.com/photo-1746365588568-3513fdefde2e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwyfHxjeWJlcnB1bmslMjBnYW1lJTIwY2hhcmFjdGVyJTIwZGFyayUyMGdsb3dpbmclMjBibHVlJTIwY3lhbnxlbnwwfHx8fDE3ODgyNjA1MTR8MA&ixlib=rb-4.1.0&q=85",
-      "valorant_radar": "https://images.unsplash.com/photo-1745402152421-7257dcfd2d19?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwzfHxjeWJlcnB1bmslMjBnYW1lJTIwY2hhcmFjdGVyJTIwZGFyayUyMGdsb3dpbmclMjBibHVlJTIwY3lhbnxlbnwwfHx8fDE3ODgyNjA1MTR8MA&ixlib=rb-4.1.0&q=85",
-      "apex_aimbot": "https://images.unsplash.com/photo-1746109971434-ca67785ce0d2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHw0fHxjeWJlcnB1bmslMjBnYW1lJTIwY2hhcmFjdGVyJTIwZGFyayUyMGdsb3dpbmclMjBibHVlJTIwY3lhbnxlbnwwfHx8fDE3ODgyNjA1MTR8MA&ixlib=rb-4.1.0&q=85",
-      "hwid_spoofer_standalone": "https://images.unsplash.com/photo-1759692788195-b95da1f4a04c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MTN8MHwxfHNlYXJjaHw0fHxnYW1pbmclMjBwb3N0ZXIlMjBkYXJrJTIwYWN0aW9uJTIwZ2FtZXIlMjBjb250cm9sbGVyJTIwbmVvbnxlbnwwfHx8fDE3ODgyNjA1MjF8MA&ixlib=rb-4.1.0&q=85"
-    }
-  },
-  "data_testid_conventions": {
-    "navigation": "data-testid=\"nav-link-{name}\", data-testid=\"nav-cart-trigger\", data-testid=\"nav-status-link\"",
-    "product_card": "data-testid=\"product-card-{id}\", data-testid=\"product-buy-button-{id}\", data-testid=\"product-status-badge-{id}\"",
-    "detail_modal": "data-testid=\"duration-option-{duration}\", data-testid=\"add-to-cart-button\", data-testid=\"instant-checkout-button\"",
-    "cart_drawer": "data-testid=\"cart-item-{id}\", data-testid=\"cart-email-input\", data-testid=\"cart-checkout-button\"",
-    "checkout_modal": "data-testid=\"checkout-email-input\", data-testid=\"pay-stripe-button\", data-testid=\"license-key-display\"",
-    "admin_dashboard": "data-testid=\"admin-login-input\", data-testid=\"admin-add-product-button\", data-testid=\"admin-status-select\""
-  },
   "instructions_to_main_agent": [
-    "1. Always read design_guidelines.json carefully before constructing or updating components.",
-    "2. Ensure all components use dark background (#06070B or #0B0E17) with electric cyan glow highlights (#00F0FF).",
-    "3. Implement full e-commerce flow: Home store -> Product Modal (1d/1w/1m) -> Cart Drawer -> Stripe/Guest Checkout -> Order Confirmation with License Key.",
-    "4. Ensure key pages (Status Page, Order Lookup, Admin Dashboard) are easily navigable via header/footer or URL routing/modal.",
-    "5. Use sonner for toast notifications when adding items to cart or copying license keys.",
-    "6. Include data-testid on all interactive elements as described in data_testid_conventions."
+    "Update tailwind.config.js and src/index.css to implement the deep navy/midnight blue palette (#050B18 base, #0A1628 surface, #2E6BFF royal blue accent) replacing any residual black/cyan theme.",
+    "Restyle the Header navigation bar with floating backdrop-blur-xl deep navy styling.",
+    "Redesign the Home Hero section with left-aligned headline 'Get the Upper Hand', royal blue accent line, Dual CTAs, quick stats row, and right-aligned cinematic character render with blue halo lighting.",
+    "Transform the product shop grid to use tall 3:4 portrait cards with full-bleed game/character artwork, status badge, price from tag, and circular blue arrow button.",
+    "Implement the Hype Drop page route (/drop) with large digital countdown timer, blurred teaser art, and email waitlist subscription form.",
+    "Ensure all components and buttons include data-testid attributes and high-contrast readable states.",
+    "Validate that cart drawer, checkout modal, order lookup, and admin panel match the polished navy theme."
   ]
 }

@@ -11,16 +11,16 @@ const REVIEWS = [
 
 function ReviewCard({ r }) {
   return (
-    <div className="w-80 shrink-0 mx-3 p-5 bg-[#0F1422]/80 border border-cyan-900/40 rounded-lg backdrop-blur-sm">
+    <div className="w-80 shrink-0 mx-3 p-5 bg-[#0F1F38]/80 border border-blue-900/40 rounded-lg backdrop-blur-sm">
       <div className="flex gap-1 mb-3">
         {Array.from({ length: 5 }).map((_, i) => (
-          <Star key={i} className="w-3.5 h-3.5 fill-cyan-400 text-cyan-400" />
+          <Star key={i} className="w-3.5 h-3.5 fill-blue-400 text-blue-400" />
         ))}
       </div>
       <p className="text-sm text-slate-300 leading-relaxed">"{r.text}"</p>
       <div className="mt-4 flex items-center justify-between">
         <span className="text-xs font-mono uppercase tracking-widest text-slate-400">{r.name}</span>
-        <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-500">{r.game}</span>
+        <span className="text-[10px] font-mono uppercase tracking-widest text-blue-500">{r.game}</span>
       </div>
     </div>
   );
@@ -29,10 +29,10 @@ function ReviewCard({ r }) {
 export default function ReviewsMarquee() {
   const doubled = [...REVIEWS, ...REVIEWS];
   return (
-    <section className="py-16 border-y border-cyan-500/10 bg-[#080A10] overflow-hidden" data-testid="reviews-section">
+    <section className="py-16 border-y border-blue-500/10 bg-[#07101F] overflow-hidden" data-testid="reviews-section">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8 flex items-end justify-between">
         <div>
-          <div className="text-xs font-mono uppercase tracking-[0.25em] text-cyan-400 mb-2">// Verified Buyers</div>
+          <div className="text-xs font-mono uppercase tracking-[0.25em] text-blue-400 mb-2">// Verified Buyers</div>
           <h2 className="font-display text-2xl sm:text-3xl font-extrabold uppercase tracking-tight">
             Word on the Street
           </h2>
@@ -45,8 +45,8 @@ export default function ReviewsMarquee() {
             <ReviewCard key={`${r.name}-${i}`} r={r} />
           ))}
         </div>
-        <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-[#06070B] to-transparent pointer-events-none" />
-        <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-[#06070B] to-transparent pointer-events-none" />
+        <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-[#050B18] to-transparent pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-[#050B18] to-transparent pointer-events-none" />
       </div>
     </section>
   );

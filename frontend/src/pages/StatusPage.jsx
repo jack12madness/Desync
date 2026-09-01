@@ -22,7 +22,7 @@ export default function StatusPage() {
       <main className="pt-28 pb-24 min-h-screen">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <div className="text-xs font-mono uppercase tracking-[0.25em] text-cyan-400 mb-2">// Live Feed</div>
+            <div className="text-xs font-mono uppercase tracking-[0.25em] text-blue-400 mb-2">// Live Feed</div>
             <h1 className="font-display text-3xl sm:text-4xl font-extrabold uppercase tracking-tight mb-3">
               Cheat Status Matrix
             </h1>
@@ -42,7 +42,7 @@ export default function StatusPage() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.06, duration: 0.4 }}
                   data-testid={`status-row-${r.id}`}
-                  className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 p-4 bg-[#0F1422] border border-cyan-900/40 rounded-lg hover:border-cyan-400/40 transition-colors duration-200"
+                  className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 p-4 bg-[#0F1F38] border border-blue-900/40 rounded-lg hover:border-blue-400/40 transition-colors duration-200"
                 >
                   <StatusPill status={r.status} testid={`status-pill-${r.id}`} />
                   <div className="flex-1 min-w-0">

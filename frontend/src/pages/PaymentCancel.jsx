@@ -16,7 +16,7 @@ export default function PaymentCancel() {
           <Link
             to="/"
             data-testid="cancel-back-link"
-            className="clip-tag mt-8 inline-flex items-center gap-2 px-8 py-4 bg-cyan-400 text-[#06070B] font-mono text-sm font-bold uppercase tracking-widest hover:bg-cyan-300 transition-all"
+            className="clip-tag mt-8 inline-flex items-center gap-2 px-8 py-4 bg-blue-400 text-[#050B18] font-mono text-sm font-bold uppercase tracking-widest hover:bg-blue-300 transition-all"
           >
             <ArrowLeft className="w-4 h-4" /> Back to the Armoury
           </Link>

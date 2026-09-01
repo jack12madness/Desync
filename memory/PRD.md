@@ -35,10 +35,18 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Backend: products/status/orders/checkout/webhook/admin endpoints, seeded 7 products, brute-safe auth, Mongo indexes
 - Stripe sandbox provisioned (claimable), EUR pricing, SMP tax handling with fallback
 
+## Implemented (2026-09-01, round 2)
+- Full redesign to deep navy/royal-blue cinematic theme (#050B18 base, #2E6BFF accent) per user feedback — closer to getcheats.gg reference: split hero with right-side character render + blue halo, blue underline accent headline, rounded-xl tall 3:4 portrait product cards with circular blue arrow CTA
+- Email key delivery via Emergent-managed Resend (email_utils.py, guardrail gate on every send): order keys emailed on payment fulfillment, waitlist confirmation emails
+- Hype drop page /drop: live countdown (target 2026-09-22T17:00Z), blurred teaser art, email waitlist with success state + live operator count
+- Waitlist backend: POST /api/waitlist (upsert), GET /api/waitlist/count, GET /api/admin/waitlist; admin dashboard Waitlist tab
+- Product art refreshed to cinematic soldier/character set
+
 ## Verified
-- API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden)
-- E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email)
+- API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
+- E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state
 - Fulfillment: signed webhook simulation → order paid → key VOID-635E-SP1H-3K7D issued → lookup returns it → success page renders keys
+- Email: order key email + waitlist confirmation both sent successfully via managed email proxy (test inbox delivered@resend.dev)
 - Admin UI: login, products tab, orders tab
 
 ## Backlog

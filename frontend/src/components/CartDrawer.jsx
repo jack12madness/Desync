@@ -36,7 +36,7 @@ export default function CartDrawer() {
     <Sheet open={isOpen} onOpenChange={(open) => !open && closeCart()}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-md bg-[#0B0E17] border-l border-cyan-500/20 text-slate-100 flex flex-col"
+        className="w-full sm:max-w-md bg-[#0A1628] border-l border-blue-500/20 text-slate-100 flex flex-col"
         data-testid="cart-drawer"
       >
         <SheetHeader>
@@ -55,7 +55,7 @@ export default function CartDrawer() {
             <div
               key={`${item.product.id}-${item.duration}`}
               data-testid={`cart-item-${item.product.id}`}
-              className="flex items-center gap-3 p-3 bg-[#0F1422] border border-cyan-900/40 rounded-lg"
+              className="flex items-center gap-3 p-3 bg-[#0F1F38] border border-blue-900/40 rounded-lg"
             >
               <img src={item.product.image_url} alt="" className="w-14 h-14 object-cover rounded-md saturate-[0.7]" />
               <div className="flex-1 min-w-0">
@@ -64,7 +64,7 @@ export default function CartDrawer() {
                   {item.product.game} // {DURATION_LABELS[item.duration]}
                 </div>
               </div>
-              <div className="font-mono text-sm font-bold text-cyan-300">{eur(item.price)}</div>
+              <div className="font-mono text-sm font-bold text-blue-300">{eur(item.price)}</div>
               <button
                 onClick={() => removeItem(idx)}
                 data-testid={`cart-remove-${item.product.id}`}
@@ -76,10 +76,10 @@ export default function CartDrawer() {
           ))}
         </div>
 
-        <div className="border-t border-cyan-500/10 pt-4 mt-4 space-y-4">
+        <div className="border-t border-blue-500/10 pt-4 mt-4 space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono uppercase tracking-[0.2em] text-slate-500">Subtotal</span>
-            <span className="font-mono text-xl font-bold text-cyan-300" data-testid="cart-subtotal">{eur(total)}</span>
+            <span className="font-mono text-xl font-bold text-blue-300" data-testid="cart-subtotal">{eur(total)}</span>
           </div>
           <div>
             <label className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-500 block mb-2">
@@ -91,14 +91,14 @@ export default function CartDrawer() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               data-testid="cart-email-input"
-              className="bg-[#06070B] border-slate-700 focus-visible:ring-cyan-400 font-mono text-sm"
+              className="bg-[#050B18] border-slate-700 focus-visible:ring-blue-400 font-mono text-sm"
             />
           </div>
           <button
             onClick={checkout}
             disabled={loading || items.length === 0}
             data-testid="cart-checkout-button"
-            className="clip-tag w-full inline-flex items-center justify-center gap-2 px-6 py-4 bg-cyan-400 text-[#06070B] font-mono text-sm font-bold uppercase tracking-[0.15em] hover:bg-cyan-300 hover:shadow-[0_0_40px_rgba(0,240,255,0.35)] disabled:opacity-40 disabled:pointer-events-none transition-all duration-300"
+            className="clip-tag w-full inline-flex items-center justify-center gap-2 px-6 py-4 bg-blue-400 text-[#050B18] font-mono text-sm font-bold uppercase tracking-[0.15em] hover:bg-blue-300 hover:shadow-[0_0_40px_rgba(46,107,255,0.35)] disabled:opacity-40 disabled:pointer-events-none transition-all duration-300"
           >
             <Lock className="w-4 h-4" />
             {loading ? "Redirecting to Stripe..." : "Checkout with Stripe"}

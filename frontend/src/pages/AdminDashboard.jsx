@@ -9,6 +9,7 @@ import StatusPill from "@/components/StatusPill";
 import { api, apiError, eur } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 import { DURATION_LABELS } from "@/context/CartContext";
+import WaitlistTab from "@/components/WaitlistTab";
 
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
@@ -47,12 +48,12 @@ function ProductForm({ initial, onSave, onClose }) {
     });
   };
 
-  const fieldCls = "bg-[#06070B] border-slate-700 focus-visible:ring-cyan-400 font-mono text-sm";
+  const fieldCls = "bg-[#050B18] border-slate-700 focus-visible:ring-blue-400 font-mono text-sm";
   const labelCls = "text-[10px] font-mono uppercase tracking-[0.25em] text-slate-500 block mb-1.5";
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl bg-[#0B0E17] border-cyan-500/20 text-slate-100 max-h-[90vh] overflow-y-auto" data-testid="product-form-modal">
+      <DialogContent className="max-w-2xl bg-[#0A1628] border-blue-500/20 text-slate-100 max-h-[90vh] overflow-y-auto" data-testid="product-form-modal">
         <DialogHeader>
           <DialogTitle className="font-display text-xl font-bold uppercase tracking-tight">
             {initial ? "Edit Product" : "New Product"}
@@ -81,7 +82,7 @@ function ProductForm({ initial, onSave, onClose }) {
               <SelectTrigger data-testid="admin-status-select" className={fieldCls}>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-[#0B0E17] border-slate-700 text-slate-100">
+              <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
                 <SelectItem value="undetected">Undetected</SelectItem>
                 <SelectItem value="updating">Updating</SelectItem>
                 <SelectItem value="testing">Testing</SelectItem>
@@ -114,7 +115,7 @@ function ProductForm({ initial, onSave, onClose }) {
                 checked={form.active}
                 onChange={(e) => set("active", e.target.checked)}
                 data-testid="product-form-active"
-                className="w-4 h-4 accent-cyan-400"
+                className="w-4 h-4 accent-blue-400"
               />
               <span className="text-xs font-mono uppercase tracking-widest text-slate-400">Visible in store</span>
             </label>
@@ -123,7 +124,7 @@ function ProductForm({ initial, onSave, onClose }) {
         <button
           onClick={save}
           data-testid="product-form-save"
-          className="clip-tag mt-6 w-full px-6 py-3 bg-cyan-400 text-[#06070B] font-mono text-sm font-bold uppercase tracking-widest hover:bg-cyan-300 transition-all"
+          className="clip-tag mt-6 w-full px-6 py-3 bg-blue-400 text-[#050B18] font-mono text-sm font-bold uppercase tracking-widest hover:bg-blue-300 transition-all"
         >
           Save Product
         </button>
@@ -222,15 +223,15 @@ export default function AdminDashboard() {
     );
   }
 
-  const fieldCls = "bg-[#06070B] border-slate-700 focus-visible:ring-cyan-400 font-mono text-sm";
+  const fieldCls = "bg-[#050B18] border-slate-700 focus-visible:ring-blue-400 font-mono text-sm";
 
   return (
     <div className="min-h-screen" data-testid="admin-dashboard">
-      <header className="border-b border-cyan-500/10 bg-[#0B0E17]/80 backdrop-blur-xl sticky top-0 z-40">
+      <header className="border-b border-blue-500/10 bg-[#0A1628]/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Terminal className="w-5 h-5 text-cyan-400" />
-            <span className="font-display font-extrabold uppercase tracking-tight">Void<span className="text-cyan-400">ware</span> Console</span>
+            <Terminal className="w-5 h-5 text-blue-400" />
+            <span className="font-display font-extrabold uppercase tracking-tight">Void<span className="text-blue-400">ware</span> Console</span>
             <span className="ml-3 text-[10px] font-mono uppercase tracking-widest text-slate-500">
               {admin.username} // {admin.role}
             </span>
@@ -243,11 +244,12 @@ export default function AdminDashboard() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <Tabs defaultValue="products">
-          <TabsList className="bg-[#0F1422] border border-cyan-900/40 mb-8">
-            <TabsTrigger value="products" data-testid="admin-tab-products" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-cyan-400 data-[state=active]:text-[#06070B]">Products</TabsTrigger>
-            <TabsTrigger value="orders" data-testid="admin-tab-orders" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-cyan-400 data-[state=active]:text-[#06070B]">Orders</TabsTrigger>
+          <TabsList className="bg-[#0F1F38] border border-blue-900/40 mb-8">
+            <TabsTrigger value="products" data-testid="admin-tab-products" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Products</TabsTrigger>
+            <TabsTrigger value="orders" data-testid="admin-tab-orders" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Orders</TabsTrigger>
+            <TabsTrigger value="waitlist" data-testid="admin-tab-waitlist" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Waitlist</TabsTrigger>
             {admin.role === "owner" && (
-              <TabsTrigger value="staff" data-testid="admin-tab-staff" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-cyan-400 data-[state=active]:text-[#06070B]">Staff</TabsTrigger>
+              <TabsTrigger value="staff" data-testid="admin-tab-staff" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Staff</TabsTrigger>
             )}
           </TabsList>
 
@@ -257,14 +259,14 @@ export default function AdminDashboard() {
               <button
                 onClick={() => setEditing({})}
                 data-testid="admin-add-product-button"
-                className="clip-tag-sm inline-flex items-center gap-2 px-4 py-2 bg-cyan-400 text-[#06070B] text-xs font-mono font-bold uppercase tracking-widest hover:bg-cyan-300 transition-all"
+                className="clip-tag-sm inline-flex items-center gap-2 px-4 py-2 bg-blue-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-blue-300 transition-all"
               >
                 <Plus className="w-4 h-4" /> Add Product
               </button>
             </div>
             <div className="space-y-3" data-testid="admin-products-list">
               {products.map((p) => (
-                <div key={p.id} className="flex flex-col lg:flex-row lg:items-center gap-4 p-4 bg-[#0F1422] border border-cyan-900/40 rounded-lg" data-testid={`admin-product-row-${p.id}`}>
+                <div key={p.id} className="flex flex-col lg:flex-row lg:items-center gap-4 p-4 bg-[#0F1F38] border border-blue-900/40 rounded-lg" data-testid={`admin-product-row-${p.id}`}>
                   <img src={p.image_url} alt="" className="w-16 h-16 object-cover rounded-md saturate-[0.7]" />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-slate-100">{p.name}</div>
@@ -275,7 +277,7 @@ export default function AdminDashboard() {
                   </div>
                   <StatusPill status={p.status} testid={`admin-product-status-${p.id}`} />
                   <div className="flex gap-2">
-                    <button onClick={() => setEditing(p)} data-testid={`admin-edit-product-${p.id}`} className="p-2 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-400/10 rounded transition-colors">
+                    <button onClick={() => setEditing(p)} data-testid={`admin-edit-product-${p.id}`} className="p-2 border border-blue-500/30 text-blue-300 hover:bg-blue-400/10 rounded transition-colors">
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button onClick={() => deleteProduct(p)} data-testid={`admin-delete-product-${p.id}`} className="p-2 border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 rounded transition-colors">
@@ -294,9 +296,9 @@ export default function AdminDashboard() {
                 <div className="text-center py-16 font-mono text-sm text-slate-500 uppercase tracking-[0.25em]">No orders yet</div>
               )}
               {orders.map((o) => (
-                <div key={o.id} className="p-4 bg-[#0F1422] border border-cyan-900/40 rounded-lg" data-testid={`admin-order-row-${o.id}`}>
+                <div key={o.id} className="p-4 bg-[#0F1F38] border border-blue-900/40 rounded-lg" data-testid={`admin-order-row-${o.id}`}>
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-3">
-                    <span className="font-mono text-sm text-cyan-300">{o.email}</span>
+                    <span className="font-mono text-sm text-blue-300">{o.email}</span>
                     <span className="font-mono text-sm font-bold text-slate-100">{eur(o.total)}</span>
                     <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 border clip-tag-sm ${
                       o.payment_status === "paid" ? "text-emerald-400 border-emerald-400/40" : "text-amber-400 border-amber-400/40"
@@ -309,7 +311,7 @@ export default function AdminDashboard() {
                     {o.items.map((it, i) => (
                       <div key={i} className="text-xs font-mono text-slate-400">
                         {it.name} ({it.duration_label})
-                        {it.license_key && <span className="text-cyan-400 ml-2">{it.license_key}</span>}
+                        {it.license_key && <span className="text-blue-400 ml-2">{it.license_key}</span>}
                       </div>
                     ))}
                   </div>
@@ -318,31 +320,35 @@ export default function AdminDashboard() {
             </div>
           </TabsContent>
 
+          <TabsContent value="waitlist">
+            <WaitlistTab />
+          </TabsContent>
+
           {admin.role === "owner" && (
             <TabsContent value="staff">
               <h2 className="font-display text-xl font-bold uppercase tracking-tight mb-6">Staff Accounts</h2>
-              <div className="p-5 bg-[#0F1422] border border-cyan-900/40 rounded-lg mb-6">
+              <div className="p-5 bg-[#0F1F38] border border-blue-900/40 rounded-lg mb-6">
                 <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-500 mb-4">Create admin — they log in at /admin with this username & password</div>
                 <div className="grid sm:grid-cols-4 gap-3">
                   <Input value={newUser.username} onChange={(e) => setNewUser((u) => ({ ...u, username: e.target.value }))} placeholder="username" data-testid="staff-username-input" className={fieldCls} />
                   <Input type="password" value={newUser.password} onChange={(e) => setNewUser((u) => ({ ...u, password: e.target.value }))} placeholder="password (6+ chars)" data-testid="staff-password-input" className={fieldCls} />
                   <Select value={newUser.role} onValueChange={(v) => setNewUser((u) => ({ ...u, role: v }))}>
                     <SelectTrigger data-testid="staff-role-select" className={fieldCls}><SelectValue /></SelectTrigger>
-                    <SelectContent className="bg-[#0B0E17] border-slate-700 text-slate-100">
+                    <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
                       <SelectItem value="admin">Admin</SelectItem>
                       <SelectItem value="owner">Owner</SelectItem>
                     </SelectContent>
                   </Select>
-                  <button onClick={createUser} data-testid="staff-create-button" className="clip-tag-sm px-4 py-2 bg-cyan-400 text-[#06070B] text-xs font-mono font-bold uppercase tracking-widest hover:bg-cyan-300 transition-all">
+                  <button onClick={createUser} data-testid="staff-create-button" className="clip-tag-sm px-4 py-2 bg-blue-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-blue-300 transition-all">
                     Create
                   </button>
                 </div>
               </div>
               <div className="space-y-2" data-testid="staff-list">
                 {users.map((u) => (
-                  <div key={u.id} className="flex items-center gap-4 p-3 bg-[#0F1422] border border-cyan-900/40 rounded-lg">
+                  <div key={u.id} className="flex items-center gap-4 p-3 bg-[#0F1F38] border border-blue-900/40 rounded-lg">
                     <span className="font-mono text-sm text-slate-100 flex-1">{u.username}</span>
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400">{u.role}</span>
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-blue-400">{u.role}</span>
                     {u.username !== admin.username && (
                       <button onClick={() => deleteUser(u)} data-testid={`staff-delete-${u.username}`} className="p-1.5 border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 rounded transition-colors">
                         <Trash2 className="w-3.5 h-3.5" />

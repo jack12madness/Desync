@@ -35,8 +35,8 @@ export default function AdminLogin() {
         className="relative w-full max-w-sm mx-4 p-8 glass-panel rounded-lg"
       >
         <div className="flex items-center gap-2 mb-2">
-          <Terminal className="w-5 h-5 text-cyan-400" />
-          <span className="font-display font-extrabold uppercase tracking-tight">Void<span className="text-cyan-400">ware</span> Staff</span>
+          <Terminal className="w-5 h-5 text-blue-400" />
+          <span className="font-display font-extrabold uppercase tracking-tight">Void<span className="text-blue-400">ware</span> Staff</span>
         </div>
         <p className="text-xs font-mono text-slate-500 uppercase tracking-widest mb-8">Restricted access // authorized only</p>
 
@@ -48,7 +48,7 @@ export default function AdminLogin() {
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               data-testid="admin-login-input"
-              className="bg-[#06070B] border-slate-700 focus-visible:ring-cyan-400 font-mono"
+              className="bg-[#050B18] border-slate-700 focus-visible:ring-blue-400 font-mono"
             />
           </div>
           <div>
@@ -59,20 +59,20 @@ export default function AdminLogin() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               data-testid="admin-password-input"
-              className="bg-[#06070B] border-slate-700 focus-visible:ring-cyan-400 font-mono"
+              className="bg-[#050B18] border-slate-700 focus-visible:ring-blue-400 font-mono"
             />
           </div>
           <button
             type="submit"
             disabled={loading}
             data-testid="admin-login-submit"
-            className="clip-tag w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-cyan-400 text-[#06070B] font-mono text-sm font-bold uppercase tracking-widest hover:bg-cyan-300 disabled:opacity-40 transition-all"
+            className="clip-tag w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-400 text-[#050B18] font-mono text-sm font-bold uppercase tracking-widest hover:bg-blue-300 disabled:opacity-40 transition-all"
           >
             <Lock className="w-4 h-4" /> {loading ? "Verifying..." : "Enter Console"}
           </button>
         </form>
 
-        <Link to="/" className="block mt-6 text-center text-xs font-mono uppercase tracking-widest text-slate-600 hover:text-cyan-300 transition-colors">
+        <Link to="/" className="block mt-6 text-center text-xs font-mono uppercase tracking-widest text-slate-600 hover:text-blue-300 transition-colors">
           ← Back to store
         </Link>
       </motion.div>

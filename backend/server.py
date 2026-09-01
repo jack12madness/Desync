@@ -12,6 +12,8 @@ import bcrypt
 import jwt
 import stripe
 
+from email_utils import send_order_email, send_waitlist_email
+
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
@@ -240,6 +242,7 @@ async def startup():
     await db.orders.create_index("id", unique=True)
     await db.orders.create_index("session_id")
     await db.orders.create_index("email")
+    await db.waitlist.create_index("email", unique=True)
     await seed_admin()
     await seed_products()
 
@@ -270,6 +273,34 @@ async def order_lookup(body: LookupIn):
         {"email": email, "payment_status": "paid"}, {"_id": 0}
     ).sort("created_at", -1).to_list(50)
     return docs
+
+
+class WaitlistIn(BaseModel):
+    email: EmailStr
+
+
+@api_router.post("/waitlist")
+async def join_waitlist(body: WaitlistIn):
+    email = body.email.lower()
+    await db.waitlist.update_one(
+        {"email": email},
+        {"$setOnInsert": {
+            "id": str(uuid.uuid4()), "email": email,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    count = await db.waitlist.count_documents({})
+    try:
+        await send_waitlist_email(email)
+    except Exception as e:
+        logger.error("Waitlist email failed for %s: %s", email, e)
+    return {"joined": True, "count": count}
+
+
+@api_router.get("/waitlist/count")
+async def waitlist_count():
+    return {"count": await db.waitlist.count_documents({})}
 
 
 # ---------- auth ----------
@@ -338,6 +369,11 @@ async def admin_orders(admin: dict = Depends(get_admin)):
     return await db.orders.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
 
 
+@api_router.get("/admin/waitlist")
+async def admin_waitlist(admin: dict = Depends(get_admin)):
+    return await db.waitlist.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+
+
 # ---------- admin: users ----------
 
 @api_router.get("/admin/users")
@@ -384,7 +420,7 @@ async def fulfill_order(session_id: str) -> Optional[dict]:
     for item in items:
         if not item.get("license_key"):
             item["license_key"] = gen_license_key()
-    await db.orders.update_one(
+    res = await db.orders.update_one(
         {"session_id": session_id, "payment_status": {"$ne": "paid"}},
         {"$set": {
             "status": "completed", "payment_status": "paid", "items": items,
@@ -392,6 +428,12 @@ async def fulfill_order(session_id: str) -> Optional[dict]:
         }},
     )
     updated = await db.orders.find_one({"session_id": session_id}, {"_id": 0})
+    if res.modified_count > 0 and updated:
+        try:
+            await send_order_email(updated)
+            await db.orders.update_one({"id": updated["id"]}, {"$set": {"email_sent": True}})
+        except Exception as e:
+            logger.error("Order email failed for %s: %s", updated.get("id"), e)
     return updated
 
 
