@@ -62,6 +62,11 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 ## Implemented (2026-09-01, round 7)
 - Animated loading splash: glitch-D halves slide in from opposite sides with a desync flicker, Desync wordmark, gradient progress bar, "Undetected. Unmatched." tagline, fades out after ~3s revealing the site (component: SplashScreen.jsx, mounted in App.js with AnimatePresence)
 
+## Implemented (2026-09-01, round 8)
+- SellAuth-style key stock: admin pastes real keys per product (bulk, one per line) via Key Manager in dashboard; on successful payment one available key is atomically assigned FIFO and delivered (confirmation page + email + My Orders). Out-of-stock items flag the order keys_pending and show "key being assigned" instead of a fake key. Sold keys show which order took them; available keys can be deleted; duplicate keys rejected
+- Admin login fully redesigned: split-screen with brand panel ("Run the whole operation."), GTA art backdrop, clean card form
+- Restored 5 missing products (were deleted during testing) with their new artwork
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state

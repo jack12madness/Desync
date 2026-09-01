@@ -146,7 +146,8 @@ async def send_order_email(order: dict) -> None:
             '<div style="color:#F1F5F9;font-weight:600;font-size:15px">' + escape(it["name"]) + '</div>'
             '<div style="color:#94A3B8;font-size:12px;margin-top:2px">'
             + escape(it["game"]) + ' &middot; ' + escape(it["duration_label"]) + '</div>'
-            + (_key_box(it["license_key"]) if it.get("license_key") else "")
+            + (_key_box(it["license_key"]) if it.get("license_key") else
+               '<div style="color:#F5C158;font-size:12px;margin-top:8px">Key is being assigned — it will appear on your My Orders page shortly.</div>')
             + '</td></tr>'
         )
     link_html = ""

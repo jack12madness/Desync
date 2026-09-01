@@ -10,6 +10,7 @@ import { api, apiError, eur } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 import { DURATION_LABELS } from "@/context/CartContext";
 import WaitlistTab from "@/components/WaitlistTab";
+import KeyManager from "@/components/KeyManager";
 
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
@@ -139,6 +140,8 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState([]);
   const [users, setUsers] = useState([]);
   const [editing, setEditing] = useState(null); // null | {} (new) | product
+  const [keysFor, setKeysFor] = useState(null); // product whose keys are being managed
+  const [stockCounts, setStockCounts] = useState({});
   const [newUser, setNewUser] = useState({ username: "", password: "", role: "admin" });
   const navigate = useNavigate();
 
@@ -157,7 +160,12 @@ export default function AdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadProducts = () => api.get("/admin/products").then(({ data }) => setProducts(data)).catch(() => {});
+  const loadProducts = () => {
+    api.get("/admin/products").then(({ data }) => setProducts(data)).catch(() => {});
+    loadStockCounts();
+  };
+  const loadStockCounts = () =>
+    api.get("/admin/keystock/counts").then(({ data }) => setStockCounts(data)).catch(() => {});
   const loadOrders = () => api.get("/admin/orders").then(({ data }) => setOrders(data)).catch(() => {});
   const loadUsers = () => api.get("/admin/users").then(({ data }) => setUsers(data)).catch(() => {});
 
@@ -276,6 +284,17 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <StatusPill status={p.status} testid={`admin-product-status-${p.id}`} />
+                  <button
+                    onClick={() => setKeysFor(p)}
+                    data-testid={`admin-keys-button-${p.id}`}
+                    className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                      (stockCounts[p.id] || 0) > 0
+                        ? "border-[#1E2D4A] text-slate-300 hover:border-[#2E6BFF]/50 hover:text-white"
+                        : "border-amber-400/40 text-amber-300 hover:border-amber-400"
+                    }`}
+                  >
+                    {stockCounts[p.id] || 0} keys · Manage
+                  </button>
                   <div className="flex gap-2">
                     <button onClick={() => setEditing(p)} data-testid={`admin-edit-product-${p.id}`} className="p-2 border border-blue-500/30 text-blue-300 hover:bg-blue-400/10 rounded transition-colors">
                       <Pencil className="w-4 h-4" />
@@ -361,6 +380,14 @@ export default function AdminDashboard() {
           )}
         </Tabs>
       </main>
+
+      {keysFor && (
+        <KeyManager
+          product={keysFor}
+          onClose={() => setKeysFor(null)}
+          onChanged={loadStockCounts}
+        />
+      )}
 
       {editing !== null && (
         <ProductForm

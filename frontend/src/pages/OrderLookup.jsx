@@ -20,21 +20,30 @@ export function KeyRow({ item }) {
           {item.game} · {item.duration_label}
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <code
-          data-testid={`license-key-${item.product_id}-${item.duration}`}
-          className="font-mono text-sm text-[#8FB8E8] bg-[#2E6BFF]/10 border border-[#2E6BFF]/30 px-3 py-1.5 rounded-md"
+      {item.license_key ? (
+        <div className="flex items-center gap-2">
+          <code
+            data-testid={`license-key-${item.product_id}-${item.duration}`}
+            className="font-mono text-sm text-[#8FB8E8] bg-[#2E6BFF]/10 border border-[#2E6BFF]/30 px-3 py-1.5 rounded-md"
+          >
+            {item.license_key}
+          </code>
+          <button
+            onClick={copy}
+            data-testid={`copy-key-${item.product_id}-${item.duration}`}
+            className="p-2 border border-[#2E6BFF]/30 text-[#8FB8E8] hover:bg-[#2E6BFF]/10 rounded-md transition-colors"
+          >
+            <Copy className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <span
+          data-testid={`key-pending-${item.product_id}-${item.duration}`}
+          className="text-xs px-3 py-1.5 rounded-md bg-amber-400/10 border border-amber-400/30 text-amber-300"
         >
-          {item.license_key}
-        </code>
-        <button
-          onClick={copy}
-          data-testid={`copy-key-${item.product_id}-${item.duration}`}
-          className="p-2 border border-[#2E6BFF]/30 text-[#8FB8E8] hover:bg-[#2E6BFF]/10 rounded-md transition-colors"
-        >
-          <Copy className="w-4 h-4" />
-        </button>
-      </div>
+          Key being assigned — check back shortly
+        </span>
+      )}
     </div>
   );
 }

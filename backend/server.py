@@ -243,6 +243,7 @@ async def startup():
     await db.orders.create_index("session_id")
     await db.orders.create_index("email")
     await db.waitlist.create_index("email", unique=True)
+    await db.keystock.create_index([("product_id", 1), ("status", 1)])
     await seed_admin()
     await seed_products()
 
@@ -374,6 +375,66 @@ async def admin_waitlist(admin: dict = Depends(get_admin)):
     return await db.waitlist.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
 
 
+# ---------- admin: key stock ----------
+
+class KeyStockIn(BaseModel):
+    product_id: str
+    keys: str
+
+
+@api_router.get("/admin/keystock/counts")
+async def keystock_counts(admin: dict = Depends(get_admin)):
+    pipeline = [
+        {"$match": {"status": "available"}},
+        {"$group": {"_id": "$product_id", "count": {"$sum": 1}}},
+    ]
+    rows = await db.keystock.aggregate(pipeline).to_list(500)
+    return {r["_id"]: r["count"] for r in rows}
+
+
+@api_router.get("/admin/keystock/{product_id}")
+async def keystock_list(product_id: str, admin: dict = Depends(get_admin)):
+    return await db.keystock.find({"product_id": product_id}, {"_id": 0}).sort("created_at", -1).to_list(2000)
+
+
+@api_router.post("/admin/keystock")
+async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
+    product = await db.products.find_one({"id": body.product_id}, {"_id": 0, "id": 1})
+    if not product:
+        raise HTTPException(404, "Product not found")
+    lines = [k.strip() for k in body.keys.replace("\r", "").split("\n")]
+    lines = [k for k in lines if k]
+    if not lines:
+        raise HTTPException(400, "No keys provided")
+    seen = set()
+    added, skipped = 0, 0
+    now = datetime.now(timezone.utc).isoformat()
+    for key in lines:
+        if key in seen:
+            skipped += 1
+            continue
+        seen.add(key)
+        exists = await db.keystock.find_one({"product_id": body.product_id, "key": key})
+        if exists:
+            skipped += 1
+            continue
+        await db.keystock.insert_one({
+            "id": str(uuid.uuid4()), "product_id": body.product_id, "key": key,
+            "status": "available", "assigned_order_id": None, "assigned_at": None,
+            "created_at": now,
+        })
+        added += 1
+    return {"added": added, "skipped": skipped}
+
+
+@api_router.delete("/admin/keystock/{key_id}")
+async def keystock_delete(key_id: str, admin: dict = Depends(get_admin)):
+    res = await db.keystock.delete_one({"id": key_id, "status": "available"})
+    if res.deleted_count == 0:
+        raise HTTPException(400, "Key not found or already assigned")
+    return {"deleted": True}
+
+
 # ---------- admin: users ----------
 
 @api_router.get("/admin/users")
@@ -417,13 +478,28 @@ async def fulfill_order(session_id: str) -> Optional[dict]:
     if not order or order.get("payment_status") == "paid":
         return order
     items = order["items"]
+    keys_pending = False
     for item in items:
         if not item.get("license_key"):
-            item["license_key"] = gen_license_key()
+            key_doc = await db.keystock.find_one_and_update(
+                {"product_id": item["product_id"], "status": "available"},
+                {"$set": {
+                    "status": "assigned",
+                    "assigned_order_id": order["id"],
+                    "assigned_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                sort=[("created_at", 1)],
+            )
+            if key_doc:
+                item["license_key"] = key_doc["key"]
+            else:
+                item["key_pending"] = True
+                keys_pending = True
     res = await db.orders.update_one(
         {"session_id": session_id, "payment_status": {"$ne": "paid"}},
         {"$set": {
             "status": "completed", "payment_status": "paid", "items": items,
+            "keys_pending": keys_pending,
             "paid_at": datetime.now(timezone.utc).isoformat(),
         }},
     )
