@@ -35,8 +35,8 @@ export default function AdminLogin() {
         className="relative w-full max-w-sm mx-4 p-8 glass-panel rounded-lg"
       >
         <div className="flex items-center gap-2.5 mb-2">
-          <span className="w-2.5 h-2.5 bg-[#2E6BFF] rounded-[2px] shadow-[0_0_14px_rgba(46,107,255,0.8)]" />
-          <span className="font-display font-extrabold tracking-tight">Void<span className="text-[#2E6BFF]">ware</span> Staff</span>
+          <img src="/images/logo.svg" alt="Desync logo" className="w-8 h-8 rounded-lg" />
+          <span className="font-display font-extrabold tracking-tight">De<span className="text-[#2E6BFF]">sync</span> Staff</span>
         </div>
         <p className="text-sm text-slate-500 mb-8">Sign in to manage the store</p>
 

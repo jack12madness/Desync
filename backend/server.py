@@ -88,7 +88,7 @@ async def require_owner(admin: dict = Depends(get_admin)) -> dict:
 def gen_license_key() -> str:
     alphabet = string.ascii_uppercase + string.digits
     groups = ["".join(secrets.choice(alphabet) for _ in range(4)) for _ in range(3)]
-    return "VOID-" + "-".join(groups)
+    return "DESYNC-" + "-".join(groups)
 
 
 def product_out(doc: dict) -> dict:
@@ -251,7 +251,7 @@ async def startup():
 
 @api_router.get("/")
 async def root():
-    return {"message": "VOIDWARE API online"}
+    return {"message": "Desync API online"}
 
 
 @api_router.get("/products")

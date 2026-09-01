@@ -31,7 +31,7 @@ export default function Hero() {
       <motion.div style={{ y: imgY }} className="absolute inset-0">
         <motion.img
           src={HERO_IMG}
-          alt="VOIDWARE crew"
+          alt="Desync crew"
           initial={{ opacity: 0, scale: 1.04 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
@@ -92,7 +92,7 @@ export default function Hero() {
                 className="block text-[#8FB8E8]"
                 data-testid="hero-line-1"
               >
-                with VOIDWARE
+                with Desync
               </motion.span>
             </span>
           </h1>

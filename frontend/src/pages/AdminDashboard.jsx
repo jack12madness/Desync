@@ -230,8 +230,8 @@ export default function AdminDashboard() {
       <header className="border-b border-blue-500/10 bg-[#0A1628]/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Terminal className="w-5 h-5 text-blue-400" />
-            <span className="font-display font-extrabold uppercase tracking-tight">Void<span className="text-blue-400">ware</span> Console</span>
+            <img src="/images/logo.svg" alt="Desync logo" className="w-7 h-7 rounded-lg" />
+            <span className="font-display font-extrabold tracking-tight">De<span className="text-blue-400">sync</span> Console</span>
             <span className="ml-3 text-[10px] font-mono uppercase tracking-widest text-slate-500">
               {admin.username} // {admin.role}
             </span>

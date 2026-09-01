@@ -6,9 +6,9 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-1 md:grid-cols-4 gap-10">
         <div className="md:col-span-2">
           <div className="flex items-center gap-2.5 mb-4">
-            <span className="w-2.5 h-2.5 bg-[#2E6BFF] rounded-[2px] shadow-[0_0_14px_rgba(46,107,255,0.8)]" />
+            <img src="/images/logo.svg" alt="Desync logo" className="w-8 h-8 rounded-lg" />
             <span className="font-display font-extrabold tracking-tight text-lg">
-              Void<span className="text-[#2E6BFF]">ware</span>
+              De<span className="text-[#2E6BFF]">sync</span>
             </span>
           </div>
           <p className="text-sm text-slate-400 max-w-sm leading-relaxed">
@@ -39,7 +39,7 @@ export default function Footer() {
       </div>
       <div className="border-t border-[#1E2D4A] py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between text-xs text-slate-600">
-          <span>© 2026 VOIDWARE</span>
+          <span>© 2026 Desync</span>
           <span>Undetected. Unmatched.</span>
         </div>
       </div>

@@ -52,6 +52,10 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Restyled: StatusPill (soft rounded pills), StatusBanner (clean trust strip), ProductModal, CartDrawer, ReviewsMarquee, Faq, Footer, StatusPage, OrderLookup, PaymentSuccess, PaymentCancel, AdminLogin, AdminDashboard (rounded buttons), DropPage
 - New staff account: Jack / Joise2701 (owner role), verified login
 
+## Implemented (2026-09-01, round 5)
+- Full rebrand VOIDWARE -> Desync: navbar/footer/admin logo + wordmark ("De[blue]sync[/blue]"), hero headline "with Desync", browser tab title + favicon + meta, email sender name (EMAIL_FROM_NAME), new license key prefix DESYNC-, API banner
+- Logo: custom SVG mark — glitched/desynced split "D" in blue gradient at /app/frontend/public/images/logo.svg (AI image generation was budget-blocked, so the mark is hand-crafted vector — crisp at any size, works as favicon)
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state

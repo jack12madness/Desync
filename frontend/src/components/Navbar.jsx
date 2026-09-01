@@ -23,9 +23,9 @@ export default function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <Link to="/" data-testid="nav-logo" className="flex items-center gap-2.5 group">
-          <span className="w-2.5 h-2.5 bg-[#2E6BFF] rounded-[2px] shadow-[0_0_14px_rgba(46,107,255,0.8)] group-hover:rotate-45 transition-transform duration-300" />
+          <img src="/images/logo.svg" alt="Desync logo" className="w-8 h-8 rounded-lg group-hover:scale-105 transition-transform duration-300" />
           <span className="font-display font-extrabold tracking-tight text-lg">
-            Void<span className="text-[#2E6BFF]">ware</span>
+            De<span className="text-[#2E6BFF]">sync</span>
           </span>
         </Link>
 
