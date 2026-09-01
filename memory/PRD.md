@@ -56,6 +56,9 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Full rebrand VOIDWARE -> Desync: navbar/footer/admin logo + wordmark ("De[blue]sync[/blue]"), hero headline "with Desync", browser tab title + favicon + meta, email sender name (EMAIL_FROM_NAME), new license key prefix DESYNC-, API banner
 - Logo: custom SVG mark — glitched/desynced split "D" in blue gradient at /app/frontend/public/images/logo.svg (AI image generation was budget-blocked, so the mark is hand-crafted vector — crisp at any size, works as favicon)
 
+## Implemented (2026-09-01, round 6)
+- Discord branding pack (vector-rendered, exact Discord sizes): server avatar 512x512, server banner 960x540 (mark + wordmark + tagline), welcome image 1920x640. Files at /app/assets/discord-pack/ and preview/downloadable on the site under /images/discord/. Generator: /app/scripts/gen_discord_pack.py
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state
