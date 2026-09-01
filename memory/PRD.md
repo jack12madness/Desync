@@ -42,6 +42,10 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Waitlist backend: POST /api/waitlist (upsert), GET /api/waitlist/count, GET /api/admin/waitlist; admin dashboard Waitlist tab
 - Product art refreshed to cinematic soldier/character set
 
+## Implemented (2026-09-01, round 3)
+- Hero rebuilt full-bleed to match getcheats.gg reference: edge-to-edge cinematic background, characters bleeding off right edge, overlaid headline "Get the Upper Hand / with VOIDWARE" with blue underline, light-blue "Search Products" pill + dark "Join Discord", icon stat row with dividers (3+ Years | 12k Customers | 18 Games), 5%-off chip bottom-left
+- Custom GTA-style key art generated via Gemini Nano Banana (EMERGENT_LLM_KEY), saved at /app/frontend/public/images/hero-gta.png; generator script at /app/scripts/gen_hero.py
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state
