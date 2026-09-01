@@ -34,41 +34,41 @@ export default function AdminLogin() {
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         className="relative w-full max-w-sm mx-4 p-8 glass-panel rounded-lg"
       >
-        <div className="flex items-center gap-2 mb-2">
-          <Terminal className="w-5 h-5 text-blue-400" />
-          <span className="font-display font-extrabold uppercase tracking-tight">Void<span className="text-blue-400">ware</span> Staff</span>
+        <div className="flex items-center gap-2.5 mb-2">
+          <span className="w-2.5 h-2.5 bg-[#2E6BFF] rounded-[2px] shadow-[0_0_14px_rgba(46,107,255,0.8)]" />
+          <span className="font-display font-extrabold tracking-tight">Void<span className="text-[#2E6BFF]">ware</span> Staff</span>
         </div>
-        <p className="text-xs font-mono text-slate-500 uppercase tracking-widest mb-8">Restricted access // authorized only</p>
+        <p className="text-sm text-slate-500 mb-8">Sign in to manage the store</p>
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-500 block mb-2">Username</label>
+            <label className="text-sm text-slate-300 block mb-2">Username</label>
             <Input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               data-testid="admin-login-input"
-              className="bg-[#050B18] border-slate-700 focus-visible:ring-blue-400 font-mono"
+              className="bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF]"
             />
           </div>
           <div>
-            <label className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-500 block mb-2">Password</label>
+            <label className="text-sm text-slate-300 block mb-2">Password</label>
             <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               data-testid="admin-password-input"
-              className="bg-[#050B18] border-slate-700 focus-visible:ring-blue-400 font-mono"
+              className="bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF]"
             />
           </div>
           <button
             type="submit"
             disabled={loading}
             data-testid="admin-login-submit"
-            className="clip-tag w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-400 text-[#050B18] font-mono text-sm font-bold uppercase tracking-widest hover:bg-blue-300 disabled:opacity-40 transition-all"
+            className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold shadow-[0_8px_24px_rgba(46,107,255,0.35)] disabled:opacity-40 transition-all duration-200"
           >
-            <Lock className="w-4 h-4" /> {loading ? "Verifying..." : "Enter Console"}
+            <Lock className="w-4 h-4" /> {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
 

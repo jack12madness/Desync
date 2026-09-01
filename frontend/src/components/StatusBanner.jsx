@@ -1,20 +1,20 @@
-const READOUTS = [
-  { k: "SYSTEMS", v: "NOMINAL", tone: "text-emerald-400" },
-  { k: "UPTIME 30D", v: "99.8%", tone: "text-blue-300" },
-  { k: "LAST STATUS SWEEP", v: "5 MIN AGO", tone: "text-blue-300" },
-  { k: "KEY DELIVERY", v: "INSTANT", tone: "text-emerald-400" },
-  { k: "SUPPORT", v: "24/7 DISCORD", tone: "text-blue-300" },
+import { Zap, Activity, Headphones, ShieldCheck } from "lucide-react";
+
+const ITEMS = [
+  { icon: Zap, label: "Instant key delivery" },
+  { icon: Activity, label: "Live status updates" },
+  { icon: Headphones, label: "24/7 Discord support" },
+  { icon: ShieldCheck, label: "Honest detection status" },
 ];
 
 export default function StatusBanner() {
   return (
-    <div className="border-y border-blue-500/10 bg-[#0A1628]/60" data-testid="status-banner">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center gap-x-10 gap-y-3 justify-center">
-        {READOUTS.map((r) => (
-          <div key={r.k} className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em]">
-            <span className="text-slate-600">{r.k}</span>
-            <span className="text-slate-700">//</span>
-            <span className={r.tone}>{r.v}</span>
+    <div className="border-y border-[#1E2D4A] bg-[#0A1628]/50" data-testid="status-banner">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-wrap items-center gap-x-10 gap-y-3 justify-center">
+        {ITEMS.map((item) => (
+          <div key={item.label} className="flex items-center gap-2.5">
+            <item.icon className="w-4 h-4 text-[#5B8CFF]" />
+            <span className="text-sm text-slate-300">{item.label}</span>
           </div>
         ))}
       </div>

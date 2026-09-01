@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, ArrowRight } from "lucide-react";
+import { CheckCircle2, Loader2, ArrowRight, Mail } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { KeyRow } from "@/pages/OrderLookup";
 import { api, eur } from "@/lib/api";
@@ -47,39 +47,40 @@ export default function PaymentSuccess() {
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
           {state.status === "polling" && (
             <div className="text-center py-24" data-testid="payment-polling">
-              <Loader2 className="w-10 h-10 text-blue-400 animate-spin mx-auto mb-6" />
-              <h1 className="font-display text-2xl font-bold uppercase tracking-tight">Confirming Payment</h1>
-              <p className="text-sm text-slate-400 mt-3 font-mono uppercase tracking-widest">Talking to Stripe...</p>
+              <Loader2 className="w-10 h-10 text-[#5B8CFF] animate-spin mx-auto mb-6" />
+              <h1 className="font-display text-2xl font-bold tracking-tight text-white">Confirming your payment</h1>
+              <p className="text-sm text-slate-400 mt-3">Talking to Stripe...</p>
             </div>
           )}
 
           {state.status === "paid" && state.order && (
-            <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>
+            <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>
               <div className="text-center mb-10">
                 <CheckCircle2 className="w-14 h-14 text-emerald-400 mx-auto mb-5" data-testid="payment-success-icon" />
-                <div className="text-xs font-mono uppercase tracking-[0.25em] text-blue-400 mb-2">// Payment Confirmed</div>
-                <h1 className="font-display text-3xl sm:text-4xl font-extrabold uppercase tracking-tight">
-                  You're Locked In
+                <div className="text-sm font-medium text-[#5B8CFF] mb-2">Payment confirmed</div>
+                <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-white">
+                  You're all set
                 </h1>
-                <p className="text-sm text-slate-400 mt-3">
-                  Keys are tied to <span className="text-blue-300 font-mono">{state.order.email}</span> — retrieve them anytime via My Orders.
+                <p className="text-sm text-slate-400 mt-3 flex items-center justify-center gap-2">
+                  <Mail className="w-4 h-4 text-[#5B8CFF]" />
+                  Keys emailed to <span className="text-slate-200">{state.order.email}</span>
                 </p>
               </div>
 
-              <div className="p-6 bg-[#0F1F38] border border-blue-500/30 rounded-lg shadow-[0_0_60px_rgba(46,107,255,0.08)]" data-testid="license-key-display">
-                <div className="flex items-center justify-between mb-5 text-xs font-mono uppercase tracking-widest text-slate-500">
-                  <span>ORDER {state.order.id.slice(0, 8).toUpperCase()}</span>
-                  <span className="text-blue-300">{eur(state.order.total)}</span>
+              <div className="p-6 bg-[#0A1628] border border-[#2E6BFF]/30 rounded-xl shadow-[0_0_60px_rgba(46,107,255,0.1)]" data-testid="license-key-display">
+                <div className="flex items-center justify-between mb-5 text-sm text-slate-400">
+                  <span>Order {state.order.id.slice(0, 8).toUpperCase()}</span>
+                  <span className="text-white font-mono font-semibold">{eur(state.order.total)}</span>
                 </div>
                 <div className="space-y-3">
                   {state.order.items.map((item) => (
                     <KeyRow key={`${item.product_id}-${item.duration}`} item={item} />
                   ))}
                 </div>
-                <div className="mt-6 p-4 border border-dashed border-blue-500/30 rounded text-xs text-slate-400 leading-relaxed">
-                  <span className="font-mono uppercase tracking-widest text-blue-400 block mb-2">Setup // 60 seconds</span>
+                <div className="mt-6 p-4 border border-dashed border-[#2E6BFF]/30 rounded-lg text-sm text-slate-400 leading-relaxed">
+                  <span className="text-white font-semibold block mb-2">Setup in 60 seconds</span>
                   1. Download the loader from the Discord #downloads channel.
-                  2. Run as Administrator, paste your key.
+                  2. Run as Administrator and paste your key.
                   3. Launch your game and press INSERT to open the menu.
                 </div>
               </div>
@@ -88,7 +89,7 @@ export default function PaymentSuccess() {
                 <Link
                   to="/orders"
                   data-testid="success-view-orders-link"
-                  className="inline-flex items-center gap-2 text-sm font-mono uppercase tracking-widest text-blue-300 hover:text-blue-200"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-[#8FB8E8] hover:text-white transition-colors"
                 >
                   View in My Orders <ArrowRight className="w-4 h-4" />
                 </Link>
@@ -98,12 +99,12 @@ export default function PaymentSuccess() {
 
           {(state.status === "error" || state.status === "timeout") && (
             <div className="text-center py-24" data-testid="payment-error-state">
-              <h1 className="font-display text-2xl font-bold uppercase tracking-tight">Still Processing</h1>
+              <h1 className="font-display text-2xl font-bold tracking-tight text-white">Still processing</h1>
               <p className="text-sm text-slate-400 mt-4 max-w-md mx-auto">
                 We couldn't confirm your payment yet. If you completed checkout, your keys will appear under
-                My Orders within a few minutes — or ping us on Discord.
+                My Orders within a few minutes — and in your email inbox.
               </p>
-              <Link to="/orders" className="mt-6 inline-flex items-center gap-2 text-sm font-mono uppercase tracking-widest text-blue-300">
+              <Link to="/orders" className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-[#8FB8E8] hover:text-white transition-colors">
                 Check My Orders <ArrowRight className="w-4 h-4" />
               </Link>
             </div>

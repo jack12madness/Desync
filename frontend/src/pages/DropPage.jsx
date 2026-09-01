@@ -79,8 +79,8 @@ export default function DropPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[#2E6BFF]/40 bg-[#2E6BFF]/10 mb-8">
               <Flame className="w-3.5 h-3.5 text-[#5B8CFF]" />
-              <span className="text-xs font-mono uppercase tracking-[0.25em] text-[#7FB0FF]" data-testid="drop-badge">
-                Next Drop // Classified
+              <span className="text-xs font-medium text-[#8FB8E8]" data-testid="drop-badge">
+                Next Drop
               </span>
             </div>
           </motion.div>

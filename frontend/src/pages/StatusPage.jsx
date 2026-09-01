@@ -22,9 +22,9 @@ export default function StatusPage() {
       <main className="pt-28 pb-24 min-h-screen">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <div className="text-xs font-mono uppercase tracking-[0.25em] text-blue-400 mb-2">// Live Feed</div>
-            <h1 className="font-display text-3xl sm:text-4xl font-extrabold uppercase tracking-tight mb-3">
-              Cheat Status Matrix
+            <div className="text-sm font-medium text-[#5B8CFF] mb-2">Live feed</div>
+            <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-white mb-3">
+              Cheat status
             </h1>
             <p className="text-sm text-slate-400 mb-10 max-w-xl">
               Honest, live status for every product. Never inject anything that isn't showing Undetected.
@@ -32,27 +32,27 @@ export default function StatusPage() {
           </motion.div>
 
           {loading ? (
-            <div className="py-20 text-center font-mono text-sm text-slate-500 uppercase tracking-[0.25em]">Scanning...</div>
+            <div className="py-20 text-center text-sm text-slate-500">Checking status...</div>
           ) : (
             <div className="space-y-3" data-testid="status-matrix">
               {rows.map((r, i) => (
                 <motion.div
                   key={r.id}
-                  initial={{ opacity: 0, x: -16 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.06, duration: 0.4 }}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05, duration: 0.4 }}
                   data-testid={`status-row-${r.id}`}
-                  className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 p-4 bg-[#0F1F38] border border-blue-900/40 rounded-lg hover:border-blue-400/40 transition-colors duration-200"
+                  className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 p-4 bg-[#0A1628] border border-[#1E2D4A] rounded-xl hover:border-[#2E6BFF]/40 transition-colors duration-200"
                 >
                   <StatusPill status={r.status} testid={`status-pill-${r.id}`} />
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-100 truncate">{r.name}</div>
-                    <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
-                      {r.game} // AC: {r.anticheat || "—"}
+                    <div className="font-semibold text-white truncate">{r.name}</div>
+                    <div className="text-xs text-slate-500">
+                      {r.game} · Anti-cheat: {r.anticheat || "—"}
                     </div>
                   </div>
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-slate-600">
-                    UPD {r.updated_at ? new Date(r.updated_at).toLocaleString() : "—"}
+                  <div className="text-xs text-slate-600">
+                    Updated {r.updated_at ? new Date(r.updated_at).toLocaleString() : "—"}
                   </div>
                 </motion.div>
               ))}

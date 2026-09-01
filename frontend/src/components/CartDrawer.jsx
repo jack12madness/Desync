@@ -36,35 +36,35 @@ export default function CartDrawer() {
     <Sheet open={isOpen} onOpenChange={(open) => !open && closeCart()}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-md bg-[#0A1628] border-l border-blue-500/20 text-slate-100 flex flex-col"
+        className="w-full sm:max-w-md bg-[#0A1628] border-l border-[#1E2D4A] text-slate-100 flex flex-col"
         data-testid="cart-drawer"
       >
         <SheetHeader>
-          <SheetTitle className="font-display text-xl font-bold uppercase tracking-tight text-slate-100">
-            Your Loadout
+          <SheetTitle className="font-display text-xl font-bold tracking-tight text-white">
+            Your Cart
           </SheetTitle>
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto mt-6 space-y-3 pr-1">
           {items.length === 0 && (
-            <div className="text-sm text-slate-500 font-mono uppercase tracking-widest text-center py-16" data-testid="cart-empty-state">
-              Cart is empty
+            <div className="text-sm text-slate-500 text-center py-16" data-testid="cart-empty-state">
+              Your cart is empty
             </div>
           )}
           {items.map((item, idx) => (
             <div
               key={`${item.product.id}-${item.duration}`}
               data-testid={`cart-item-${item.product.id}`}
-              className="flex items-center gap-3 p-3 bg-[#0F1F38] border border-blue-900/40 rounded-lg"
+              className="flex items-center gap-3 p-3 bg-[#050B18] border border-[#1E2D4A] rounded-lg"
             >
-              <img src={item.product.image_url} alt="" className="w-14 h-14 object-cover rounded-md saturate-[0.7]" />
+              <img src={item.product.image_url} alt="" className="w-14 h-14 object-cover rounded-md" />
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold truncate">{item.product.name}</div>
-                <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
-                  {item.product.game} // {DURATION_LABELS[item.duration]}
+                <div className="text-sm font-semibold truncate text-white">{item.product.name}</div>
+                <div className="text-xs text-slate-500">
+                  {item.product.game} · {DURATION_LABELS[item.duration]}
                 </div>
               </div>
-              <div className="font-mono text-sm font-bold text-blue-300">{eur(item.price)}</div>
+              <div className="font-mono text-sm font-bold text-[#8FB8E8]">{eur(item.price)}</div>
               <button
                 onClick={() => removeItem(idx)}
                 data-testid={`cart-remove-${item.product.id}`}
@@ -76,14 +76,14 @@ export default function CartDrawer() {
           ))}
         </div>
 
-        <div className="border-t border-blue-500/10 pt-4 mt-4 space-y-4">
+        <div className="border-t border-[#1E2D4A] pt-4 mt-4 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono uppercase tracking-[0.2em] text-slate-500">Subtotal</span>
-            <span className="font-mono text-xl font-bold text-blue-300" data-testid="cart-subtotal">{eur(total)}</span>
+            <span className="text-sm text-slate-400">Subtotal</span>
+            <span className="font-mono text-xl font-bold text-white" data-testid="cart-subtotal">{eur(total)}</span>
           </div>
           <div>
-            <label className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-500 block mb-2">
-              Delivery Email — your keys land here
+            <label className="text-sm text-slate-300 block mb-2">
+              Delivery email — your keys land here
             </label>
             <Input
               type="email"
@@ -91,21 +91,21 @@ export default function CartDrawer() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               data-testid="cart-email-input"
-              className="bg-[#050B18] border-slate-700 focus-visible:ring-blue-400 font-mono text-sm"
+              className="bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] text-sm h-11"
             />
           </div>
           <button
             onClick={checkout}
             disabled={loading || items.length === 0}
             data-testid="cart-checkout-button"
-            className="clip-tag w-full inline-flex items-center justify-center gap-2 px-6 py-4 bg-blue-400 text-[#050B18] font-mono text-sm font-bold uppercase tracking-[0.15em] hover:bg-blue-300 hover:shadow-[0_0_40px_rgba(46,107,255,0.35)] disabled:opacity-40 disabled:pointer-events-none transition-all duration-300"
+            className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold shadow-[0_8px_24px_rgba(46,107,255,0.35)] disabled:opacity-40 disabled:pointer-events-none transition-all duration-200 active:scale-95"
           >
             <Lock className="w-4 h-4" />
-            {loading ? "Redirecting to Stripe..." : "Checkout with Stripe"}
+            {loading ? "Redirecting to Stripe..." : "Checkout securely"}
             {!loading && <ArrowRight className="w-4 h-4" />}
           </button>
-          <p className="text-[10px] font-mono text-slate-600 text-center uppercase tracking-wider">
-            Instant key delivery after payment // Test mode
+          <p className="text-xs text-slate-600 text-center">
+            Keys are emailed to you instantly after payment
           </p>
         </div>
       </SheetContent>

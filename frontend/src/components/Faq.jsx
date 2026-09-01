@@ -3,7 +3,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 const FAQS = [
   {
     q: "How fast do I get my key?",
-    a: "Instantly. The second your payment clears, your license key appears on the confirmation page and is tied to your email. You can re-pull it anytime from the My Orders page.",
+    a: "Instantly. The second your payment clears, your license key is emailed to you and shown on the confirmation page. You can re-pull it anytime from the My Orders page.",
   },
   {
     q: "Is this safe to use on my main account?",
@@ -27,14 +27,14 @@ export default function Faq() {
   return (
     <section className="py-16 sm:py-24" data-testid="faq-section">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-xs font-mono uppercase tracking-[0.25em] text-blue-400 mb-2 text-center">// Intel</div>
-        <h2 className="font-display text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-center mb-10">
-          Questions, Answered Straight
+        <div className="text-sm font-medium text-[#5B8CFF] mb-2 text-center">Good to know</div>
+        <h2 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white text-center mb-10">
+          Questions, answered straight
         </h2>
         <Accordion type="single" collapsible>
           {FAQS.map((f, i) => (
-            <AccordionItem key={i} value={`faq-${i}`} className="border-blue-500/10" data-testid={`faq-item-${i}`}>
-              <AccordionTrigger className="text-left text-sm sm:text-base font-semibold text-slate-200 hover:text-blue-300 hover:no-underline">
+            <AccordionItem key={i} value={`faq-${i}`} className="border-[#1E2D4A]" data-testid={`faq-item-${i}`}>
+              <AccordionTrigger className="text-left text-sm sm:text-base font-semibold text-slate-200 hover:text-white hover:no-underline">
                 {f.q}
               </AccordionTrigger>
               <AccordionContent className="text-sm text-slate-400 leading-relaxed">

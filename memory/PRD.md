@@ -46,6 +46,12 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Hero rebuilt full-bleed to match getcheats.gg reference: edge-to-edge cinematic background, characters bleeding off right edge, overlaid headline "Get the Upper Hand / with VOIDWARE" with blue underline, light-blue "Search Products" pill + dark "Join Discord", icon stat row with dividers (3+ Years | 12k Customers | 18 Games), 5%-off chip bottom-left
 - Custom GTA-style key art generated via Gemini Nano Banana (EMERGENT_LLM_KEY), saved at /app/frontend/public/images/hero-gta.png; generator script at /app/scripts/gen_hero.py
 
+## Implemented (2026-09-01, round 4)
+- De-"AI robot" cleanup: removed terminal styling across all pages (no more mono HUD labels, // jargon, chamfer clips) — clean rounded buttons, pill filters, plain sans text matching the reference's clean navy look
+- Generated 7 custom GTA-style human product images (Nano Banana), saved locally in /app/frontend/public/images/ and wired into the catalog; generator at /app/scripts/gen_products.py
+- Restyled: StatusPill (soft rounded pills), StatusBanner (clean trust strip), ProductModal, CartDrawer, ReviewsMarquee, Faq, Footer, StatusPage, OrderLookup, PaymentSuccess, PaymentCancel, AdminLogin, AdminDashboard (rounded buttons), DropPage
+- New staff account: Jack / Joise2701 (owner role), verified login
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state

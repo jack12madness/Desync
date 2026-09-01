@@ -41,9 +41,9 @@ export default function Home() {
             transition={{ duration: 0.6 }}
             className="mb-10"
           >
-            <div className="text-xs font-mono uppercase tracking-[0.25em] text-blue-400 mb-2">// The Armoury</div>
-            <h2 className="font-display text-3xl sm:text-4xl font-extrabold uppercase tracking-tight">
-              Choose Your Weapon
+            <div className="text-sm font-medium text-[#5B8CFF] mb-2">Shop</div>
+            <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-white">
+              All cheats & hacks
             </h2>
           </motion.div>
 
@@ -53,10 +53,10 @@ export default function Home() {
                 key={g}
                 onClick={() => setFilter(g)}
                 data-testid={`filter-tab-${g.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-                className={`clip-tag-sm px-4 py-2 text-xs font-mono uppercase tracking-[0.15em] border transition-all duration-200 ${
+                className={`rounded-full px-5 py-2 text-sm font-medium border transition-all duration-200 ${
                   filter === g
-                    ? "bg-blue-400 text-[#050B18] border-blue-400 font-bold"
-                    : "border-slate-700/60 text-slate-400 hover:border-blue-500/40 hover:text-blue-300"
+                    ? "bg-[#2E6BFF] text-white border-[#2E6BFF]"
+                    : "border-[#1E2D4A] text-slate-400 hover:border-[#2E6BFF]/50 hover:text-white"
                 }`}
               >
                 {g}
@@ -65,8 +65,8 @@ export default function Home() {
           </div>
 
           {loading ? (
-            <div className="py-24 text-center font-mono text-sm text-slate-500 uppercase tracking-[0.25em]" data-testid="shop-loading">
-              Loading armoury...
+            <div className="py-24 text-center text-sm text-slate-500" data-testid="shop-loading">
+              Loading products...
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8" data-testid="product-grid">

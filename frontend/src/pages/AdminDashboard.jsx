@@ -124,7 +124,7 @@ function ProductForm({ initial, onSave, onClose }) {
         <button
           onClick={save}
           data-testid="product-form-save"
-          className="clip-tag mt-6 w-full px-6 py-3 bg-blue-400 text-[#050B18] font-mono text-sm font-bold uppercase tracking-widest hover:bg-blue-300 transition-all"
+          className="rounded-lg mt-6 w-full px-6 py-3 bg-blue-400 text-[#050B18] font-mono text-sm font-bold uppercase tracking-widest hover:bg-blue-300 transition-all"
         >
           Save Product
         </button>
@@ -259,7 +259,7 @@ export default function AdminDashboard() {
               <button
                 onClick={() => setEditing({})}
                 data-testid="admin-add-product-button"
-                className="clip-tag-sm inline-flex items-center gap-2 px-4 py-2 bg-blue-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-blue-300 transition-all"
+                className="rounded-lg inline-flex items-center gap-2 px-4 py-2 bg-blue-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-blue-300 transition-all"
               >
                 <Plus className="w-4 h-4" /> Add Product
               </button>
@@ -300,7 +300,7 @@ export default function AdminDashboard() {
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-3">
                     <span className="font-mono text-sm text-blue-300">{o.email}</span>
                     <span className="font-mono text-sm font-bold text-slate-100">{eur(o.total)}</span>
-                    <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 border clip-tag-sm ${
+                    <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 border rounded-lg ${
                       o.payment_status === "paid" ? "text-emerald-400 border-emerald-400/40" : "text-amber-400 border-amber-400/40"
                     }`}>
                       {o.payment_status}
@@ -339,7 +339,7 @@ export default function AdminDashboard() {
                       <SelectItem value="owner">Owner</SelectItem>
                     </SelectContent>
                   </Select>
-                  <button onClick={createUser} data-testid="staff-create-button" className="clip-tag-sm px-4 py-2 bg-blue-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-blue-300 transition-all">
+                  <button onClick={createUser} data-testid="staff-create-button" className="rounded-lg px-4 py-2 bg-blue-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-blue-300 transition-all">
                     Create
                   </button>
                 </div>
