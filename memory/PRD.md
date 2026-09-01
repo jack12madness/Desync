@@ -72,6 +72,12 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Low-stock alerts: when a pool drops to 4 keys (and again at 0), an alert email fires to the notification email set in admin (Orders tab -> Low-stock alerts card). Tested live to resend test inbox
 - Real Discord invite https://discord.gg/qh3aUNKcYc wired into every Join Discord link (navbar, hero, footer, drop page)
 
+## Implemented (2026-09-01, round 10)
+- Pending-Key Filler: orders that sold with an empty pool show "Keys pending — assign now" in admin Orders; one click pulls a key from the matching pool, updates the order and re-emails the buyer
+- Sales stats: dashboard top strip (Revenue / Paid Orders / Keys Sold / Waitlist) + per-product sales bars (GET /api/admin/stats)
+- Drop date & teaser now admin-editable (Launch tab) and served publicly via GET /api/drop-config; DropPage renders live settings. Currently set to 2026-10-01 18:00 UTC with sample teaser "SPECTRE v2 — full rewrite..." (owner should edit)
+- Go-live checklist in Launch tab: auto-checked items (alert email, Discord link, products live, pools stocked, drop date) + manual checkboxes (Stripe claimed, live test purchase, custom domain) persisted in settings
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state

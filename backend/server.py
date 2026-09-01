@@ -449,6 +449,9 @@ async def keystock_delete(key_id: str, admin: dict = Depends(get_admin)):
 
 class SettingsIn(BaseModel):
     notify_email: Optional[EmailStr] = None
+    drop_date: Optional[str] = None
+    drop_teaser: Optional[str] = None
+    checklist: Optional[dict] = None
 
 
 @api_router.get("/admin/settings")
@@ -459,12 +462,86 @@ async def get_settings(admin: dict = Depends(get_admin)):
 
 @api_router.put("/admin/settings")
 async def put_settings(body: SettingsIn, admin: dict = Depends(get_admin)):
+    updates = body.model_dump(exclude_none=True)
+    if "drop_date" in updates and updates["drop_date"] == "":
+        updates.pop("drop_date")
     await db.settings.update_one(
         {"id": "main"},
-        {"$set": {"id": "main", "notify_email": body.notify_email}},
+        {"$set": {"id": "main", **updates}},
         upsert=True,
     )
-    return {"id": "main", "notify_email": body.notify_email}
+    return await db.settings.find_one({"id": "main"}, {"_id": 0})
+
+
+# ---------- public: drop config ----------
+
+@api_router.get("/drop-config")
+async def drop_config():
+    doc = await db.settings.find_one({"id": "main"}, {"_id": 0, "drop_date": 1, "drop_teaser": 1})
+    doc = doc or {}
+    return {"drop_date": doc.get("drop_date"), "drop_teaser": doc.get("drop_teaser")}
+
+
+# ---------- admin: stats & key assignment ----------
+
+@api_router.get("/admin/stats")
+async def admin_stats(admin: dict = Depends(get_admin)):
+    pipeline = [
+        {"$match": {"payment_status": "paid"}},
+        {"$unwind": "$items"},
+        {"$group": {"_id": "$items.product_id", "sold": {"$sum": 1}, "revenue": {"$sum": "$items.unit_price"}}},
+    ]
+    rows = await db.orders.aggregate(pipeline).to_list(500)
+    by_product = {r["_id"]: {"sold": r["sold"], "revenue": round(r["revenue"], 2)} for r in rows}
+    paid = await db.orders.find({"payment_status": "paid"}, {"_id": 0, "total": 1}).to_list(10000)
+    return {
+        "total_revenue": round(sum(o.get("total", 0) for o in paid), 2),
+        "total_orders": len(paid),
+        "keys_sold": sum(v["sold"] for v in by_product.values()),
+        "waitlist": await db.waitlist.count_documents({}),
+        "by_product": by_product,
+    }
+
+
+@api_router.post("/admin/orders/{order_id}/assign-keys")
+async def admin_assign_keys(order_id: str, admin: dict = Depends(get_admin)):
+    order = await db.orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order.get("payment_status") != "paid":
+        raise HTTPException(400, "Order is not paid")
+    items = order["items"]
+    assigned = 0
+    still_pending = False
+    for item in items:
+        if item.get("key_pending") or not item.get("license_key"):
+            key_doc = await db.keystock.find_one_and_update(
+                {"product_id": item["product_id"], "duration": item["duration"], "status": "available"},
+                {"$set": {
+                    "status": "assigned",
+                    "assigned_order_id": order["id"],
+                    "assigned_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                sort=[("created_at", 1)],
+            )
+            if key_doc:
+                item["license_key"] = key_doc["key"]
+                item["key_pending"] = False
+                assigned += 1
+            else:
+                still_pending = True
+    if assigned:
+        await db.orders.update_one(
+            {"id": order_id},
+            {"$set": {"items": items, "keys_pending": still_pending,
+                      "updated_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        order["items"] = items
+        try:
+            await send_order_email(order)
+        except Exception as e:
+            logger.error("Resend keys email failed for %s: %s", order_id, e)
+    return {"assigned": assigned, "keys_pending": still_pending, "items": items}
 
 
 # ---------- admin: users ----------

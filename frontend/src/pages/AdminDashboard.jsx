@@ -11,6 +11,8 @@ import { toast } from "@/components/ui/sonner";
 import { DURATION_LABELS } from "@/context/CartContext";
 import WaitlistTab from "@/components/WaitlistTab";
 import KeyManager from "@/components/KeyManager";
+import SalesStats from "@/components/SalesStats";
+import LaunchTab from "@/components/LaunchTab";
 
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
@@ -234,6 +236,20 @@ export default function AdminDashboard() {
     navigate("/admin");
   };
 
+  const assignKeys = async (orderId) => {
+    try {
+      const { data } = await api.post(`/admin/orders/${orderId}/assign-keys`);
+      if (data.assigned > 0) {
+        toast.success(`${data.assigned} key${data.assigned === 1 ? "" : "s"} assigned and emailed to the buyer`);
+      } else {
+        toast.error("No keys available in the matching pools");
+      }
+      loadOrders();
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
+
   if (!admin) {
     return (
       <div className="min-h-screen flex items-center justify-center font-mono text-sm text-slate-500 uppercase tracking-[0.25em]">
@@ -262,11 +278,13 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <SalesStats />
         <Tabs defaultValue="products">
           <TabsList className="bg-[#0F1F38] border border-blue-900/40 mb-8">
             <TabsTrigger value="products" data-testid="admin-tab-products" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Products</TabsTrigger>
             <TabsTrigger value="orders" data-testid="admin-tab-orders" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Orders</TabsTrigger>
             <TabsTrigger value="waitlist" data-testid="admin-tab-waitlist" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Waitlist</TabsTrigger>
+            <TabsTrigger value="launch" data-testid="admin-tab-launch" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Launch</TabsTrigger>
             {admin.role === "owner" && (
               <TabsTrigger value="staff" data-testid="admin-tab-staff" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Staff</TabsTrigger>
             )}
@@ -357,6 +375,15 @@ export default function AdminDashboard() {
                       {o.payment_status}
                     </span>
                     <span className="text-[10px] font-mono text-slate-600">{new Date(o.created_at).toLocaleString()}</span>
+                    {o.keys_pending && (
+                      <button
+                        onClick={() => assignKeys(o.id)}
+                        data-testid={`assign-keys-${o.id}`}
+                        className="px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/40 text-amber-300 text-xs font-medium hover:bg-amber-400/20 transition-colors"
+                      >
+                        Keys pending — assign now
+                      </button>
+                    )}
                   </div>
                   <div className="space-y-1">
                     {o.items.map((it, i) => (
@@ -369,6 +396,10 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="launch">
+            <LaunchTab />
           </TabsContent>
 
           <TabsContent value="waitlist">

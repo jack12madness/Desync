@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { api, apiError } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 
-const DROP_DATE = new Date("2026-09-22T17:00:00Z");
-const TEASER_IMG =
-  "https://images.unsplash.com/photo-1700774606348-9249ec7fc882?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHwyfHxjeWJlcnB1bmslMjBzb2xkaWVyJTIwdGFjdGljYWwlMjBnYW1lciUyMG5lb24lMjBhY3Rpb24lMjB3YWxscGFwZXJ8ZW58MHx8fHwxNzg4MjYyMTA5fDA&ixlib=rb-4.1.0&q=85";
+const DEFAULT_DROP_DATE = new Date("2026-09-22T17:00:00Z");
+const DEFAULT_TEASER =
+  "Our next release is locked and in final testing. Join the drop list and be first through the door — early list gets first-key priority.";
+const TEASER_IMG = "/images/product-fivem-menu.png";
 
 function useCountdown(target) {
   const [now, setNow] = useState(Date.now());
@@ -29,13 +30,19 @@ function useCountdown(target) {
 const pad = (n) => String(n).padStart(2, "0");
 
 export default function DropPage() {
-  const { days, hours, minutes, seconds } = useCountdown(DROP_DATE);
+  const [dropDate, setDropDate] = useState(DEFAULT_DROP_DATE);
+  const [teaser, setTeaser] = useState(DEFAULT_TEASER);
+  const { days, hours, minutes, seconds } = useCountdown(dropDate);
   const [email, setEmail] = useState("");
   const [joined, setJoined] = useState(false);
   const [count, setCount] = useState(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    api.get("/drop-config").then(({ data }) => {
+      if (data.drop_date) setDropDate(new Date(data.drop_date));
+      if (data.drop_teaser) setTeaser(data.drop_teaser);
+    }).catch(() => {});
     api.get("/waitlist/count").then(({ data }) => setCount(data.count)).catch(() => {});
   }, []);
 
@@ -100,9 +107,9 @@ export default function DropPage() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.6 }}
             className="mt-5 text-base sm:text-lg text-slate-400 max-w-xl mx-auto"
+            data-testid="drop-teaser-text"
           >
-            Our next release is locked and in final testing. Join the drop list and be
-            first through the door — early list gets first-key priority.
+            {teaser}
           </motion.p>
 
           <motion.div
