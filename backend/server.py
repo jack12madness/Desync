@@ -5,7 +5,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)
 load_dotenv(os.path.join(_HERE, ".env"))
 
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Response
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
@@ -379,6 +379,17 @@ async def admin_orders(admin: dict = Depends(get_admin)):
 @api_router.get("/admin/waitlist")
 async def admin_waitlist(admin: dict = Depends(get_admin)):
     return await db.waitlist.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+
+
+@api_router.get("/admin/waitlist/export")
+async def admin_waitlist_export(admin: dict = Depends(get_admin)):
+    rows = await db.waitlist.find({}, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    lines = ["email,joined_at"] + [f"{r['email']},{r['created_at']}" for r in rows]
+    return Response(
+        "\n".join(lines),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=desync-waitlist.csv"},
+    )
 
 
 # ---------- admin: key stock ----------

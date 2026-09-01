@@ -93,6 +93,10 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Announce bot: Launch tab "Announce the drop" card — editable subject + message, confirm dialog, one click emails the entire waitlist with a shop link; records last-sent time; POST /api/admin/announce (tested: 1/1 delivered)
 - Fixed coupon-create response serialization (insert_one _id leak)
 
+## Implemented (2026-09-01, round 14)
+- Waitlist export: admin Waitlist tab "Export CSV" button downloads desync-waitlist.csv (email + joined date); GET /api/admin/waitlist/export (401 without auth, verified)
+- Redeploy pushed live with all changes since last deploy (Discord invite fix, coupons, per-duration stock, alerts, announce bot, export, stats, launch tab, email dual-path, startup hardening)
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state
