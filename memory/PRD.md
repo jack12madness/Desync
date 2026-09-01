@@ -59,6 +59,9 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 ## Implemented (2026-09-01, round 6)
 - Discord branding pack (vector-rendered, exact Discord sizes): server avatar 512x512, server banner 960x540 (mark + wordmark + tagline), welcome image 1920x640. Files at /app/assets/discord-pack/ and preview/downloadable on the site under /images/discord/. Generator: /app/scripts/gen_discord_pack.py
 
+## Implemented (2026-09-01, round 7)
+- Animated loading splash: glitch-D halves slide in from opposite sides with a desync flicker, Desync wordmark, gradient progress bar, "Undetected. Unmatched." tagline, fades out after ~3s revealing the site (component: SplashScreen.jsx, mounted in App.js with AnimatePresence)
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state
