@@ -5,7 +5,6 @@ import Hero from "@/components/Hero";
 import StatusBanner from "@/components/StatusBanner";
 import ProductCard from "@/components/ProductCard";
 import ProductModal from "@/components/ProductModal";
-import ReviewsMarquee from "@/components/ReviewsMarquee";
 import Faq from "@/components/Faq";
 import Footer from "@/components/Footer";
 import { api } from "@/lib/api";
@@ -78,7 +77,6 @@ export default function Home() {
         </div>
       </section>
 
-      <ReviewsMarquee />
       <Faq />
       <Footer />
 

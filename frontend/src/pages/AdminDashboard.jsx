@@ -13,6 +13,7 @@ import WaitlistTab from "@/components/WaitlistTab";
 import KeyManager from "@/components/KeyManager";
 import SalesStats from "@/components/SalesStats";
 import LaunchTab from "@/components/LaunchTab";
+import CouponsTab from "@/components/CouponsTab";
 
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
@@ -285,6 +286,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="orders" data-testid="admin-tab-orders" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Orders</TabsTrigger>
             <TabsTrigger value="waitlist" data-testid="admin-tab-waitlist" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Waitlist</TabsTrigger>
             <TabsTrigger value="launch" data-testid="admin-tab-launch" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Launch</TabsTrigger>
+            <TabsTrigger value="coupons" data-testid="admin-tab-coupons" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Coupons</TabsTrigger>
             {admin.role === "owner" && (
               <TabsTrigger value="staff" data-testid="admin-tab-staff" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Staff</TabsTrigger>
             )}
@@ -400,6 +402,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="launch">
             <LaunchTab />
+          </TabsContent>
+
+          <TabsContent value="coupons">
+            <CouponsTab />
           </TabsContent>
 
           <TabsContent value="waitlist">

@@ -5,9 +5,9 @@ import { ArrowRight, MessageCircle, Clock, Users, Gamepad2, Percent } from "luci
 const HERO_IMG = "/images/hero-gta.png";
 
 const stats = [
-  { icon: Clock, value: "3+", label: "Years" },
-  { icon: Users, value: "12k", label: "Customers" },
-  { icon: Gamepad2, value: "18", label: "Games" },
+  { icon: Clock, value: "24/7", label: "Support" },
+  { icon: Users, value: "Instant", label: "Delivery" },
+  { icon: Gamepad2, value: "7", label: "Games" },
 ];
 
 export default function Hero() {

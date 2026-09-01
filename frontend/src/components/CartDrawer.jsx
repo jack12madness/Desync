@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Lock, ArrowRight } from "lucide-react";
+import { X, Lock, ArrowRight, Tag } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { useCart, DURATION_LABELS } from "@/context/CartContext";
@@ -9,7 +9,27 @@ import { toast } from "@/components/ui/sonner";
 export default function CartDrawer() {
   const { items, removeItem, total, isOpen, closeCart } = useCart();
   const [email, setEmail] = useState(() => localStorage.getItem("void_email") || "");
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState(null);
+  const [checking, setChecking] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const discount = coupon ? (total * coupon.percent) / 100 : 0;
+  const payable = Math.max(0, total - discount);
+
+  const applyCoupon = async () => {
+    if (!couponInput.trim()) return;
+    setChecking(true);
+    try {
+      const { data } = await api.post("/coupons/validate", { code: couponInput.trim() });
+      setCoupon(data);
+      toast.success(`${data.code} applied — ${data.percent}% off`);
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setChecking(false);
+    }
+  };
 
   const checkout = async () => {
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
@@ -23,6 +43,7 @@ export default function CartDrawer() {
       const { data } = await api.post("/payments/checkout", {
         email,
         items: items.map((i) => ({ product_id: i.product.id, duration: i.duration })),
+        coupon: coupon ? coupon.code : null,
         origin_url: window.location.origin,
       });
       window.location.href = data.checkout_url;
@@ -77,10 +98,56 @@ export default function CartDrawer() {
         </div>
 
         <div className="border-t border-[#1E2D4A] pt-4 mt-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-400">Subtotal</span>
-            <span className="font-mono text-xl font-bold text-white" data-testid="cart-subtotal">{eur(total)}</span>
+          <div>
+            <label className="text-sm text-slate-300 block mb-2">Discount code</label>
+            {coupon ? (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-400/10 border border-emerald-400/30" data-testid="cart-coupon-applied">
+                <span className="flex items-center gap-2 text-sm text-emerald-300">
+                  <Tag className="w-4 h-4" /> {coupon.code} — {coupon.percent}% off
+                </span>
+                <button onClick={() => setCoupon(null)} data-testid="cart-coupon-remove" className="text-slate-500 hover:text-rose-400">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && applyCoupon()}
+                  placeholder="LAUNCH20"
+                  data-testid="cart-coupon-input"
+                  className="bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] text-sm h-10 font-mono uppercase"
+                />
+                <button
+                  onClick={applyCoupon}
+                  disabled={checking || !couponInput.trim()}
+                  data-testid="cart-coupon-apply"
+                  className="shrink-0 px-4 rounded-lg border border-[#2E6BFF]/40 text-[#8FB8E8] text-sm font-medium hover:bg-[#2E6BFF]/10 disabled:opacity-40 transition-all"
+                >
+                  {checking ? "..." : "Apply"}
+                </button>
+              </div>
+            )}
           </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-400">Subtotal</span>
+              <span className="font-mono text-sm text-slate-300" data-testid="cart-subtotal">{eur(total)}</span>
+            </div>
+            {coupon && (
+              <div className="flex items-center justify-between" data-testid="cart-discount-line">
+                <span className="text-sm text-emerald-300">Discount ({coupon.code})</span>
+                <span className="font-mono text-sm text-emerald-300">-{eur(discount)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between pt-1.5 border-t border-[#1E2D4A]">
+              <span className="text-sm font-semibold text-white">Total</span>
+              <span className="font-mono text-xl font-bold text-white" data-testid="cart-total">{eur(payable)}</span>
+            </div>
+          </div>
+
           <div>
             <label className="text-sm text-slate-300 block mb-2">
               Delivery email — your keys land here

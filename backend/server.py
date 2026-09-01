@@ -136,6 +136,7 @@ class CartItemIn(BaseModel):
 class CheckoutIn(BaseModel):
     email: EmailStr
     items: List[CartItemIn]
+    coupon: Optional[str] = None
     origin_url: str
 
 
@@ -549,6 +550,75 @@ async def admin_assign_keys(order_id: str, admin: dict = Depends(get_admin)):
     return {"assigned": assigned, "keys_pending": still_pending, "items": items}
 
 
+# ---------- coupons ----------
+
+class CouponIn(BaseModel):
+    code: str
+    percent: float
+    max_uses: Optional[int] = None
+    active: bool = True
+
+
+class CouponValidateIn(BaseModel):
+    code: str
+
+
+async def _find_valid_coupon(code: str) -> Optional[dict]:
+    c = await db.coupons.find_one({"code": code.strip().upper(), "active": True}, {"_id": 0})
+    if not c:
+        return None
+    if c.get("max_uses") is not None and c.get("used_count", 0) >= c["max_uses"]:
+        return None
+    return c
+
+
+@api_router.post("/coupons/validate")
+async def validate_coupon(body: CouponValidateIn):
+    c = await _find_valid_coupon(body.code)
+    if not c:
+        raise HTTPException(404, "Invalid or expired code")
+    return {"code": c["code"], "percent": c["percent"]}
+
+
+@api_router.get("/admin/coupons")
+async def admin_coupons(admin: dict = Depends(get_admin)):
+    return await db.coupons.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+
+
+@api_router.post("/admin/coupons")
+async def admin_create_coupon(body: CouponIn, admin: dict = Depends(get_admin)):
+    code = body.code.strip().upper()
+    if not code or len(code) < 3:
+        raise HTTPException(400, "Code must be 3+ characters")
+    if not (0 < body.percent <= 100):
+        raise HTTPException(400, "Percent must be between 1 and 100")
+    if await db.coupons.find_one({"code": code}):
+        raise HTTPException(409, "That code already exists")
+    doc = {
+        "id": str(uuid.uuid4()), "code": code, "percent": float(body.percent),
+        "max_uses": body.max_uses, "active": body.active, "used_count": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.coupons.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@api_router.put("/admin/coupons/{coupon_id}")
+async def admin_toggle_coupon(coupon_id: str, body: dict, admin: dict = Depends(get_admin)):
+    res = await db.coupons.update_one({"id": coupon_id}, {"$set": {"active": bool(body.get("active"))}})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Coupon not found")
+    return await db.coupons.find_one({"id": coupon_id}, {"_id": 0})
+
+
+@api_router.delete("/admin/coupons/{coupon_id}")
+async def admin_delete_coupon(coupon_id: str, admin: dict = Depends(get_admin)):
+    res = await db.coupons.delete_one({"id": coupon_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Coupon not found")
+    return {"deleted": True}
+
+
 # ---------- admin: users ----------
 
 @api_router.get("/admin/users")
@@ -632,6 +702,8 @@ async def fulfill_order(session_id: str) -> Optional[dict]:
     )
     updated = await db.orders.find_one({"session_id": session_id}, {"_id": 0})
     if res.modified_count > 0 and updated:
+        if updated.get("coupon_code"):
+            await db.coupons.update_one({"code": updated["coupon_code"]}, {"$inc": {"used_count": 1}})
         try:
             await send_order_email(updated)
             await db.orders.update_one({"id": updated["id"]}, {"$set": {"email_sent": True}})
@@ -645,9 +717,18 @@ async def create_checkout(body: CheckoutIn):
     if not body.items:
         raise HTTPException(400, "Cart is empty")
     email = body.email.lower()
+    discount_pct = 0.0
+    coupon_code = None
+    if body.coupon:
+        c = await _find_valid_coupon(body.coupon)
+        if not c:
+            raise HTTPException(400, "Invalid or expired coupon code")
+        discount_pct = float(c["percent"])
+        coupon_code = c["code"]
     line_items = []
     order_items = []
     total_cents = 0
+    subtotal_cents = 0
     for item in body.items:
         if item.duration not in DURATIONS:
             raise HTTPException(400, f"Invalid duration: {item.duration}")
@@ -657,7 +738,8 @@ async def create_checkout(body: CheckoutIn):
         price = product.get("prices", {}).get(item.duration)
         if price is None:
             raise HTTPException(400, f"Duration not available for {product['name']}")
-        unit_cents = int(round(float(price) * 100))
+        subtotal_cents += int(round(float(price) * 100))
+        unit_cents = int(round(float(price) * 100 * (1 - discount_pct / 100)))
         total_cents += unit_cents
         label = DURATIONS[item.duration]
         line_items.append({
@@ -707,6 +789,8 @@ async def create_checkout(body: CheckoutIn):
     await db.orders.insert_one({
         "id": order_id, "session_id": session.id, "email": email,
         "items": order_items, "total": total_cents / 100.0, "currency": "eur",
+        "subtotal": subtotal_cents / 100.0, "discount_percent": discount_pct,
+        "coupon_code": coupon_code,
         "status": "initiated", "payment_status": "pending",
         "created_at": now, "updated_at": now,
     })

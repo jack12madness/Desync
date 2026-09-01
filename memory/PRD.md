@@ -82,6 +82,12 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Branded sender readiness: email_utils send_email now uses direct Resend API when RESEND_API_KEY + EMAIL_FROM_ADDRESS env vars are present (own verified domain, e.g. keys@desync.gg), else falls back to Emergent-managed sender. Awaiting user's domain + Resend key
 - Production 520 fix: absolute-path load_dotenv + sys.path hardening in server.py (prod-import-safe from any cwd); root cause was Cloudflare edge routing pointer for /api/*, remedy = redeploy (user confirmed, redeploy in progress)
 
+## Implemented (2026-09-01, round 12)
+- Discount codes: admin Coupons tab (create % codes, optional max uses, enable/disable, delete, usage counter); cart has code field with applied chip, discount line and new total; server re-validates at checkout and computes discounted Stripe amounts server-side; used_count increments only on paid fulfillment
+- Removed fake reviews section from home; hero stats replaced with factual ones (24/7 Support, Instant Delivery, 7 Games)
+- Live-site 520 confirmed fixed by user after redeploy
+- Test coupon LAUNCH20 (20% off, max 5 uses) exists in admin
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state
