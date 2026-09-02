@@ -80,15 +80,6 @@ export default function DropPage() {
           <div className="absolute inset-0 bg-gradient-to-b from-[#050B18]/80 via-[#050B18]/60 to-[#050B18]" />
           <div className="absolute inset-0 grid-overlay opacity-60" />
           <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[560px] h-[560px] rounded-full bg-[#2E6BFF]/15 blur-[140px]" />
-          <motion.img
-            src="/images/character-franklin.png"
-            alt=""
-            initial={{ opacity: 0, x: 80 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3, duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute bottom-0 right-[4%] h-[62%] xl:h-[70%] w-auto object-contain object-bottom hidden lg:block opacity-90 pointer-events-none drop-shadow-[0_30px_60px_rgba(0,0,0,0.65)]"
-            data-testid="drop-franklin"
-          />
         </div>
 
         <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 text-center py-20 w-full">

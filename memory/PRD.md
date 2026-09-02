@@ -113,6 +113,10 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 ## Implemented (2026-09-02, round 19)
 - Drop page AI Franklin replaced with the REAL Franklin cropped from the user's own trio cutout (alpha-edge crop x468-700 of hero-crew.png, 232x353 RGBA) at /app/frontend/public/images/character-franklin.png; drop page figure restyled to bottom-anchored object-contain cutout. Entire site now uses the user's own character art
 
+## Implemented (2026-09-02, round 20)
+- Removed the Franklin cutout from the drop page per user (didn't like it) — drop page back to clean blurred backdrop
+- Home hero crew scaled way up (~76-88% width, right-bleed) to match the old full-bleed presence while keeping the user's exact photo characters
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state
