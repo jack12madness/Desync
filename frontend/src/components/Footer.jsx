@@ -33,6 +33,7 @@ export default function Footer() {
           <ul className="space-y-2.5 text-sm text-slate-400">
             <li><a href="https://discord.gg/GapTZMAY7v" target="_blank" rel="noopener noreferrer" data-testid="footer-link-discord" className="hover:text-white transition-colors">Discord Server</a></li>
             <li><Link to="/terms" data-testid="footer-link-terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
+            <li><Link to="/privacy" data-testid="footer-link-privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
             <li><Link to="/admin" data-testid="footer-link-staff" className="hover:text-white transition-colors">Staff Login</Link></li>
           </ul>
         </div>

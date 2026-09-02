@@ -15,6 +15,7 @@ export default function CartDrawer() {
   const [email, setEmail] = useState(() => localStorage.getItem("void_email") || "");
   const [couponInput, setCouponInput] = useState("");
   const [coupon, setCoupon] = useState(null);
+  const [agreed, setAgreed] = useState(false);
   const [checking, setChecking] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -45,6 +46,10 @@ export default function CartDrawer() {
   const checkout = async () => {
     if (!validEmail) {
       toast.error("Enter a valid email — your keys are delivered there");
+      return;
+    }
+    if (!agreed) {
+      toast.error("Please agree to the Terms of Service first");
       return;
     }
     if (items.length === 0) return;
@@ -171,9 +176,30 @@ export default function CartDrawer() {
             />
           </div>
 
+          <label className="flex items-start gap-3 cursor-pointer select-none" data-testid="terms-agree-label">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              data-testid="terms-agree-checkbox"
+              className="mt-0.5 w-4 h-4 shrink-0 accent-[#2E6BFF]"
+            />
+            <span className="text-xs text-slate-400 leading-relaxed">
+              I have read and agree to the{" "}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" data-testid="terms-agree-link" className="text-[#7FB0FF] hover:text-white underline underline-offset-2 transition-colors">
+                Terms of Service
+              </a>{" "}
+              and{" "}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" data-testid="privacy-agree-link" className="text-[#7FB0FF] hover:text-white underline underline-offset-2 transition-colors">
+                Privacy Policy
+              </a>
+              . All sales are final except where required by law.
+            </span>
+          </label>
+
           <button
             onClick={checkout}
-            disabled={loading || items.length === 0}
+            disabled={loading || items.length === 0 || !agreed}
             data-testid="cart-checkout-button"
             className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold shadow-[0_8px_24px_rgba(46,107,255,0.35)] disabled:opacity-40 disabled:pointer-events-none transition-all duration-200 active:scale-95"
           >

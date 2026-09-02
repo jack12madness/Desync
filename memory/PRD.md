@@ -12,6 +12,12 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-02 — TOS checkbox, Privacy Policy, admin tab cleanup
+- Cart now requires agreeing to Terms of Service + Privacy Policy (checkbox, links to /terms and /privacy) before the Pay button enables; toast error if skipped
+- New Privacy Policy page at /privacy (13 sections, Australian privacy law, footer link)
+- Launch and Waitlist admin tabs removed (files deleted); admin tabs now: Products, Categories, Orders, Coupons, Staff. Backend waitlist endpoints remain but unused by UI
+- Note: SalesStats shows a "Deleted product" row for historical orders of removed products (cosmetic, admin-only)
+
 ### 2026-09-02 — TOS page, Next Drop removed
 - New Terms of Service page at /terms (19 sections, linked in footer; dates filled 2 September 2026, Queensland/Australia, EUR, delync.gg@hotmail.com)
 - Next Drop page removed: /drop route gone, nav + footer links removed, DropPage.jsx deleted. Backend waitlist endpoints + admin Waitlist/Launch tabs still exist (now have no public page)

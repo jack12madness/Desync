@@ -9,10 +9,8 @@ import StatusPill from "@/components/StatusPill";
 import { api, apiError, eur } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 import { DURATION_LABELS } from "@/context/CartContext";
-import WaitlistTab from "@/components/WaitlistTab";
 import KeyManager from "@/components/KeyManager";
 import SalesStats from "@/components/SalesStats";
-import LaunchTab from "@/components/LaunchTab";
 import CouponsTab from "@/components/CouponsTab";
 import CategoriesTab from "@/components/CategoriesTab";
 
@@ -303,8 +301,6 @@ export default function AdminDashboard() {
             <TabsTrigger value="products" data-testid="admin-tab-products" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Products</TabsTrigger>
             <TabsTrigger value="categories" data-testid="admin-tab-categories" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Categories</TabsTrigger>
             <TabsTrigger value="orders" data-testid="admin-tab-orders" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Orders</TabsTrigger>
-            <TabsTrigger value="waitlist" data-testid="admin-tab-waitlist" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Waitlist</TabsTrigger>
-            <TabsTrigger value="launch" data-testid="admin-tab-launch" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Launch</TabsTrigger>
             <TabsTrigger value="coupons" data-testid="admin-tab-coupons" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Coupons</TabsTrigger>
             {admin.role === "owner" && (
               <TabsTrigger value="staff" data-testid="admin-tab-staff" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Staff</TabsTrigger>
@@ -423,16 +419,8 @@ export default function AdminDashboard() {
             </div>
           </TabsContent>
 
-          <TabsContent value="launch">
-            <LaunchTab />
-          </TabsContent>
-
           <TabsContent value="coupons">
             <CouponsTab />
-          </TabsContent>
-
-          <TabsContent value="waitlist">
-            <WaitlistTab />
           </TabsContent>
 
           {admin.role === "owner" && (
