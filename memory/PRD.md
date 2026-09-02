@@ -120,6 +120,9 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 ## Implemented (2026-09-02, round 21)
 - PayPal checkout (SANDBOX keys from user): gold PayPal button + PayPal-hosted "Debit or Credit Card" in cart drawer next to Stripe. Backend: OAuth token cache, POST /api/paypal/create (validates cart + coupon server-side, EUR, internal order with payment_provider=paypal), POST /api/paypal/capture (captures then fulfills via shared _fulfill_order), GET /api/orders/by-id/{id} for the success page. PaymentSuccess handles ?order= (PayPal) and ?session_id= (Stripe). Frontend env REACT_APP_PAYPAL_CLIENT_ID; backend env PAYPAL_CLIENT_ID/SECRET/BASE_URL (sandbox api-m.sandbox.paypal.com). To go live: swap to live PayPal app keys + PAYPAL_BASE_URL=https://api-m.paypal.com
 
+## Implemented (2026-09-02, round 22)
+- Hero quality fix: user's cutout was 707px and blurry at hero size. AI-upscaled the exact photo 2x to 1442x720 (identity-locked enhance pass, /app/scripts/upscale_crew.py), then cut the white background with a border-flood scipy cutout + edge erosion/feather (/app/scripts/cutout_crew_fast.py — rembg kept getting killed by the exec sandbox). Characters pixel-identical, now sharp at hero size. Note: PayPal + hero art still awaiting a republish to hit the live site
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state
