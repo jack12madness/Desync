@@ -12,6 +12,10 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-02 — TOS page, Next Drop removed
+- New Terms of Service page at /terms (19 sections, linked in footer; dates filled 2 September 2026, Queensland/Australia, EUR, delync.gg@hotmail.com)
+- Next Drop page removed: /drop route gone, nav + footer links removed, DropPage.jsx deleted. Backend waitlist endpoints + admin Waitlist/Launch tabs still exist (now have no public page)
+
 ### 2026-09-02 — Coupons, Categories, Sold-out, PayPal hidden
 - DESYNC10 coupon: 10% sitewide, only active code (old 5% deleted). Hero chip + cart placeholder updated
 - Categories: `categories` collection; public GET /api/categories; admin create/delete (delete blocked when products assigned); admin Categories tab; product form "Game" field is now a category dropdown

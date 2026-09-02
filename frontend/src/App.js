@@ -13,7 +13,7 @@ import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
-import DropPage from "@/pages/DropPage";
+import TermsPage from "@/pages/TermsPage";
 
 function App() {
   const [splash, setSplash] = useState(true);
@@ -47,7 +47,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/status" element={<StatusPage />} />
             <Route path="/orders" element={<OrderLookup />} />
-            <Route path="/drop" element={<DropPage />} />
+            <Route path="/terms" element={<TermsPage />} />
             <Route path="/payment/success" element={<PaymentSuccess />} />
             <Route path="/payment/cancel" element={<PaymentCancel />} />
             <Route path="/admin" element={<AdminLogin />} />

@@ -26,13 +26,13 @@ export default function Footer() {
             <li><a href="/#shop" data-testid="footer-link-shop" className="hover:text-white transition-colors">All Products</a></li>
             <li><Link to="/status" data-testid="footer-link-status" className="hover:text-white transition-colors">Cheat Status</Link></li>
             <li><Link to="/orders" data-testid="footer-link-orders" className="hover:text-white transition-colors">My Orders</Link></li>
-            <li><Link to="/drop" data-testid="footer-link-drop" className="hover:text-white transition-colors">Next Drop</Link></li>
           </ul>
         </div>
         <div>
           <div className="text-sm font-semibold text-white mb-4">Support</div>
           <ul className="space-y-2.5 text-sm text-slate-400">
             <li><a href="https://discord.gg/GapTZMAY7v" target="_blank" rel="noopener noreferrer" data-testid="footer-link-discord" className="hover:text-white transition-colors">Discord Server</a></li>
+            <li><Link to="/terms" data-testid="footer-link-terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
             <li><Link to="/admin" data-testid="footer-link-staff" className="hover:text-white transition-colors">Staff Login</Link></li>
           </ul>
         </div>

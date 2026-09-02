@@ -8,7 +8,6 @@ const links = [
   { label: "Shop", to: "/#shop", testid: "nav-link-shop", anchor: true },
   { label: "Status", to: "/status", testid: "nav-link-status" },
   { label: "My Orders", to: "/orders", testid: "nav-link-orders" },
-  { label: "Next Drop", to: "/drop", testid: "nav-link-drop" },
 ];
 
 export default function Navbar() {
