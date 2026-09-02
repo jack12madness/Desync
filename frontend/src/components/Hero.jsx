@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, MessageCircle, Clock, Users, Gamepad2, Percent } from "lucide-react";
 
-const HERO_IMG = "/images/hero-gta.png";
+const HERO_IMG = "/images/hero-crew.png";
 
 const stats = [
   { icon: Clock, value: "24/7", label: "Support" },
@@ -27,26 +27,17 @@ export default function Hero() {
         }}
       />
 
-      {/* character art bleeding off the right edge */}
-      <motion.div style={{ y: imgY }} className="absolute inset-0">
+      {/* character cutout standing off the right edge */}
+      <motion.div style={{ y: imgY }} className="absolute inset-0 pointer-events-none">
         <motion.img
           src={HERO_IMG}
           alt="Desync crew"
-          initial={{ opacity: 0, scale: 1.04 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute right-0 top-0 h-full w-full object-cover object-right"
-          style={{
-            maskImage:
-              "linear-gradient(to right, transparent 8%, rgba(0,0,0,0.55) 38%, black 62%), linear-gradient(to top, transparent 2%, black 34%)",
-            maskComposite: "intersect",
-            WebkitMaskImage:
-              "linear-gradient(to right, transparent 8%, rgba(0,0,0,0.55) 38%, black 62%), linear-gradient(to top, transparent 2%, black 34%)",
-            WebkitMaskComposite: "source-in",
-          }}
+          initial={{ opacity: 0, x: 60 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+          className="absolute bottom-0 right-0 w-[78%] sm:w-[64%] lg:w-[56%] xl:w-[52%] h-auto object-contain object-bottom drop-shadow-[0_30px_60px_rgba(0,0,0,0.65)]"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0A1B38]/80 via-[#0A1B38]/30 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#050B18] to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#050B18] to-transparent" />
       </motion.div>
 
       {/* content */}
