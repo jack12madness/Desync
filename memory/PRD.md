@@ -97,6 +97,10 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Waitlist export: admin Waitlist tab "Export CSV" button downloads desync-waitlist.csv (email + joined date); GET /api/admin/waitlist/export (401 without auth, verified)
 - Redeploy pushed live with all changes since last deploy (Discord invite fix, coupons, per-duration stock, alerts, announce bot, export, stats, launch tab, email dual-path, startup hardening)
 
+## Implemented (2026-09-02, round 15)
+- Hero art replaced with Michael-and-Trevor-style fan-art homage (suited arms-crossed man + bald bat-wielding man, rooftop, navy grade), generated via Nano Banana at /app/frontend/public/images/hero-gta.png (script /app/scripts/gen_hero2.py)
+- Clarified for user: package reinstall on republish is normal fresh-build behavior; admin changes persist in the database; preview and live use separate databases
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state
