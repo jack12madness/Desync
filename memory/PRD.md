@@ -110,6 +110,9 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 ## Implemented (2026-09-02, round 18)
 - Hero now uses the user's OWN cutout photo of the GTA trio (image-removebg-preview (1).png, 707x353 RGBA) — characters pixel-identical to what they sent, no AI redraw. Saved at /app/frontend/public/images/hero-crew.png; Hero.jsx renders it bottom-right, enlarged (~58-64% width) and raised (bottom 3%) per user nudge request, over the navy atmosphere
 
+## Implemented (2026-09-02, round 19)
+- Drop page AI Franklin replaced with the REAL Franklin cropped from the user's own trio cutout (alpha-edge crop x468-700 of hero-crew.png, 232x353 RGBA) at /app/frontend/public/images/character-franklin.png; drop page figure restyled to bottom-anchored object-contain cutout. Entire site now uses the user's own character art
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state

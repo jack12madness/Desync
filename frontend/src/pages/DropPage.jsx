@@ -86,11 +86,7 @@ export default function DropPage() {
             initial={{ opacity: 0, x: 80 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3, duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute right-0 bottom-0 h-full w-[55%] object-cover object-right hidden lg:block opacity-60 pointer-events-none"
-            style={{
-              maskImage: "linear-gradient(to right, transparent 0%, black 55%)",
-              WebkitMaskImage: "linear-gradient(to right, transparent 0%, black 55%)",
-            }}
+            className="absolute bottom-0 right-[4%] h-[62%] xl:h-[70%] w-auto object-contain object-bottom hidden lg:block opacity-90 pointer-events-none drop-shadow-[0_30px_60px_rgba(0,0,0,0.65)]"
             data-testid="drop-franklin"
           />
         </div>
