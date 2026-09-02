@@ -35,7 +35,7 @@ export default function Hero() {
           initial={{ opacity: 0, x: 60 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute bottom-0 right-0 w-[78%] sm:w-[64%] lg:w-[56%] xl:w-[52%] h-auto object-contain object-bottom drop-shadow-[0_30px_60px_rgba(0,0,0,0.65)]"
+          className="absolute bottom-[3%] right-[-1%] w-[85%] sm:w-[72%] lg:w-[64%] xl:w-[58%] h-auto object-contain object-bottom drop-shadow-[0_30px_60px_rgba(0,0,0,0.65)]"
         />
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#050B18] to-transparent" />
       </motion.div>

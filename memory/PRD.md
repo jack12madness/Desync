@@ -108,7 +108,7 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Hero art replaced again per user reference: full heist-crew lineup — all three characters in matching dark suits with duffel bags and rifles (Michael/Trevor/Franklin-style trio), on the navy night backdrop with left negative space (script /app/scripts/gen_hero3.py, overwrote hero-gta.png). Reference was the GTA V heist artwork; characters/styling echoed, background kept as ours
 
 ## Implemented (2026-09-02, round 18)
-- Hero now uses the user's OWN cutout photo of the GTA trio (image-removebg-preview (1).png, 707x353 RGBA) — characters pixel-identical to what they sent, no AI redraw. Saved at /app/frontend/public/images/hero-crew.png; Hero.jsx renders it as a bottom-right anchored cutout (object-contain, width-scaled) over the navy atmosphere, drop shadow + bottom fade
+- Hero now uses the user's OWN cutout photo of the GTA trio (image-removebg-preview (1).png, 707x353 RGBA) — characters pixel-identical to what they sent, no AI redraw. Saved at /app/frontend/public/images/hero-crew.png; Hero.jsx renders it bottom-right, enlarged (~58-64% width) and raised (bottom 3%) per user nudge request, over the navy atmosphere
 
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
