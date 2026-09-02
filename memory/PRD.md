@@ -104,6 +104,9 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 ## Implemented (2026-09-02, round 16)
 - Franklin-style character (green/black bomber, fade, gold chain, rooftop, matching navy grade) generated at /app/frontend/public/images/character-franklin.png (script /app/scripts/gen_franklin.py) and placed on the drop page as a right-edge figure with left-fade mask; trio complete: Michael+Trevor on home hero, Franklin on /drop
 
+## Implemented (2026-09-02, round 17)
+- Hero art replaced again per user reference: full heist-crew lineup — all three characters in matching dark suits with duffel bags and rifles (Michael/Trevor/Franklin-style trio), on the navy night backdrop with left negative space (script /app/scripts/gen_hero3.py, overwrote hero-gta.png). Reference was the GTA V heist artwork; characters/styling echoed, background kept as ours
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state
