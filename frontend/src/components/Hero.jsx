@@ -1,19 +1,26 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, MessageCircle, Clock, Users, Gamepad2, Percent } from "lucide-react";
+import { api } from "@/lib/api";
 
 const HERO_IMG = "/images/hero-crew.png";
-
-const stats = [
-  { icon: Clock, value: "24/7", label: "Support" },
-  { icon: Users, value: "Instant", label: "Delivery" },
-  { icon: Gamepad2, value: "7", label: "Games" },
-];
 
 export default function Hero() {
   const ref = useRef(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const imgY = useTransform(scrollYProgress, [0, 1], ["0%", "12%"]);
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    api.get("/categories").then(({ data }) => setCategories(data)).catch(() => {});
+  }, []);
+
+  const stats = [
+    { icon: Clock, value: "24/7", label: "Support" },
+    { icon: Users, value: "Instant", label: "Delivery" },
+    { icon: Gamepad2, value: String(categories.length), label: "Games" },
+  ];
+  const badgeText = categories.length ? categories.map((c) => c.name).join(" // ") : "FiveM";
 
   return (
     <section ref={ref} className="relative min-h-screen overflow-hidden" data-testid="hero-section">
@@ -53,7 +60,7 @@ export default function Hero() {
               <span className="status-dot relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
             </span>
             <span className="text-xs font-mono uppercase tracking-[0.25em] text-[#8FB8E8]" data-testid="hero-badge">
-              FiveM // Rust // Warzone // More
+              {badgeText}
             </span>
           </motion.div>
 
@@ -153,7 +160,7 @@ export default function Hero() {
         data-testid="hero-discount-chip"
       >
         <Percent className="w-3.5 h-3.5 text-[#8FB8E8]" />
-        <span className="text-xs font-mono text-slate-300">5% off first order — Discord</span>
+        <span className="text-xs font-mono text-slate-300">10% off site-wide — code DESYNC10</span>
       </motion.div>
     </section>
   );

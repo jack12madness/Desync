@@ -6,6 +6,8 @@ import { eur } from "@/lib/api";
 export default function ProductCard({ product, index, onSelect }) {
   const prices = Object.values(product.prices || {});
   const minPrice = prices.length ? Math.min(...prices) : 0;
+  const durations = Object.keys(product.prices || {});
+  const soldOut = durations.length > 0 && durations.every((d) => !(product.stock?.[d] > 0));
 
   return (
     <motion.article
@@ -22,12 +24,19 @@ export default function ProductCard({ product, index, onSelect }) {
           src={product.image_url}
           alt={product.name}
           loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover saturate-[0.75] group-hover:saturate-100 group-hover:scale-105 transition-all duration-700"
+          className={`absolute inset-0 w-full h-full object-cover saturate-[0.75] group-hover:saturate-100 group-hover:scale-105 transition-all duration-700 ${soldOut ? "opacity-40 grayscale-[0.4]" : ""}`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#050B18] via-[#050B18]/25 to-transparent" />
         <div className="absolute top-4 left-4 z-10">
           <StatusPill status={product.status} testid={`product-status-badge-${product.id}`} />
         </div>
+        {soldOut && (
+          <div className="absolute top-4 right-4 z-10" data-testid={`product-soldout-badge-${product.id}`}>
+            <span className="px-2.5 py-1 rounded-md bg-rose-500/90 text-white text-[10px] font-mono font-bold uppercase tracking-[0.2em] shadow-lg">
+              Sold Out
+            </span>
+          </div>
+        )}
 
         <div className="absolute inset-x-0 bottom-0 p-5 z-10">
           <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-[#5B8CFF] mb-1.5">

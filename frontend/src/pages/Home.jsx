@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 
 export default function Home() {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
   const [selected, setSelected] = useState(null);
@@ -20,9 +21,10 @@ export default function Home() {
       .then(({ data }) => setProducts(data))
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
+    api.get("/categories").then(({ data }) => setCategories(data)).catch(() => {});
   }, []);
 
-  const games = useMemo(() => ["All", ...new Set(products.map((p) => p.game))], [products]);
+  const games = useMemo(() => ["All", ...categories.map((c) => c.name)], [categories]);
   const visible = filter === "All" ? products : products.filter((p) => p.game === filter);
 
   return (

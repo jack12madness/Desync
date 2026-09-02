@@ -165,52 +165,7 @@ SEED_PRODUCTS = [
         "features": ["Vehicle Spawner", "Money Tools", "Aim Assist", "ESP", "Trolling Suite"],
         "prices": {"day": 4.99, "week": 14.99, "month": 29.99},
         "active": True, "sort_order": 2,
-    },
-    {
-        "game": "Rust", "name": "RECOIL ZERO // Rust Suite",
-        "description": "Full Rust suite with perfect recoil control, player ESP and raid radar. Built for official servers.",
-        "image_url": "https://images.unsplash.com/photo-1622023346627-b7d48c4484a9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwxfHxjeWJlcnB1bmslMjBnYW1lJTIwY2hhcmFjdGVyJTIwZGFyayUyMGdsb3dpbmclMjBibHVlJTIwY3lhbnxlbnwwfHx8fDE3ODgyNjA1MTR8MA&ixlib=rb-4.1.0&q=85",
-        "status": "updating", "anticheat": "Easy Anti-Cheat",
-        "features": ["No Recoil", "Player ESP", "Ore ESP", "Raid Radar", "Silent Aim"],
-        "prices": {"day": 5.99, "week": 17.99, "month": 34.99},
-        "active": True, "sort_order": 3,
-    },
-    {
-        "game": "COD Warzone", "name": "NIGHTHAWK // Warzone",
-        "description": "Aimbot, wallhack and unlock tools for Warzone. Shadow-ban evasion layer included.",
-        "image_url": "https://images.unsplash.com/photo-1746365588568-3513fdefde2e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwyfHxjeWJlcnB1bmslMjBnYW1lJTIwY2hhcmFjdGVyJTIwZGFyayUyMGdsb3dpbmclMjBibHVlJTIwY3lhbnxlbnwwfHx8fDE3ODgyNjA1MTR8MA&ixlib=rb-4.1.0&q=85",
-        "status": "undetected", "anticheat": "Ricochet",
-        "features": ["Aimbot", "Wallhack", "Unlock All", "Anti-Shadowban", "Radar"],
-        "prices": {"day": 5.49, "week": 16.99, "month": 32.99},
-        "active": True, "sort_order": 4,
-    },
-    {
-        "game": "Valorant", "name": "SIGHTLINE // Valo Radar",
-        "description": "External radar and trigger assist for Valorant. Zero injection, reads memory externally.",
-        "image_url": "https://images.unsplash.com/photo-1745402152421-7257dcfd2d19?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHwzfHxjeWJlcnB1bmslMjBnYW1lJTIwY2hhcmFjdGVyJTIwZGFyayUyMGdsb3dpbmclMjBibHVlJTIwY3lhbnxlbnwwfHx8fDE3ODgyNjA1MTR8MA&ixlib=rb-4.1.0&q=85",
-        "status": "testing", "anticheat": "Vanguard",
-        "features": ["2D Radar", "Trigger Assist", "External Only", "Stream Proof"],
-        "prices": {"week": 21.99, "month": 44.99},
-        "active": True, "sort_order": 5,
-    },
-    {
-        "game": "Apex Legends", "name": "PREDATOR // Apex Aim",
-        "description": "Precision aim assist and ESP for Apex Legends. Humanized smoothing for legit play.",
-        "image_url": "https://images.unsplash.com/photo-1746109971434-ca67785ce0d2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzV8MHwxfHNlYXJjaHw0fHxjeWJlcnB1bmslMjBnYW1lJTIwY2hhcmFjdGVyJTIwZGFyayUyMGdsb3dpbmclMjBibHVlJTIwY3lhbnxlbnwwfHx8fDE3ODgyNjA1MTR8MA&ixlib=rb-4.1.0&q=85",
-        "status": "undetected", "anticheat": "Easy Anti-Cheat",
-        "features": ["Aim Assist", "ESP", "Item Glow", "Humanized Smoothing"],
-        "prices": {"day": 4.99, "week": 15.99, "month": 29.99},
-        "active": True, "sort_order": 6,
-    },
-    {
-        "game": "Universal", "name": "GHOST // HWID Spoofer",
-        "description": "Universal HWID spoofer. Unban your machine on any anti-cheat in one click. Works with every VOIDWARE product.",
-        "image_url": "https://images.unsplash.com/photo-1759692788195-b95da1f4a04c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MTN8MHwxfHNlYXJjaHw0fHxnYW1pbmclMjBwb3N0ZXIlMjBkYXJrJTIwYWN0aW9uJTIwZ2FtZXIlMjBjb250cm9sbGVyJTIwbmVvbnxlbnwwfHx8fDE3ODgyNjA1MjF8MA&ixlib=rb-4.1.0&q=85",
-        "status": "undetected", "anticheat": "EAC / BE / Vanguard / Ricochet",
-        "features": ["One-Click Spoof", "Permanent & Temp Modes", "Cleaner Included", "All AC Support"],
-        "prices": {"week": 12.99, "month": 24.99, "lifetime": 59.99},
-        "active": True, "sort_order": 7,
-    },
+    }
 ]
 
 
@@ -251,6 +206,7 @@ async def startup():
     await db.orders.create_index("email")
     await db.waitlist.create_index("email", unique=True)
     await db.keystock.create_index([("product_id", 1), ("status", 1)])
+    await db.categories.create_index("id", unique=True)
     await seed_admin()
     await seed_products()
 
@@ -262,10 +218,66 @@ async def root():
     return {"message": "Desync API online"}
 
 
+async def _available_stock_map() -> Dict[str, Dict[str, int]]:
+    pipeline = [
+        {"$match": {"status": "available"}},
+        {"$group": {"_id": {"product_id": "$product_id", "duration": "$duration"}, "count": {"$sum": 1}}},
+    ]
+    rows = await db.keystock.aggregate(pipeline).to_list(5000)
+    out: Dict[str, Dict[str, int]] = {}
+    for r in rows:
+        pid = r["_id"]["product_id"]
+        dur = r["_id"].get("duration") or "day"
+        out.setdefault(pid, {})[dur] = out.setdefault(pid, {}).get(dur, 0) + r["count"]
+    return out
+
+
 @api_router.get("/products")
 async def list_products():
     docs = await db.products.find({"active": True}, {"_id": 0}).sort("sort_order", 1).to_list(200)
+    stock = await _available_stock_map()
+    for d in docs:
+        d["stock"] = stock.get(d["id"], {})
     return docs
+
+
+# ---------- categories ----------
+
+class CategoryIn(BaseModel):
+    name: str
+    sort_order: int = 0
+
+
+@api_router.get("/categories")
+async def list_categories():
+    return await db.categories.find({}, {"_id": 0}).sort("sort_order", 1).to_list(200)
+
+
+@api_router.post("/admin/categories")
+async def admin_create_category(body: CategoryIn, admin: dict = Depends(get_admin)):
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(400, "Name required")
+    if await db.categories.find_one({"name": {"$regex": f"^{name}$", "$options": "i"}}):
+        raise HTTPException(409, "Category already exists")
+    doc = {
+        "id": str(uuid.uuid4()), "name": name, "sort_order": body.sort_order,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.categories.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@api_router.delete("/admin/categories/{category_id}")
+async def admin_delete_category(category_id: str, admin: dict = Depends(get_admin)):
+    cat = await db.categories.find_one({"id": category_id})
+    if not cat:
+        raise HTTPException(404, "Category not found")
+    in_use = await db.products.count_documents({"game": cat["name"]})
+    if in_use:
+        raise HTTPException(400, f"Category is used by {in_use} product(s) — reassign them first")
+    await db.categories.delete_one({"id": category_id})
+    return {"deleted": True}
 
 
 @api_router.get("/status")
@@ -775,6 +787,11 @@ async def _price_cart(items: List[CartItemIn], coupon: Optional[str]):
         price = product.get("prices", {}).get(item.duration)
         if price is None:
             raise HTTPException(400, f"Duration not available for {product['name']}")
+        in_stock = await db.keystock.count_documents(
+            {"product_id": product["id"], "duration": item.duration, "status": "available"}
+        )
+        if in_stock == 0:
+            raise HTTPException(400, f"{product['name']} ({DURATIONS[item.duration]}) is sold out")
         unit_cents = int(round(float(price) * 100 * (1 - discount_pct / 100)))
         subtotal_cents += int(round(float(price) * 100))
         total_cents += unit_cents

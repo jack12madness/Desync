@@ -8,6 +8,7 @@ import { api, apiError, eur } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 
 const PAYPAL_CLIENT_ID = process.env.REACT_APP_PAYPAL_CLIENT_ID;
+const SHOW_PAYPAL = false; // PayPal hidden for now — set true to re-enable
 
 export default function CartDrawer() {
   const { items, removeItem, total, isOpen, closeCart } = useCart();
@@ -123,7 +124,7 @@ export default function CartDrawer() {
                   value={couponInput}
                   onChange={(e) => setCouponInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && applyCoupon()}
-                  placeholder="LAUNCH20"
+                  placeholder="DESYNC10"
                   data-testid="cart-coupon-input"
                   className="bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] text-sm h-10 font-mono uppercase"
                 />
@@ -181,7 +182,7 @@ export default function CartDrawer() {
             {!loading && <ArrowRight className="w-4 h-4" />}
           </button>
 
-          {PAYPAL_CLIENT_ID && (
+          {SHOW_PAYPAL && PAYPAL_CLIENT_ID && (
             <div data-testid="paypal-section">
               <div className="flex items-center gap-3 text-xs text-slate-600">
                 <div className="flex-1 h-px bg-[#1E2D4A]" />

@@ -14,6 +14,7 @@ import KeyManager from "@/components/KeyManager";
 import SalesStats from "@/components/SalesStats";
 import LaunchTab from "@/components/LaunchTab";
 import CouponsTab from "@/components/CouponsTab";
+import CategoriesTab from "@/components/CategoriesTab";
 
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
@@ -21,7 +22,7 @@ const EMPTY_PRODUCT = {
   active: true, sort_order: 0,
 };
 
-function ProductForm({ initial, onSave, onClose }) {
+function ProductForm({ initial, categories, onSave, onClose }) {
   const [form, setForm] = useState(() => {
     if (!initial) return EMPTY_PRODUCT;
     return {
@@ -65,8 +66,22 @@ function ProductForm({ initial, onSave, onClose }) {
         </DialogHeader>
         <div className="grid sm:grid-cols-2 gap-4 mt-2">
           <div>
-            <label className={labelCls}>Game</label>
-            <Input value={form.game} onChange={(e) => set("game", e.target.value)} placeholder="FiveM" data-testid="product-form-game" className={fieldCls} />
+            <label className={labelCls}>Category</label>
+            <Select value={form.game} onValueChange={(v) => set("game", v)}>
+              <SelectTrigger data-testid="product-form-game" className={fieldCls}>
+                <SelectValue placeholder="Pick a category" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {categories.length === 0 && (
+              <div className="text-[10px] font-mono text-amber-400 mt-1.5">
+                No categories yet — create one in the Categories tab first
+              </div>
+            )}
           </div>
           <div>
             <label className={labelCls}>Name</label>
@@ -145,6 +160,7 @@ export default function AdminDashboard() {
   const [editing, setEditing] = useState(null); // null | {} (new) | product
   const [keysFor, setKeysFor] = useState(null); // product whose keys are being managed
   const [stockCounts, setStockCounts] = useState({});
+  const [categories, setCategories] = useState([]);
   const [notifyEmail, setNotifyEmail] = useState("");
   const [newUser, setNewUser] = useState({ username: "", password: "", role: "admin" });
   const navigate = useNavigate();
@@ -156,6 +172,7 @@ export default function AdminDashboard() {
         loadProducts();
         loadOrders();
         loadSettings();
+        loadCategories();
         if (data.role === "owner") loadUsers();
       })
       .catch(() => {
@@ -182,6 +199,7 @@ export default function AdminDashboard() {
     }
   };
   const loadUsers = () => api.get("/admin/users").then(({ data }) => setUsers(data)).catch(() => {});
+  const loadCategories = () => api.get("/categories").then(({ data }) => setCategories(data)).catch(() => {});
 
   const saveProduct = async (payload) => {
     try {
@@ -283,6 +301,7 @@ export default function AdminDashboard() {
         <Tabs defaultValue="products">
           <TabsList className="bg-[#0F1F38] border border-blue-900/40 mb-8">
             <TabsTrigger value="products" data-testid="admin-tab-products" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Products</TabsTrigger>
+            <TabsTrigger value="categories" data-testid="admin-tab-categories" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Categories</TabsTrigger>
             <TabsTrigger value="orders" data-testid="admin-tab-orders" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Orders</TabsTrigger>
             <TabsTrigger value="waitlist" data-testid="admin-tab-waitlist" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Waitlist</TabsTrigger>
             <TabsTrigger value="launch" data-testid="admin-tab-launch" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Launch</TabsTrigger>
@@ -337,6 +356,10 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="categories">
+            <CategoriesTab onChanged={loadCategories} />
           </TabsContent>
 
           <TabsContent value="orders">
@@ -461,6 +484,7 @@ export default function AdminDashboard() {
       {editing !== null && (
         <ProductForm
           initial={editing.id ? editing : null}
+          categories={categories}
           onSave={saveProduct}
           onClose={() => setEditing(null)}
         />
