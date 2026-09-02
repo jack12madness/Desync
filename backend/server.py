@@ -10,8 +10,9 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict
-import uuid, logging, secrets, string
+import time, uuid, logging, secrets, string
 from datetime import datetime, timezone, timedelta
+import httpx
 
 import bcrypt
 import jwt
@@ -694,8 +695,8 @@ async def admin_delete_user(admin_id: str, owner: dict = Depends(require_owner))
 
 # ---------- payments ----------
 
-async def fulfill_order(session_id: str) -> Optional[dict]:
-    order = await db.orders.find_one({"session_id": session_id}, {"_id": 0})
+async def _fulfill_order(where: dict) -> Optional[dict]:
+    order = await db.orders.find_one(where, {"_id": 0})
     if not order or order.get("payment_status") == "paid":
         return order
     items = order["items"]
@@ -730,14 +731,14 @@ async def fulfill_order(session_id: str) -> Optional[dict]:
                 item["key_pending"] = True
                 keys_pending = True
     res = await db.orders.update_one(
-        {"session_id": session_id, "payment_status": {"$ne": "paid"}},
+        {**where, "payment_status": {"$ne": "paid"}},
         {"$set": {
             "status": "completed", "payment_status": "paid", "items": items,
             "keys_pending": keys_pending,
             "paid_at": datetime.now(timezone.utc).isoformat(),
         }},
     )
-    updated = await db.orders.find_one({"session_id": session_id}, {"_id": 0})
+    updated = await db.orders.find_one(where, {"_id": 0})
     if res.modified_count > 0 and updated:
         if updated.get("coupon_code"):
             await db.coupons.update_one({"code": updated["coupon_code"]}, {"$inc": {"used_count": 1}})
@@ -749,24 +750,23 @@ async def fulfill_order(session_id: str) -> Optional[dict]:
     return updated
 
 
-@api_router.post("/payments/checkout")
-async def create_checkout(body: CheckoutIn):
-    if not body.items:
-        raise HTTPException(400, "Cart is empty")
-    email = body.email.lower()
+async def fulfill_order(session_id: str) -> Optional[dict]:
+    return await _fulfill_order({"session_id": session_id})
+
+
+async def _price_cart(items: List[CartItemIn], coupon: Optional[str]):
     discount_pct = 0.0
     coupon_code = None
-    if body.coupon:
-        c = await _find_valid_coupon(body.coupon)
+    if coupon:
+        c = await _find_valid_coupon(coupon)
         if not c:
             raise HTTPException(400, "Invalid or expired coupon code")
         discount_pct = float(c["percent"])
         coupon_code = c["code"]
-    line_items = []
     order_items = []
     total_cents = 0
     subtotal_cents = 0
-    for item in body.items:
+    for item in items:
         if item.duration not in DURATIONS:
             raise HTTPException(400, f"Invalid duration: {item.duration}")
         product = await db.products.find_one({"id": item.product_id, "active": True}, {"_id": 0})
@@ -775,23 +775,36 @@ async def create_checkout(body: CheckoutIn):
         price = product.get("prices", {}).get(item.duration)
         if price is None:
             raise HTTPException(400, f"Duration not available for {product['name']}")
-        subtotal_cents += int(round(float(price) * 100))
         unit_cents = int(round(float(price) * 100 * (1 - discount_pct / 100)))
+        subtotal_cents += int(round(float(price) * 100))
         total_cents += unit_cents
-        label = DURATIONS[item.duration]
-        line_items.append({
-            "price_data": {
-                "currency": "eur",
-                "unit_amount": unit_cents,
-                "product_data": {"name": f"{product['name']} — {label}", "tax_code": "txcd_10000000"},
-            },
-            "quantity": 1,
-        })
         order_items.append({
             "product_id": product["id"], "name": product["name"], "game": product["game"],
-            "duration": item.duration, "duration_label": label,
-            "unit_price": float(price), "license_key": None,
+            "duration": item.duration, "duration_label": DURATIONS[item.duration],
+            "unit_price": unit_cents / 100.0, "license_key": None,
         })
+    return order_items, subtotal_cents, total_cents, discount_pct, coupon_code
+
+
+@api_router.post("/payments/checkout")
+async def create_checkout(body: CheckoutIn):
+    if not body.items:
+        raise HTTPException(400, "Cart is empty")
+    email = body.email.lower()
+    order_items, subtotal_cents, total_cents, discount_pct, coupon_code = await _price_cart(
+        body.items, body.coupon
+    )
+    line_items = [
+        {
+            "price_data": {
+                "currency": "eur",
+                "unit_amount": int(round(it["unit_price"] * 100)),
+                "product_data": {"name": f"{it['name']} — {it['duration_label']}", "tax_code": "txcd_10000000"},
+            },
+            "quantity": 1,
+        }
+        for it in order_items
+    ]
 
     order_id = str(uuid.uuid4())
     kwargs = dict(
@@ -875,6 +888,117 @@ async def stripe_webhook(request: Request):
                       "updated_at": datetime.now(timezone.utc).isoformat()}},
         )
     return {"status": "ok"}
+
+
+# ---------- paypal ----------
+
+PAYPAL_BASE = os.environ.get("PAYPAL_BASE_URL", "https://api-m.sandbox.paypal.com")
+PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_CLIENT_ID")
+PAYPAL_SECRET = os.environ.get("PAYPAL_SECRET")
+_paypal_cache = {"token": None, "expires": 0.0}
+
+
+async def paypal_token() -> str:
+    if not PAYPAL_CLIENT_ID or not PAYPAL_SECRET:
+        raise HTTPException(503, "PayPal is not configured")
+    now = time.time()
+    if _paypal_cache["token"] and _paypal_cache["expires"] > now + 30:
+        return _paypal_cache["token"]
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{PAYPAL_BASE}/v1/oauth2/token",
+            auth=(PAYPAL_CLIENT_ID, PAYPAL_SECRET),
+            data={"grant_type": "client_credentials"},
+        )
+    if resp.status_code != 200:
+        logger.error("PayPal auth failed: %s %s", resp.status_code, resp.text)
+        raise HTTPException(502, "PayPal authentication failed")
+    data = resp.json()
+    _paypal_cache["token"] = data["access_token"]
+    _paypal_cache["expires"] = now + data.get("expires_in", 3000)
+    return data["access_token"]
+
+
+class PayPalCreateIn(BaseModel):
+    email: EmailStr
+    items: List[CartItemIn]
+    coupon: Optional[str] = None
+
+
+class PayPalCaptureIn(BaseModel):
+    paypal_order_id: str
+
+
+@api_router.post("/paypal/create")
+async def paypal_create(body: PayPalCreateIn):
+    if not body.items:
+        raise HTTPException(400, "Cart is empty")
+    email = body.email.lower()
+    order_items, subtotal_cents, total_cents, discount_pct, coupon_code = await _price_cart(
+        body.items, body.coupon
+    )
+    if total_cents <= 0:
+        raise HTTPException(400, "Total must be above zero")
+    order_id = str(uuid.uuid4())
+    token = await paypal_token()
+    payload = {
+        "intent": "CAPTURE",
+        "purchase_units": [{
+            "reference_id": order_id,
+            "custom_id": order_id,
+            "description": "Desync — game keys",
+            "amount": {"currency_code": "EUR", "value": f"{total_cents / 100:.2f}"},
+        }],
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{PAYPAL_BASE}/v2/checkout/orders",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json=payload,
+        )
+    if resp.status_code >= 400:
+        logger.error("PayPal order create failed: %s %s", resp.status_code, resp.text)
+        raise HTTPException(502, "PayPal could not create the order")
+    pp = resp.json()
+    now = datetime.now(timezone.utc).isoformat()
+    await db.orders.insert_one({
+        "id": order_id, "session_id": None, "paypal_order_id": pp["id"],
+        "payment_provider": "paypal", "email": email,
+        "items": order_items, "total": total_cents / 100.0, "currency": "eur",
+        "subtotal": subtotal_cents / 100.0, "discount_percent": discount_pct,
+        "coupon_code": coupon_code,
+        "status": "initiated", "payment_status": "pending",
+        "created_at": now, "updated_at": now,
+    })
+    return {"paypal_order_id": pp["id"], "order_id": order_id}
+
+
+@api_router.post("/paypal/capture")
+async def paypal_capture(body: PayPalCaptureIn):
+    token = await paypal_token()
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{PAYPAL_BASE}/v2/checkout/orders/{body.paypal_order_id}/capture",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        )
+    if resp.status_code >= 400:
+        logger.error("PayPal capture failed: %s %s", resp.status_code, resp.text)
+        raise HTTPException(502, "PayPal capture failed")
+    data = resp.json()
+    if data.get("status") != "COMPLETED":
+        raise HTTPException(402, "Payment not completed")
+    order = await _fulfill_order({"paypal_order_id": body.paypal_order_id})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    return {"status": "paid", "order_id": order["id"]}
+
+
+@api_router.get("/orders/by-id/{order_id}")
+async def order_by_id(order_id: str):
+    order = await db.orders.find_one({"id": order_id, "payment_status": "paid"}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    return order
 
 
 app.include_router(api_router)

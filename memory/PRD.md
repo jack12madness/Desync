@@ -117,6 +117,9 @@ User is reselling game cheats, mainly FiveM, expanding to other games. Wants a l
 - Removed the Franklin cutout from the drop page per user (didn't like it) — drop page back to clean blurred backdrop
 - Home hero crew scaled way up (~76-88% width, right-bleed) to match the old full-bleed presence while keeping the user's exact photo characters
 
+## Implemented (2026-09-02, round 21)
+- PayPal checkout (SANDBOX keys from user): gold PayPal button + PayPal-hosted "Debit or Credit Card" in cart drawer next to Stripe. Backend: OAuth token cache, POST /api/paypal/create (validates cart + coupon server-side, EUR, internal order with payment_provider=paypal), POST /api/paypal/capture (captures then fulfills via shared _fulfill_order), GET /api/orders/by-id/{id} for the success page. PaymentSuccess handles ?order= (PayPal) and ?session_id= (Stripe). Frontend env REACT_APP_PAYPAL_CLIENT_ID; backend env PAYPAL_CLIENT_ID/SECRET/BASE_URL (sandbox api-m.sandbox.paypal.com). To go live: swap to live PayPal app keys + PAYPAL_BASE_URL=https://api-m.paypal.com
+
 ## Verified
 - API: login/me, admin products, checkout session creation (real Stripe URL), wrong-password 401, status matrix, lookup gating (unpaid hidden), waitlist join/count/admin list
 - E2E browser: home render, product modal, duration select, cart, Stripe checkout page (correct item/price/email), drop page countdown + waitlist join with success state

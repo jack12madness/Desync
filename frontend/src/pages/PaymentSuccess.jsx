@@ -10,18 +10,27 @@ import { useCart } from "@/context/CartContext";
 export default function PaymentSuccess() {
   const [params] = useSearchParams();
   const sessionId = params.get("session_id");
+  const orderId = params.get("order");
   const [state, setState] = useState({ status: "polling", order: null });
   const { clearCart } = useCart();
   const tries = useRef(0);
 
   useEffect(() => {
-    if (!sessionId) {
+    if (!sessionId && !orderId) {
       setState({ status: "error", order: null });
       return;
     }
     let cancelled = false;
     const poll = async () => {
       try {
+        if (orderId) {
+          const { data } = await api.get(`/orders/by-id/${orderId}`);
+          if (!cancelled) {
+            setState({ status: "paid", order: data });
+            clearCart();
+          }
+          return;
+        }
         const { data } = await api.get(`/payments/status/${sessionId}`);
         if (cancelled) return;
         if (data.payment_status === "paid" && data.order) {
@@ -29,16 +38,21 @@ export default function PaymentSuccess() {
           clearCart();
           return;
         }
-        tries.current += 1;
-        if (tries.current < 30) setTimeout(poll, 2500);
-        else setState({ status: "timeout", order: null });
-      } catch {
-        if (!cancelled) setState({ status: "error", order: null });
+      } catch (e) {
+        if (orderId && e?.response?.status === 404) {
+          // paypal capture still settling — keep polling
+        } else if (!cancelled && !orderId) {
+          // stripe status errors: keep polling too
+        }
       }
+      if (cancelled) return;
+      tries.current += 1;
+      if (tries.current < 30) setTimeout(poll, 2500);
+      else setState({ status: "timeout", order: null });
     };
     poll();
     return () => { cancelled = true; };
-  }, [sessionId, clearCart]);
+  }, [sessionId, orderId, clearCart]);
 
   return (
     <div data-testid="payment-success-page">
@@ -49,7 +63,7 @@ export default function PaymentSuccess() {
             <div className="text-center py-24" data-testid="payment-polling">
               <Loader2 className="w-10 h-10 text-[#5B8CFF] animate-spin mx-auto mb-6" />
               <h1 className="font-display text-2xl font-bold tracking-tight text-white">Confirming your payment</h1>
-              <p className="text-sm text-slate-400 mt-3">Talking to Stripe...</p>
+              <p className="text-sm text-slate-400 mt-3">Talking to the payment provider...</p>
             </div>
           )}
 

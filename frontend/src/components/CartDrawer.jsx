@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { X, Lock, ArrowRight, Tag } from "lucide-react";
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { useCart, DURATION_LABELS } from "@/context/CartContext";
 import { api, apiError, eur } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
+
+const PAYPAL_CLIENT_ID = process.env.REACT_APP_PAYPAL_CLIENT_ID;
 
 export default function CartDrawer() {
   const { items, removeItem, total, isOpen, closeCart } = useCart();
@@ -16,6 +19,13 @@ export default function CartDrawer() {
 
   const discount = coupon ? (total * coupon.percent) / 100 : 0;
   const payable = Math.max(0, total - discount);
+
+  const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+  const cartPayload = () => ({
+    email,
+    items: items.map((i) => ({ product_id: i.product.id, duration: i.duration })),
+    coupon: coupon ? coupon.code : null,
+  });
 
   const applyCoupon = async () => {
     if (!couponInput.trim()) return;
@@ -32,7 +42,7 @@ export default function CartDrawer() {
   };
 
   const checkout = async () => {
-    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    if (!validEmail) {
       toast.error("Enter a valid email — your keys are delivered there");
       return;
     }
@@ -41,9 +51,7 @@ export default function CartDrawer() {
     try {
       localStorage.setItem("void_email", email);
       const { data } = await api.post("/payments/checkout", {
-        email,
-        items: items.map((i) => ({ product_id: i.product.id, duration: i.duration })),
-        coupon: coupon ? coupon.code : null,
+        ...cartPayload(),
         origin_url: window.location.origin,
       });
       window.location.href = data.checkout_url;
@@ -161,16 +169,56 @@ export default function CartDrawer() {
               className="bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] text-sm h-11"
             />
           </div>
+
           <button
             onClick={checkout}
             disabled={loading || items.length === 0}
             data-testid="cart-checkout-button"
-            className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold shadow-[0_8px_24px_rgba(46,107,255,0.35)] disabled:opacity-40 disabled:pointer-events-none transition-all duration-200 active:scale-95"
+            className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold shadow-[0_8px_24px_rgba(46,107,255,0.35)] disabled:opacity-40 disabled:pointer-events-none transition-all duration-200 active:scale-95"
           >
             <Lock className="w-4 h-4" />
-            {loading ? "Redirecting to Stripe..." : "Checkout securely"}
+            {loading ? "Redirecting to Stripe..." : "Pay with card"}
             {!loading && <ArrowRight className="w-4 h-4" />}
           </button>
+
+          {PAYPAL_CLIENT_ID && (
+            <div data-testid="paypal-section">
+              <div className="flex items-center gap-3 text-xs text-slate-600">
+                <div className="flex-1 h-px bg-[#1E2D4A]" />
+                <span>or</span>
+                <div className="flex-1 h-px bg-[#1E2D4A]" />
+              </div>
+              <PayPalScriptProvider options={{ clientId: PAYPAL_CLIENT_ID, currency: "EUR" }}>
+                <div data-testid="paypal-buttons" className="min-h-[45px]">
+                  <PayPalButtons
+                    style={{ layout: "vertical", color: "gold", shape: "rect", label: "paypal", height: 45 }}
+                    disabled={items.length === 0}
+                    forceReRender={[payable, email]}
+                    createOrder={async () => {
+                      if (!validEmail) {
+                        toast.error("Enter your email first — keys are delivered there");
+                        throw new Error("email required");
+                      }
+                      localStorage.setItem("void_email", email);
+                      const { data } = await api.post("/paypal/create", cartPayload());
+                      return data.paypal_order_id;
+                    }}
+                    onApprove={async (data) => {
+                      try {
+                        const res = await api.post("/paypal/capture", { paypal_order_id: data.orderID });
+                        window.location.href = `/payment/success?order=${res.data.order_id}`;
+                      } catch (e) {
+                        toast.error(apiError(e));
+                      }
+                    }}
+                    onError={() => toast.error("PayPal hit an error — try again or pay by card")}
+                    onCancel={() => toast.info("PayPal checkout cancelled")}
+                  />
+                </div>
+              </PayPalScriptProvider>
+            </div>
+          )}
+
           <p className="text-xs text-slate-600 text-center">
             Keys are emailed to you instantly after payment
           </p>
