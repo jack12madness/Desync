@@ -12,6 +12,21 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-03 — Discord account sales + min-buy quantity
+- Stock items can now be Discord accounts: keystock docs carry `account: {email, email_password, discord_password, discord_token}`; bulk paste in KeyManager with "License keys / Discord accounts" mode toggle — format `email:emailpass:discordpass:token` per line (colons in discord password handled; invalid lines + dupes reported)
+- Delivery: fulfilled orders carry `deliverables` list; email renders credential blocks (4 fields) or key boxes; My Orders KeyRow shows all deliverables with per-field copy buttons; PaymentSuccess shows account-specific setup steps
+- Min-buy / quantity: ProductIn.min_buy (admin product form field); cart auto-adds at min qty with stepper (can't go below min); _price_cart enforces min + stock>=qty, multiplies totals; Stripe line_items quantity=qty; fulfillment assigns qty keys/accounts, partial = key_pending; assign-keys tops up
+- Verified: bulk add (3 ok/1 dup/1 invalid), account delivered end-to-end, min-buy 400 below min, qty×2 = €29.98 with 2 deliverables, UI stepper + notes. 9/9 regression tests pass
+
+### 2026-09-03 — Bank transfer (PayID/BSB) + Customers + Expenses
+- Bank transfer checkout: POST /api/payments/bank-transfer → order awaiting_payment with reference DS-XXXXXXXX + 48h expiry; BankPending page shows PayID/BSB/amount/reference; "not instant delivery" messaging on cart, page and email; auto-cancel loop (15min) cancels expired + emails buyer
+- Admin: mark-paid button on awaiting orders → full fulfillment (key + email + loader link); bank details editable in Orders tab settings card
+- Real PayID/BSB set in PREVIEW settings (user-provided); PROD settings endpoint is old code until deploy — re-save on live admin after deployment
+- Customers tab: aggregate by email (spent/orders/last) + manual add + Send key (pulls stock, $0 order, emails key)
+- Expenses tab: label/amount/category/date CRUD; stats now include expenses, profit, customers (SalesStats 6 cards)
+- Note: Cloudflare replaces origin HTTP 502 with its own page — never raise 502 from endpoints (use 500)
+
+
 ### 2026-09-03 — Per-product share links with artwork previews
 - New route /product/{id} (ProductPage.jsx) — opens that product's modal directly, deep-linkable
 - Backend GET /api/share/product/{id} serves crawler HTML with that product's og:image (its artwork), og:title, price in description; humans are meta-refresh/JS redirected to /product/{id}; 404 for unknown ids

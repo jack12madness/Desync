@@ -30,7 +30,10 @@ export function CartProvider({ children }) {
         toast.error("Already in your cart");
         return prev;
       }
-      toast.success(`${product.name} (${DURATION_LABELS[duration]}) added to cart`);
+      const minBuy = Math.max(1, product.min_buy || 1);
+      toast.success(minBuy > 1
+        ? `${product.name} (${DURATION_LABELS[duration]}) ×${minBuy} pack added to cart`
+        : `${product.name} (${DURATION_LABELS[duration]}) added to cart`);
       return [
         ...prev,
         {
@@ -39,12 +42,22 @@ export function CartProvider({ children }) {
             name: product.name,
             game: product.game,
             image_url: product.image_url,
+            min_buy: minBuy,
           },
           duration,
+          qty: minBuy,
           price: product.prices[duration],
         },
       ];
     });
+  }, []);
+
+  const setQty = useCallback((idx, qty) => {
+    setItems((prev) => prev.map((it, i) => {
+      if (i !== idx) return it;
+      const min = Math.max(1, it.product.min_buy || 1);
+      return { ...it, qty: Math.max(min, Math.min(100, qty)) };
+    }));
   }, []);
 
   const removeItem = useCallback((idx) => {
@@ -53,13 +66,14 @@ export function CartProvider({ children }) {
 
   const clearCart = useCallback(() => setItems([]), []);
 
-  const total = items.reduce((s, i) => s + i.price, 0);
+  const total = items.reduce((s, i) => s + i.price * (i.qty || 1), 0);
 
   return (
     <CartContext.Provider
       value={{
         items,
         addItem,
+        setQty,
         removeItem,
         clearCart,
         total,

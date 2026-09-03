@@ -7,17 +7,46 @@ import { Input } from "@/components/ui/input";
 import { api, apiError, eur, BASE_URL } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 
+function CredentialRow({ label, value, testid }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500 w-28 shrink-0">{label}</span>
+      <code
+        data-testid={testid}
+        className="font-mono text-xs text-[#8FB8E8] bg-[#2E6BFF]/10 border border-[#2E6BFF]/30 px-2 py-1 rounded truncate flex-1"
+      >
+        {value}
+      </code>
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(value);
+          toast.success(`${label} copied`);
+        }}
+        data-testid={`copy-${testid}`}
+        className="p-1.5 border border-[#2E6BFF]/30 text-[#8FB8E8] hover:bg-[#2E6BFF]/10 rounded-md transition-colors shrink-0"
+      >
+        <Copy className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
 export function KeyRow({ item }) {
-  const copy = () => {
-    navigator.clipboard.writeText(item.license_key);
+  const copy = (key) => {
+    navigator.clipboard.writeText(key);
     toast.success("License key copied");
   };
+  const deliverables = item.deliverables?.length
+    ? item.deliverables
+    : (item.license_key || item.account)
+      ? [{ license_key: item.license_key, account: item.account }]
+      : [];
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-[#050B18] border border-[#1E2D4A] rounded-lg">
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold text-white">{item.name}</div>
         <div className="text-xs text-slate-500">
-          {item.game} · {item.duration_label}
+          {item.game} · {item.duration_label}{(item.qty || 1) > 1 ? ` × ${item.qty}` : ""}
         </div>
         {item.download_url && (
           <a
@@ -29,21 +58,39 @@ export function KeyRow({ item }) {
           </a>
         )}
       </div>
-      {item.license_key ? (
-        <div className="flex items-center gap-2">
-          <code
-            data-testid={`license-key-${item.product_id}-${item.duration}`}
-            className="font-mono text-sm text-[#8FB8E8] bg-[#2E6BFF]/10 border border-[#2E6BFF]/30 px-3 py-1.5 rounded-md"
-          >
-            {item.license_key}
-          </code>
-          <button
-            onClick={copy}
-            data-testid={`copy-key-${item.product_id}-${item.duration}`}
-            className="p-2 border border-[#2E6BFF]/30 text-[#8FB8E8] hover:bg-[#2E6BFF]/10 rounded-md transition-colors"
-          >
-            <Copy className="w-4 h-4" />
-          </button>
+      {deliverables.length > 0 ? (
+        <div className="w-full sm:w-auto sm:min-w-80 space-y-2" data-testid={`deliverables-${item.product_id}-${item.duration}`}>
+          {deliverables.map((d, di) => (
+            <div key={di} className={deliverables.length > 1 ? "pt-2 border-t border-[#1E2D4A] first:border-0 first:pt-0" : ""}>
+              {deliverables.length > 1 && (
+                <div className="text-[10px] font-mono text-slate-600 mb-1">#{di + 1}</div>
+              )}
+              {d.account ? (
+                <div className="space-y-1.5" data-testid={`account-details-${item.product_id}-${item.duration}-${di}`}>
+                  <CredentialRow label="Email" value={d.account.email} testid={`account-email-${item.product_id}-${item.duration}-${di}`} />
+                  <CredentialRow label="Email Password" value={d.account.email_password} testid={`account-email-password-${item.product_id}-${item.duration}-${di}`} />
+                  <CredentialRow label="Discord Password" value={d.account.discord_password} testid={`account-discord-password-${item.product_id}-${item.duration}-${di}`} />
+                  <CredentialRow label="Discord Token" value={d.account.discord_token} testid={`account-discord-token-${item.product_id}-${item.duration}-${di}`} />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <code
+                    data-testid={`license-key-${item.product_id}-${item.duration}-${di}`}
+                    className="font-mono text-sm text-[#8FB8E8] bg-[#2E6BFF]/10 border border-[#2E6BFF]/30 px-3 py-1.5 rounded-md"
+                  >
+                    {d.license_key}
+                  </code>
+                  <button
+                    onClick={() => copy(d.license_key)}
+                    data-testid={`copy-key-${item.product_id}-${item.duration}-${di}`}
+                    className="p-2 border border-[#2E6BFF]/30 text-[#8FB8E8] hover:bg-[#2E6BFF]/10 rounded-md transition-colors"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       ) : (
         <span

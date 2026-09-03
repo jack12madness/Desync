@@ -12,6 +12,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
   const [keys, setKeys] = useState(null);
   const [input, setInput] = useState("");
   const [duration, setDuration] = useState("day");
+  const [mode, setMode] = useState("keys");
   const [adding, setAdding] = useState(false);
 
   const load = () =>
@@ -26,8 +27,9 @@ export default function KeyManager({ product, onClose, onChanged }) {
     if (!input.trim()) return;
     setAdding(true);
     try {
-      const { data } = await api.post("/admin/keystock", { product_id: product.id, duration, keys: input });
-      toast.success(`${data.added} key${data.added === 1 ? "" : "s"} added to ${DURATION_LABELS[duration]}${data.skipped ? `, ${data.skipped} duplicates skipped` : ""}`);
+      const { data } = await api.post("/admin/keystock", { product_id: product.id, duration, keys: input, mode });
+      const noun = mode === "accounts" ? "account" : "key";
+      toast.success(`${data.added} ${noun}${data.added === 1 ? "" : "s"} added to ${DURATION_LABELS[duration]}${data.skipped ? `, ${data.skipped} duplicates skipped` : ""}${data.invalid ? `, ${data.invalid} invalid lines skipped` : ""}`);
       setInput("");
       load();
       onChanged && onChanged();
@@ -80,7 +82,27 @@ export default function KeyManager({ product, onClose, onChanged }) {
         </div>
 
         <div className="mt-5">
-          <label className="text-sm text-slate-300 block mb-2">Add keys — one per line, into a duration pool</label>
+          <div className="flex gap-2 mb-3" data-testid="keys-mode-toggle">
+            {[["keys", "License keys"], ["accounts", "Discord accounts"]].map(([m, label]) => (
+              <button
+                key={m}
+                onClick={() => { setMode(m); setInput(""); }}
+                data-testid={`keys-mode-${m}`}
+                className={`px-4 py-2 rounded-lg text-xs font-mono font-bold uppercase tracking-widest border transition-all ${
+                  mode === m
+                    ? "bg-blue-400 text-[#050B18] border-blue-400"
+                    : "border-slate-700 text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <label className="text-sm text-slate-300 block mb-2">
+            {mode === "keys"
+              ? "Add keys — one per line, into a duration pool"
+              : "Add Discord accounts — one per line as email:email password:discord password:discord token"}
+          </label>
           <div className="flex gap-3 mb-3">
             <Select value={duration} onValueChange={setDuration}>
               <SelectTrigger data-testid="keys-duration-select" className="w-44 bg-[#050B18] border-[#1E2D4A]">
@@ -97,7 +119,9 @@ export default function KeyManager({ product, onClose, onChanged }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             rows={4}
-            placeholder={"XXXX-XXXX-XXXX-XXXX\nYYYY-YYYY-YYYY-YYYY"}
+            placeholder={mode === "keys"
+              ? "XXXX-XXXX-XXXX-XXXX\nYYYY-YYYY-YYYY-YYYY"
+              : "buyer@mail.com:emailpass123:discordpass456:MTIzNDU2.token.xyz\nnext@mail.com:pass2:dpass2:OTk4.token.abc"}
             data-testid="keys-input"
             className="w-full rounded-lg bg-[#050B18] border border-[#1E2D4A] focus:border-[#2E6BFF] focus:outline-none font-mono text-sm p-3 text-slate-100 placeholder:text-slate-600"
           />
@@ -127,6 +151,11 @@ export default function KeyManager({ product, onClose, onChanged }) {
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#2E6BFF]/10 border border-[#2E6BFF]/30 text-[#8FB8E8] uppercase tracking-wider shrink-0">
                 {DURATION_LABELS[k.duration] || k.duration || "—"}
               </span>
+              {k.account && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-400/10 border border-violet-400/30 text-violet-300 uppercase tracking-wider shrink-0">
+                  Account
+                </span>
+              )}
               <code className="font-mono text-sm text-slate-100 flex-1 truncate">{k.key}</code>
               {k.status === "available" ? (
                 <>

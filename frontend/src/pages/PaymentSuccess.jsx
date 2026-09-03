@@ -92,10 +92,21 @@ export default function PaymentSuccess() {
                   ))}
                 </div>
                 <div className="mt-6 p-4 border border-dashed border-[#2E6BFF]/30 rounded-lg text-sm text-slate-400 leading-relaxed">
-                  <span className="text-white font-semibold block mb-2">Setup in 60 seconds</span>
-                  1. Download your loader using the button next to your product above (also in your email).
-                  2. Run as Administrator and paste your key.
-                  3. Launch your game and press INSERT to open the menu.
+                  {state.order.items.some((i) => i.account) ? (
+                    <>
+                      <span className="text-white font-semibold block mb-2">Your Discord account</span>
+                      1. Open Discord and log in with the email and Discord password above.
+                      2. Change the email and password so the account is fully yours.
+                      3. Keep the token safe — it's proof of access and never shown again here.
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-white font-semibold block mb-2">Setup in 60 seconds</span>
+                      1. Download your loader using the button next to your product above (also in your email).
+                      2. Run as Administrator and paste your key.
+                      3. Launch your game and press INSERT to open the menu.
+                    </>
+                  )}
                 </div>
               </div>
 

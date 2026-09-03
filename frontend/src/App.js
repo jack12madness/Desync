@@ -11,6 +11,7 @@ import ProductPage from "@/pages/ProductPage";
 import StatusPage from "@/pages/StatusPage";
 import OrderLookup from "@/pages/OrderLookup";
 import PaymentSuccess from "@/pages/PaymentSuccess";
+import BankPending from "@/pages/BankPending";
 import PaymentCancel from "@/pages/PaymentCancel";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
@@ -53,6 +54,7 @@ function App() {
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/payment/success" element={<PaymentSuccess />} />
+            <Route path="/payment/bank-pending" element={<BankPending />} />
             <Route path="/payment/cancel" element={<PaymentCancel />} />
             <Route path="/admin" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />

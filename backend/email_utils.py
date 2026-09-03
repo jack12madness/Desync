@@ -161,6 +161,43 @@ def _key_box(key: str) -> str:
     )
 
 
+def _account_box(account: dict) -> str:
+    rows = ""
+    for label, field in (("Email", "email"), ("Email password", "email_password"),
+                         ("Discord password", "discord_password"), ("Discord token", "discord_token")):
+        rows += (
+            '<tr><td style="color:#64748B;font-size:12px;padding:3px 0">' + label + '</td>'
+            '<td style="font-family:Courier,monospace;font-size:13px;color:#7FB0FF;text-align:right;word-break:break-all">'
+            + escape(account.get(field, "")) + '</td></tr>'
+        )
+    return (
+        '<table role="presentation" width="100%" style="background:#050B18;border:1px solid #1E2D4A;'
+        'border-radius:8px;padding:12px 16px;margin:8px 0">' + rows + '</table>'
+        '<div style="color:#94A3B8;font-size:11px;margin-top:4px">Log in with these details, then change the '
+        'passwords so the account is fully yours.</div>'
+    )
+
+
+def _deliverables_html(it: dict) -> str:
+    dels = it.get("deliverables") or []
+    if not dels and it.get("license_key"):
+        dels = [{"license_key": it["license_key"], "account": it.get("account")}]
+    if not dels:
+        return ('<div style="color:#F5C158;font-size:12px;margin-top:8px">Key is being assigned — '
+                'it will appear on your My Orders page shortly.</div>')
+    qty = max(1, int(it.get("qty") or 1))
+    out = ""
+    if qty > 1:
+        out += ('<div style="color:#94A3B8;font-size:12px;margin:8px 0 2px">'
+                + str(len(dels)) + ' of ' + str(qty) + ' delivered:</div>')
+    for i, d in enumerate(dels):
+        if qty > 1:
+            out += ('<div style="color:#64748B;font-size:11px;font-family:Courier,monospace;margin-top:8px">#'
+                    + str(i + 1) + '</div>')
+        out += _account_box(d["account"]) if d.get("account") else _key_box(d["license_key"])
+    return out
+
+
 async def send_order_email(order: dict) -> None:
     rows = ""
     for it in order["items"]:
@@ -168,9 +205,9 @@ async def send_order_email(order: dict) -> None:
             '<tr><td style="padding:14px 0;border-bottom:1px solid #1E2D4A">'
             '<div style="color:#F1F5F9;font-weight:600;font-size:15px">' + escape(it["name"]) + '</div>'
             '<div style="color:#94A3B8;font-size:12px;margin-top:2px">'
-            + escape(it["game"]) + ' &middot; ' + escape(it["duration_label"]) + '</div>'
-            + (_key_box(it["license_key"]) if it.get("license_key") else
-               '<div style="color:#F5C158;font-size:12px;margin-top:8px">Key is being assigned — it will appear on your My Orders page shortly.</div>')
+            + escape(it["game"]) + ' &middot; ' + escape(it["duration_label"])
+            + (' &middot; &times;' + str(it["qty"]) if (it.get("qty") or 1) > 1 else '') + '</div>'
+            + _deliverables_html(it)
             + ('<div style="margin-top:10px"><a href="' + STORE_URL + it["download_url"] + '" '
                'style="display:inline-block;background:#2E6BFF;color:#ffffff;font-size:13px;font-weight:600;'
                'padding:9px 16px;border-radius:8px;text-decoration:none">Download loader</a>'
@@ -247,3 +284,82 @@ async def send_announce_email(to: str, subject: str, message: str) -> None:
         + link_html
     )
     await send_email(to=to, subject=subject, html=_shell("Announcement", inner))
+
+
+async def send_bank_transfer_email(order: dict, bank: dict, reference: str, expires_at: str) -> None:
+    rows = ""
+    for it in order["items"]:
+        rows += (
+            '<tr><td style="padding:10px 0;border-bottom:1px solid #1E2D4A">'
+            '<div style="color:#F1F5F9;font-weight:600;font-size:14px">' + escape(it["name"]) + '</div>'
+            '<div style="color:#94A3B8;font-size:12px;margin-top:2px">'
+            + escape(it["game"]) + ' &middot; ' + escape(it["duration_label"]) + '</div></td></tr>'
+        )
+
+    def bank_row(label, value):
+        if not value:
+            return ""
+        return (
+            '<tr><td style="color:#64748B;font-size:12px;padding:4px 0">' + escape(label) + '</td>'
+            '<td style="color:#F1F5F9;font-size:13px;font-family:Courier,monospace;text-align:right">'
+            + escape(value) + '</td></tr>'
+        )
+
+    bank_table = (
+        '<table role="presentation" width="100%" style="background:#050B18;border:1px solid #1E2D4A;'
+        'border-radius:8px;padding:14px 16px;margin:14px 0">'
+        + bank_row("PayID", bank.get("payid"))
+        + bank_row("BSB", bank.get("bank_bsb"))
+        + bank_row("Account number", bank.get("bank_account_number"))
+        + bank_row("Account name", bank.get("bank_account_name"))
+        + bank_row("Amount", "EUR %.2f" % order.get("total", 0))
+        + '</table>'
+    )
+    link_html = ""
+    if STORE_URL:
+        link_html = (
+            '<p style="margin:16px 0 0"><a href="' + STORE_URL + '/orders" '
+            'style="color:#2E6BFF;font-size:13px">Check your order on the My Orders page</a></p>'
+        )
+    inner = (
+        '<p style="color:#F1F5F9;font-size:15px;margin:0 0 6px">Your order is reserved — complete the bank transfer to release your keys.</p>'
+        '<p style="color:#94A3B8;font-size:13px;margin:0 0 8px">Order <strong style="color:#F1F5F9">'
+        + escape(order["id"][:8].upper()) + '</strong></p>'
+        '<table role="presentation" width="100%">' + rows + '</table>'
+        + bank_table +
+        '<p style="color:#F5C158;font-size:13px;margin:0">Important: use reference <strong>'
+        + escape(reference) + '</strong> so we can match your payment.</p>'
+        '<p style="color:#94A3B8;font-size:12px;margin-top:14px">Bank transfers are not instant delivery — '
+        'we manually confirm each payment. Once your payment arrives we mark the order paid and your '
+        'license key is emailed automatically. This reservation expires after 48 hours ('
+        + escape(expires_at[:16].replace("T", " ")) + ' UTC) if no payment is received.</p>'
+        + link_html
+    )
+    await send_email(
+        to=order["email"],
+        subject="Complete your bank transfer - " + EMAIL_FROM_NAME + " order " + order["id"][:8].upper(),
+        html=_shell("Bank Transfer Instructions", inner),
+    )
+
+
+async def send_bank_expired_email(order: dict) -> None:
+    link_html = ""
+    if STORE_URL:
+        link_html = (
+            '<p style="margin:18px 0 0"><a href="' + STORE_URL + '" '
+            'style="display:inline-block;background:#2E6BFF;color:#ffffff;text-decoration:none;'
+            'font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px">Back to the shop</a></p>'
+        )
+    inner = (
+        '<p style="color:#F1F5F9;font-size:15px;margin:0 0 10px">Your bank-transfer order has expired.</p>'
+        '<p style="color:#94A3B8;font-size:13px;margin:0">Order <strong style="color:#F1F5F9">'
+        + escape(order["id"][:8].upper()) + '</strong> was cancelled because no payment arrived within '
+        '48 hours. If you still want the product, just place a new order — nothing was charged.</p>'
+        + link_html
+    )
+    await send_email(
+        to=order["email"],
+        subject=EMAIL_FROM_NAME + " order " + order["id"][:8].upper() + " expired",
+        html=_shell("Order Expired", inner),
+    )
+

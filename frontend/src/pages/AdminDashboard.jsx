@@ -13,11 +13,13 @@ import KeyManager from "@/components/KeyManager";
 import SalesStats from "@/components/SalesStats";
 import CouponsTab from "@/components/CouponsTab";
 import CategoriesTab from "@/components/CategoriesTab";
+import CustomersTab from "@/components/CustomersTab";
+import ExpensesTab from "@/components/ExpensesTab";
 
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
   features: [], anticheat: "", prices: { day: "", week: "", month: "", lifetime: "" },
-  active: true, sort_order: 0,
+  min_buy: 1, active: true, sort_order: 0,
 };
 
 function ProductForm({ initial, categories, onSave, onClose }) {
@@ -49,7 +51,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
       features: typeof form.features === "string"
         ? form.features.split(",").map((s) => s.trim()).filter(Boolean)
         : form.features,
-      prices, active: form.active, sort_order: Number(form.sort_order) || 0,
+      prices, min_buy: Math.max(1, parseInt(form.min_buy) || 1), active: form.active, sort_order: Number(form.sort_order) || 0,
     }, loaderFile, removeLoader);
   };
 
@@ -162,6 +164,10 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             <label className={labelCls}>Sort Order</label>
             <Input type="number" value={form.sort_order} onChange={(e) => set("sort_order", e.target.value)} data-testid="product-form-sort" className={fieldCls} />
           </div>
+          <div>
+            <label className={labelCls}>Min per purchase (e.g. 5 for account packs)</label>
+            <Input type="number" min="1" value={form.min_buy} onChange={(e) => set("min_buy", e.target.value)} data-testid="product-form-min-buy" className={fieldCls} />
+          </div>
           <div className="flex items-end pb-1">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -197,6 +203,7 @@ export default function AdminDashboard() {
   const [stockCounts, setStockCounts] = useState({});
   const [categories, setCategories] = useState([]);
   const [notifyEmail, setNotifyEmail] = useState("");
+  const [bank, setBank] = useState({ payid: "", bank_bsb: "", bank_account_number: "", bank_account_name: "" });
   const [newUser, setNewUser] = useState({ username: "", password: "", role: "admin" });
   const navigate = useNavigate();
 
@@ -224,11 +231,17 @@ export default function AdminDashboard() {
   const loadStockCounts = () =>
     api.get("/admin/keystock/counts").then(({ data }) => setStockCounts(data)).catch(() => {});
   const loadOrders = () => api.get("/admin/orders").then(({ data }) => setOrders(data)).catch(() => {});
-  const loadSettings = () => api.get("/admin/settings").then(({ data }) => setNotifyEmail(data.notify_email || "")).catch(() => {});
+  const loadSettings = () => api.get("/admin/settings").then(({ data }) => {
+    setNotifyEmail(data.notify_email || "");
+    setBank({
+      payid: data.payid || "", bank_bsb: data.bank_bsb || "",
+      bank_account_number: data.bank_account_number || "", bank_account_name: data.bank_account_name || "",
+    });
+  }).catch(() => {});
   const saveSettings = async () => {
     try {
-      await api.put("/admin/settings", { notify_email: notifyEmail });
-      toast.success("Alert email saved");
+      await api.put("/admin/settings", { notify_email: notifyEmail, ...bank });
+      toast.success("Settings saved");
     } catch (e) {
       toast.error(apiError(e));
     }
@@ -326,6 +339,16 @@ export default function AdminDashboard() {
     }
   };
 
+  const markPaid = async (orderId) => {
+    try {
+      await api.post(`/admin/orders/${orderId}/mark-paid`);
+      toast.success("Marked paid — key assigned and emailed to the buyer");
+      loadOrders();
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
+
 
   if (!admin) {
     return (
@@ -362,6 +385,8 @@ export default function AdminDashboard() {
             <TabsTrigger value="categories" data-testid="admin-tab-categories" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Categories</TabsTrigger>
             <TabsTrigger value="orders" data-testid="admin-tab-orders" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Orders</TabsTrigger>
             <TabsTrigger value="coupons" data-testid="admin-tab-coupons" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Coupons</TabsTrigger>
+            <TabsTrigger value="customers" data-testid="admin-tab-customers" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Customers</TabsTrigger>
+            <TabsTrigger value="expenses" data-testid="admin-tab-expenses" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Expenses</TabsTrigger>
             {admin.role === "owner" && (
               <TabsTrigger value="staff" data-testid="admin-tab-staff" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Staff</TabsTrigger>
             )}
@@ -419,7 +444,7 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="orders">
-            <div className="mb-6 p-4 bg-[#0F1F38] border border-[#1E2D4A] rounded-lg flex flex-col sm:flex-row sm:items-center gap-3" data-testid="low-stock-settings">
+            <div className="mb-4 p-4 bg-[#0F1F38] border border-[#1E2D4A] rounded-lg flex flex-col sm:flex-row sm:items-center gap-3" data-testid="low-stock-settings">
               <div className="flex-1">
                 <div className="text-sm font-semibold text-white">Low-stock alerts</div>
                 <div className="text-xs text-slate-500">Get emailed when any product + duration pool drops to 4 keys, and again at 0</div>
@@ -440,6 +465,27 @@ export default function AdminDashboard() {
                 Save
               </button>
             </div>
+            <div className="mb-6 p-4 bg-[#0F1F38] border border-[#1E2D4A] rounded-lg" data-testid="bank-settings">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+                <div className="flex-1">
+                  <div className="text-sm font-semibold text-white">Bank transfer details</div>
+                  <div className="text-xs text-slate-500">Shown to buyers who choose Bank Transfer (PayID / BSB) at checkout</div>
+                </div>
+                <button
+                  onClick={saveSettings}
+                  data-testid="bank-settings-save"
+                  className="px-5 py-2.5 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold transition-all duration-200"
+                >
+                  Save
+                </button>
+              </div>
+              <div className="grid sm:grid-cols-4 gap-3">
+                <Input value={bank.payid} onChange={(e) => setBank({ ...bank, payid: e.target.value })} placeholder="PayID (email/phone)" data-testid="bank-payid-input" className="bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] h-10 font-mono text-sm" />
+                <Input value={bank.bank_bsb} onChange={(e) => setBank({ ...bank, bank_bsb: e.target.value })} placeholder="BSB" data-testid="bank-bsb-input" className="bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] h-10 font-mono text-sm" />
+                <Input value={bank.bank_account_number} onChange={(e) => setBank({ ...bank, bank_account_number: e.target.value })} placeholder="Account number" data-testid="bank-account-number-input" className="bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] h-10 font-mono text-sm" />
+                <Input value={bank.bank_account_name} onChange={(e) => setBank({ ...bank, bank_account_name: e.target.value })} placeholder="Account name" data-testid="bank-account-name-input" className="bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] h-10 font-mono text-sm" />
+              </div>
+            </div>
             <h2 className="font-display text-xl font-bold uppercase tracking-tight mb-6">{orders.length} Orders</h2>
             <div className="space-y-3" data-testid="admin-orders-list">
               {orders.length === 0 && (
@@ -451,11 +497,26 @@ export default function AdminDashboard() {
                     <span className="font-mono text-sm text-blue-300">{o.email}</span>
                     <span className="font-mono text-sm font-bold text-slate-100">{eur(o.total)}</span>
                     <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 border rounded-lg ${
-                      o.payment_status === "paid" ? "text-emerald-400 border-emerald-400/40" : "text-amber-400 border-amber-400/40"
+                      o.payment_status === "paid" ? "text-emerald-400 border-emerald-400/40"
+                      : o.payment_status === "cancelled" ? "text-rose-400 border-rose-400/40"
+                      : o.payment_status === "awaiting_payment" ? "text-sky-300 border-sky-400/40"
+                      : "text-amber-400 border-amber-400/40"
                     }`}>
-                      {o.payment_status}
+                      {o.payment_status === "awaiting_payment" ? "awaiting bank transfer" : o.payment_status}
                     </span>
+                    {o.provider === "bank_transfer" && o.reference && (
+                      <span className="text-[10px] font-mono text-slate-500" data-testid={`order-reference-${o.id}`}>ref {o.reference}</span>
+                    )}
                     <span className="text-[10px] font-mono text-slate-600">{new Date(o.created_at).toLocaleString()}</span>
+                    {o.payment_status === "awaiting_payment" && o.provider === "bank_transfer" && (
+                      <button
+                        onClick={() => markPaid(o.id)}
+                        data-testid={`mark-paid-${o.id}`}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-400/10 border border-emerald-400/40 text-emerald-300 text-xs font-medium hover:bg-emerald-400/20 transition-colors"
+                      >
+                        Payment arrived — mark paid
+                      </button>
+                    )}
                     {o.keys_pending && (
                       <button
                         onClick={() => assignKeys(o.id)}
@@ -490,6 +551,14 @@ export default function AdminDashboard() {
 
           <TabsContent value="coupons">
             <CouponsTab />
+          </TabsContent>
+
+          <TabsContent value="customers">
+            <CustomersTab />
+          </TabsContent>
+
+          <TabsContent value="expenses">
+            <ExpensesTab />
           </TabsContent>
 
           {admin.role === "owner" && (

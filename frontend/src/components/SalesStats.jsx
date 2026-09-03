@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Euro, ShoppingBag, KeyRound, Users } from "lucide-react";
+import { Euro, ShoppingBag, KeyRound, Users, Receipt, TrendingUp } from "lucide-react";
 import { api, eur } from "@/lib/api";
 
 export default function SalesStats() {
@@ -15,9 +15,11 @@ export default function SalesStats() {
 
   const cards = [
     { icon: Euro, label: "Revenue", value: eur(stats.total_revenue), testid: "stat-revenue" },
+    { icon: Receipt, label: "Expenses", value: eur(stats.total_expenses ?? 0), testid: "stat-expenses" },
+    { icon: TrendingUp, label: "Profit", value: eur(stats.profit ?? stats.total_revenue), testid: "stat-profit" },
     { icon: ShoppingBag, label: "Paid Orders", value: stats.total_orders, testid: "stat-orders" },
     { icon: KeyRound, label: "Keys Sold", value: stats.keys_sold, testid: "stat-keys" },
-    { icon: Users, label: "Drop Waitlist", value: stats.waitlist, testid: "stat-waitlist" },
+    { icon: Users, label: "Customers", value: stats.customers ?? 0, testid: "stat-customers" },
   ];
 
   const byProduct = Object.entries(stats.by_product || {})
@@ -27,7 +29,7 @@ export default function SalesStats() {
 
   return (
     <div className="mb-10" data-testid="admin-stats">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         {cards.map((c) => (
           <div key={c.label} className="p-5 bg-[#0F1F38] border border-[#1E2D4A] rounded-xl" data-testid={c.testid}>
             <div className="flex items-center gap-2 text-slate-500 mb-2">

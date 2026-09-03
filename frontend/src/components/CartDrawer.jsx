@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { X, Lock, ArrowRight, Tag } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { X, Lock, ArrowRight, Tag, Landmark, Minus, Plus } from "lucide-react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,8 @@ const PAYPAL_CLIENT_ID = process.env.REACT_APP_PAYPAL_CLIENT_ID;
 const SHOW_PAYPAL = false; // PayPal hidden for now — set true to re-enable
 
 export default function CartDrawer() {
-  const { items, removeItem, total, isOpen, closeCart } = useCart();
+  const { items, removeItem, setQty, total, isOpen, closeCart } = useCart();
+  const navigate = useNavigate();
   const [email, setEmail] = useState(() => localStorage.getItem("void_email") || "");
   const [couponInput, setCouponInput] = useState("");
   const [coupon, setCoupon] = useState(null);
@@ -25,7 +27,7 @@ export default function CartDrawer() {
   const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
   const cartPayload = () => ({
     email,
-    items: items.map((i) => ({ product_id: i.product.id, duration: i.duration })),
+    items: items.map((i) => ({ product_id: i.product.id, duration: i.duration, qty: i.qty || 1 })),
     coupon: coupon ? coupon.code : null,
   });
 
@@ -67,6 +69,32 @@ export default function CartDrawer() {
     }
   };
 
+  const bankCheckout = async () => {
+    if (!validEmail) {
+      toast.error("Enter a valid email — your keys are delivered there");
+      return;
+    }
+    if (!agreed) {
+      toast.error("Please agree to the Terms of Service first");
+      return;
+    }
+    if (items.length === 0) return;
+    setLoading(true);
+    try {
+      localStorage.setItem("void_email", email);
+      const { data } = await api.post("/payments/bank-transfer", {
+        ...cartPayload(),
+        origin_url: window.location.origin,
+      });
+      navigate(`/payment/bank-pending?order=${data.order_id}`);
+      closeCart();
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && closeCart()}>
       <SheetContent
@@ -97,9 +125,28 @@ export default function CartDrawer() {
                 <div className="text-sm font-semibold truncate text-white">{item.product.name}</div>
                 <div className="text-xs text-slate-500">
                   {item.product.game} · {DURATION_LABELS[item.duration]}
+                  {(item.qty || 1) > 1 && <span className="text-[#8FB8E8]"> × {item.qty}</span>}
+                </div>
+                <div className="flex items-center gap-1.5 mt-1.5" data-testid={`qty-stepper-${item.product.id}`}>
+                  <button
+                    onClick={() => setQty(idx, (item.qty || 1) - 1)}
+                    disabled={(item.qty || 1) <= Math.max(1, item.product.min_buy || 1)}
+                    data-testid={`qty-minus-${item.product.id}`}
+                    className="w-5 h-5 inline-flex items-center justify-center rounded border border-[#1E2D4A] text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <span className="font-mono text-xs text-slate-300 w-6 text-center" data-testid={`qty-value-${item.product.id}`}>{item.qty || 1}</span>
+                  <button
+                    onClick={() => setQty(idx, (item.qty || 1) + 1)}
+                    data-testid={`qty-plus-${item.product.id}`}
+                    className="w-5 h-5 inline-flex items-center justify-center rounded border border-[#1E2D4A] text-slate-400 hover:text-white transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
                 </div>
               </div>
-              <div className="font-mono text-sm font-bold text-[#8FB8E8]">{eur(item.price)}</div>
+              <div className="font-mono text-sm font-bold text-[#8FB8E8]">{eur(item.price * (item.qty || 1))}</div>
               <button
                 onClick={() => removeItem(idx)}
                 data-testid={`cart-remove-${item.product.id}`}
@@ -207,6 +254,19 @@ export default function CartDrawer() {
             {loading ? "Redirecting to Stripe..." : "Pay with card"}
             {!loading && <ArrowRight className="w-4 h-4" />}
           </button>
+
+          <button
+            onClick={bankCheckout}
+            disabled={loading || items.length === 0 || !agreed}
+            data-testid="cart-bank-transfer-button"
+            className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg border border-[#2E6BFF]/40 text-[#8FB8E8] text-sm font-semibold hover:bg-[#2E6BFF]/10 disabled:opacity-40 disabled:pointer-events-none transition-all duration-200"
+          >
+            <Landmark className="w-4 h-4" />
+            {loading ? "Reserving..." : "Bank Transfer (PayID / BSB)"}
+          </button>
+          <p className="text-center text-[11px] text-slate-500 -mt-1" data-testid="bank-transfer-note">
+            Bank transfer is manually confirmed — not instant delivery
+          </p>
 
           {SHOW_PAYPAL && PAYPAL_CLIENT_ID && (
             <div data-testid="paypal-section">

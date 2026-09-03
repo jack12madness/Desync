@@ -21,7 +21,8 @@ import bcrypt
 import jwt
 import stripe
 
-from email_utils import send_order_email, send_waitlist_email, send_low_stock_email, send_announce_email
+from email_utils import (send_order_email, send_waitlist_email, send_low_stock_email, send_announce_email,
+                         send_bank_transfer_email, send_bank_expired_email)
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -164,6 +165,7 @@ class ProductIn(BaseModel):
     features: List[str] = []
     anticheat: str = ""
     prices: Dict[str, float] = {}
+    min_buy: int = 1
     active: bool = True
     sort_order: int = 0
 
@@ -182,6 +184,7 @@ class AdminUserIn(BaseModel):
 class CartItemIn(BaseModel):
     product_id: str
     duration: str
+    qty: int = 1
 
 
 class CheckoutIn(BaseModel):
@@ -257,6 +260,9 @@ async def startup():
     await db.waitlist.create_index("email", unique=True)
     await db.keystock.create_index([("product_id", 1), ("status", 1)])
     await db.categories.create_index("id", unique=True)
+    await db.customers.create_index("email", unique=True)
+    await db.expenses.create_index("id", unique=True)
+    asyncio.create_task(_bank_expiry_loop())
     try:
         init_storage()
         logger.info("Object storage initialized")
@@ -592,6 +598,7 @@ class KeyStockIn(BaseModel):
     product_id: str
     duration: str = "day"
     keys: str
+    mode: str = "keys"  # "keys" (one per line) or "accounts" (email:emailpass:discordpass:token per line)
 
 
 @api_router.get("/admin/keystock/counts")
@@ -628,9 +635,23 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
     if not lines:
         raise HTTPException(400, "No keys provided")
     seen = set()
-    added, skipped = 0, 0
+    added, skipped, invalid = 0, 0, 0
     now = datetime.now(timezone.utc).isoformat()
-    for key in lines:
+    for line in lines:
+        account = None
+        key = line
+        if body.mode == "accounts":
+            parts = line.split(":")
+            if len(parts) < 4 or not all(parts[i].strip() for i in (0, 1, 2)) or not parts[-1].strip():
+                invalid += 1
+                continue
+            account = {
+                "email": parts[0].strip(),
+                "email_password": parts[1].strip(),
+                "discord_password": ":".join(parts[2:-1]).strip(),
+                "discord_token": parts[-1].strip(),
+            }
+            key = account["email"]
         if key in seen:
             skipped += 1
             continue
@@ -639,13 +660,16 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
         if exists:
             skipped += 1
             continue
-        await db.keystock.insert_one({
+        doc = {
             "id": str(uuid.uuid4()), "product_id": body.product_id, "duration": body.duration,
             "key": key, "status": "available", "assigned_order_id": None, "assigned_at": None,
             "created_at": now,
-        })
+        }
+        if account:
+            doc["account"] = account
+        await db.keystock.insert_one(doc)
         added += 1
-    return {"added": added, "skipped": skipped}
+    return {"added": added, "skipped": skipped, "invalid": invalid}
 
 
 @api_router.delete("/admin/keystock/{key_id}")
@@ -663,6 +687,10 @@ class SettingsIn(BaseModel):
     drop_date: Optional[str] = None
     drop_teaser: Optional[str] = None
     checklist: Optional[dict] = None
+    payid: Optional[str] = None
+    bank_bsb: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_account_name: Optional[str] = None
 
 
 @api_router.get("/admin/settings")
@@ -730,12 +758,18 @@ async def admin_stats(admin: dict = Depends(get_admin)):
     ]
     rows = await db.orders.aggregate(pipeline).to_list(500)
     by_product = {r["_id"]: {"sold": r["sold"], "revenue": round(r["revenue"], 2)} for r in rows}
-    paid = await db.orders.find({"payment_status": "paid"}, {"_id": 0, "total": 1}).to_list(10000)
+    paid = await db.orders.find({"payment_status": "paid"}, {"_id": 0, "total": 1, "email": 1}).to_list(10000)
+    revenue = round(sum(o.get("total", 0) for o in paid), 2)
+    expenses = await db.expenses.find({}, {"_id": 0, "amount": 1}).to_list(10000)
+    total_expenses = round(sum(e.get("amount", 0) for e in expenses), 2)
     return {
-        "total_revenue": round(sum(o.get("total", 0) for o in paid), 2),
+        "total_revenue": revenue,
         "total_orders": len(paid),
         "keys_sold": sum(v["sold"] for v in by_product.values()),
+        "customers": len({o.get("email") for o in paid if o.get("email")}),
         "waitlist": await db.waitlist.count_documents({}),
+        "total_expenses": total_expenses,
+        "profit": round(revenue - total_expenses, 2),
         "by_product": by_product,
     }
 
@@ -751,7 +785,11 @@ async def admin_assign_keys(order_id: str, admin: dict = Depends(get_admin)):
     assigned = 0
     still_pending = False
     for item in items:
-        if item.get("key_pending") or not item.get("license_key"):
+        qty = max(1, int(item.get("qty") or 1))
+        deliverables = item.get("deliverables") or []
+        if item.get("license_key") and not deliverables:
+            deliverables = [{"license_key": item["license_key"], "account": item.get("account")}]
+        while len(deliverables) < qty:
             key_doc = await db.keystock.find_one_and_update(
                 {"product_id": item["product_id"], "duration": item["duration"], "status": "available"},
                 {"$set": {
@@ -761,12 +799,17 @@ async def admin_assign_keys(order_id: str, admin: dict = Depends(get_admin)):
                 }},
                 sort=[("created_at", 1)],
             )
-            if key_doc:
-                item["license_key"] = key_doc["key"]
-                item["key_pending"] = False
-                assigned += 1
-            else:
-                still_pending = True
+            if not key_doc:
+                break
+            deliverables.append({"license_key": key_doc["key"], "account": key_doc.get("account")})
+            assigned += 1
+        if deliverables:
+            item["deliverables"] = deliverables
+            item["license_key"] = deliverables[0]["license_key"]
+            item["account"] = deliverables[0].get("account")
+        item["key_pending"] = len(deliverables) < qty
+        if item["key_pending"]:
+            still_pending = True
     if assigned:
         await db.orders.update_one(
             {"id": order_id},
@@ -796,6 +839,242 @@ async def admin_resend_order_email(order_id: str, admin: dict = Depends(get_admi
         raise HTTPException(500, f"Email send failed: {e}")
     await db.orders.update_one({"id": order_id}, {"$set": {"email_sent": True}})
     return {"sent": True, "email": order["email"]}
+
+
+# ---------- payments: bank transfer (PayID / BSB) ----------
+
+BANK_ORDER_TTL_HOURS = 48
+
+
+async def _bank_details() -> dict:
+    settings = await db.settings.find_one({"id": "main"}, {"_id": 0}) or {}
+    return {
+        "payid": settings.get("payid"),
+        "bank_bsb": settings.get("bank_bsb"),
+        "bank_account_number": settings.get("bank_account_number"),
+        "bank_account_name": settings.get("bank_account_name"),
+    }
+
+
+@api_router.post("/payments/bank-transfer")
+async def bank_transfer_checkout(body: CheckoutIn):
+    if not body.items:
+        raise HTTPException(400, "Cart is empty")
+    items, subtotal_cents, total_cents, discount_pct, coupon_code = await _price_cart(body.items, body.coupon)
+    total = total_cents / 100.0
+    order_id = str(uuid.uuid4())
+    reference = "DS-" + order_id[:8].upper()
+    now = datetime.now(timezone.utc)
+    order = {
+        "id": order_id, "email": body.email.lower(), "items": items,
+        "subtotal": subtotal_cents / 100.0, "total": total,
+        "discount": round((subtotal_cents - total_cents) / 100.0, 2),
+        "currency": "eur", "provider": "bank_transfer",
+        "payment_session_id": f"bank-{order_id}", "reference": reference,
+        "coupon_code": coupon_code,
+        "status": "awaiting_payment", "payment_status": "awaiting_payment",
+        "download_token": secrets.token_urlsafe(24),
+        "expires_at": (now + timedelta(hours=BANK_ORDER_TTL_HOURS)).isoformat(),
+        "created_at": now.isoformat(), "updated_at": now.isoformat(),
+    }
+    await db.orders.insert_one(order)
+    bank = await _bank_details()
+    try:
+        await send_bank_transfer_email(order, bank, reference, order["expires_at"])
+    except Exception as e:
+        logger.error("Bank transfer email failed for %s: %s", order_id, e)
+    return {
+        "order_id": order_id, "reference": reference, "total": total,
+        "expires_at": order["expires_at"], "bank": bank,
+    }
+
+
+@api_router.get("/payments/bank-transfer/{order_id}")
+async def bank_transfer_details(order_id: str):
+    order = await db.orders.find_one(
+        {"id": order_id, "provider": "bank_transfer", "payment_status": "awaiting_payment"}, {"_id": 0}
+    )
+    if not order:
+        raise HTTPException(404, "Order not found or no longer awaiting payment")
+    return {
+        "order_id": order["id"], "reference": order["reference"], "total": order["total"],
+        "expires_at": order["expires_at"], "bank": await _bank_details(),
+        "items": [{"name": i["name"], "duration_label": i["duration_label"]} for i in order["items"]],
+    }
+
+
+@api_router.post("/admin/orders/{order_id}/mark-paid")
+async def admin_mark_paid(order_id: str, admin: dict = Depends(get_admin)):
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order.get("provider") != "bank_transfer":
+        raise HTTPException(400, "Only bank transfer orders can be marked paid manually")
+    if order.get("payment_status") != "awaiting_payment":
+        raise HTTPException(400, "Order is not awaiting payment")
+    updated = await _fulfill_order({"id": order_id})
+    return {"fulfilled": bool(updated and updated.get("payment_status") == "paid"), "order_id": order_id}
+
+
+async def _bank_expiry_loop():
+    while True:
+        try:
+            now = datetime.now(timezone.utc).isoformat()
+            expired = await db.orders.find(
+                {"provider": "bank_transfer", "payment_status": "awaiting_payment", "expires_at": {"$lt": now}},
+                {"_id": 0},
+            ).to_list(100)
+            for o in expired:
+                res = await db.orders.update_one(
+                    {"id": o["id"], "payment_status": "awaiting_payment"},
+                    {"$set": {"payment_status": "cancelled", "status": "cancelled", "updated_at": now}},
+                )
+                if res.modified_count:
+                    try:
+                        await send_bank_expired_email(o)
+                    except Exception as e:
+                        logger.error("Bank expiry email failed for %s: %s", o["id"], e)
+        except Exception as e:
+            logger.error("Bank expiry loop error: %s", e)
+        await asyncio.sleep(900)
+
+
+# ---------- admin: customers ----------
+
+class CustomerIn(BaseModel):
+    email: EmailStr
+    name: Optional[str] = None
+    note: Optional[str] = None
+
+
+class SendKeyIn(BaseModel):
+    email: EmailStr
+    product_id: str
+    duration: str
+
+
+@api_router.get("/admin/customers")
+async def admin_customers(admin: dict = Depends(get_admin)):
+    pipeline = [
+        {"$match": {"payment_status": "paid"}},
+        {"$group": {
+            "_id": "$email", "total_spent": {"$sum": "$total"}, "orders": {"$sum": 1},
+            "last_order": {"$max": "$created_at"},
+        }},
+    ]
+    rows = await db.orders.aggregate(pipeline).to_list(5000)
+    by_email = {}
+    for r in rows:
+        by_email[r["_id"]] = {
+            "email": r["_id"], "total_spent": round(r["total_spent"], 2),
+            "orders": r["orders"], "last_order": r["last_order"], "manual": False,
+        }
+    for m in await db.customers.find({}, {"_id": 0}).to_list(5000):
+        e = by_email.setdefault(m["email"], {
+            "email": m["email"], "total_spent": 0.0, "orders": 0, "last_order": None, "manual": True,
+        })
+        e["manual"] = True
+        if m.get("name"):
+            e["name"] = m["name"]
+        if m.get("note"):
+            e["note"] = m["note"]
+    return sorted(by_email.values(), key=lambda x: x["total_spent"], reverse=True)
+
+
+@api_router.post("/admin/customers")
+async def admin_add_customer(body: CustomerIn, admin: dict = Depends(get_admin)):
+    email = body.email.lower()
+    await db.customers.update_one(
+        {"email": email},
+        {"$set": {
+            "email": email, "name": body.name, "note": body.note,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }, "$setOnInsert": {"id": str(uuid.uuid4()), "created_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return {"email": email}
+
+
+@api_router.post("/admin/customers/send-key")
+async def admin_send_key(body: SendKeyIn, admin: dict = Depends(get_admin)):
+    product = await db.products.find_one({"id": body.product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(404, "Product not found")
+    if body.duration not in DURATIONS or product.get("prices", {}).get(body.duration) is None:
+        raise HTTPException(400, "Duration not available for this product")
+    order_id = str(uuid.uuid4())
+    key_doc = await db.keystock.find_one_and_update(
+        {"product_id": body.product_id, "duration": body.duration, "status": "available"},
+        {"$set": {"status": "assigned", "assigned_order_id": order_id,
+                  "assigned_at": datetime.now(timezone.utc).isoformat()}},
+        sort=[("created_at", 1)],
+    )
+    if not key_doc:
+        raise HTTPException(400, "No keys in stock for this product + duration")
+    now = datetime.now(timezone.utc).isoformat()
+    item = {
+        "product_id": product["id"], "name": product["name"], "game": product["game"],
+        "duration": body.duration, "duration_label": DURATIONS[body.duration],
+        "unit_price": 0.0, "license_key": key_doc["key"],
+    }
+    if key_doc.get("account"):
+        item["account"] = key_doc["account"]
+    order = {
+        "id": order_id, "email": body.email.lower(),
+        "items": [item],
+        "subtotal": 0.0, "total": 0.0, "discount": 0.0, "currency": "eur",
+        "provider": "manual", "payment_session_id": f"manual-{order_id}",
+        "coupon_code": None, "status": "completed", "payment_status": "paid",
+        "download_token": secrets.token_urlsafe(24),
+        "paid_at": now, "created_at": now, "updated_at": now,
+    }
+    await db.orders.insert_one(order)
+    try:
+        await _attach_loader_links(order)
+        await send_order_email(order)
+        await db.orders.update_one({"id": order_id}, {"$set": {"email_sent": True}})
+    except Exception as e:
+        logger.error("Manual key email failed for %s: %s", order_id, e)
+        raise HTTPException(500, "Key assigned but email failed — check the order in the Orders tab")
+    return {"sent": True, "order_id": order_id}
+
+
+# ---------- admin: expenses ----------
+
+class ExpenseIn(BaseModel):
+    label: str
+    amount: float
+    category: str = "General"
+    date: Optional[str] = None
+
+
+@api_router.get("/admin/expenses")
+async def admin_expenses(admin: dict = Depends(get_admin)):
+    return await db.expenses.find({}, {"_id": 0}).sort("date", -1).to_list(2000)
+
+
+@api_router.post("/admin/expenses")
+async def admin_add_expense(body: ExpenseIn, admin: dict = Depends(get_admin)):
+    if not body.label.strip():
+        raise HTTPException(400, "Label required")
+    if body.amount <= 0:
+        raise HTTPException(400, "Amount must be positive")
+    doc = {
+        "id": str(uuid.uuid4()), "label": body.label.strip(),
+        "amount": round(body.amount, 2), "category": body.category.strip() or "General",
+        "date": body.date or datetime.now(timezone.utc).date().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.expenses.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@api_router.delete("/admin/expenses/{expense_id}")
+async def admin_delete_expense(expense_id: str, admin: dict = Depends(get_admin)):
+    res = await db.expenses.delete_one({"id": expense_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Expense not found")
+    return {"deleted": True}
 
 
 # ---------- coupons ----------
@@ -912,7 +1191,11 @@ async def _fulfill_order(where: dict) -> Optional[dict]:
     items = order["items"]
     keys_pending = False
     for item in items:
-        if not item.get("license_key"):
+        qty = max(1, int(item.get("qty") or 1))
+        deliverables = item.get("deliverables") or []
+        if item.get("license_key") and not deliverables:
+            deliverables = [{"license_key": item["license_key"], "account": item.get("account")}]
+        while len(deliverables) < qty:
             key_doc = await db.keystock.find_one_and_update(
                 {"product_id": item["product_id"], "duration": item["duration"], "status": "available"},
                 {"$set": {
@@ -922,24 +1205,31 @@ async def _fulfill_order(where: dict) -> Optional[dict]:
                 }},
                 sort=[("created_at", 1)],
             )
-            if key_doc:
-                item["license_key"] = key_doc["key"]
-                remaining = await db.keystock.count_documents(
-                    {"product_id": item["product_id"], "duration": item["duration"], "status": "available"}
-                )
-                if remaining in (0, 4):
-                    settings = await db.settings.find_one({"id": "main"}, {"_id": 0})
-                    notify = (settings or {}).get("notify_email")
-                    if notify:
-                        try:
-                            await send_low_stock_email(
-                                notify, item["name"], DURATIONS[item["duration"]], remaining
-                            )
-                        except Exception as e:
-                            logger.error("Low stock email failed: %s", e)
-            else:
-                item["key_pending"] = True
-                keys_pending = True
+            if not key_doc:
+                break
+            deliverables.append({"license_key": key_doc["key"], "account": key_doc.get("account")})
+            remaining = await db.keystock.count_documents(
+                {"product_id": item["product_id"], "duration": item["duration"], "status": "available"}
+            )
+            if remaining in (0, 4):
+                settings = await db.settings.find_one({"id": "main"}, {"_id": 0})
+                notify = (settings or {}).get("notify_email")
+                if notify:
+                    try:
+                        await send_low_stock_email(
+                            notify, item["name"], DURATIONS[item["duration"]], remaining
+                        )
+                    except Exception as e:
+                        logger.error("Low stock email failed: %s", e)
+        if deliverables:
+            item["deliverables"] = deliverables
+            item["license_key"] = deliverables[0]["license_key"]
+            item["account"] = deliverables[0].get("account")
+            item["key_pending"] = len(deliverables) < qty
+        else:
+            item["key_pending"] = True
+        if item["key_pending"]:
+            keys_pending = True
     res = await db.orders.update_one(
         {**where, "payment_status": {"$ne": "paid"}},
         {"$set": {
@@ -986,18 +1276,24 @@ async def _price_cart(items: List[CartItemIn], coupon: Optional[str]):
         price = product.get("prices", {}).get(item.duration)
         if price is None:
             raise HTTPException(400, f"Duration not available for {product['name']}")
+        min_buy = max(1, int(product.get("min_buy") or 1))
+        qty = max(1, int(getattr(item, "qty", 1) or 1))
+        if qty < min_buy:
+            raise HTTPException(400, f"{product['name']} has a minimum purchase of {min_buy}")
         in_stock = await db.keystock.count_documents(
             {"product_id": product["id"], "duration": item.duration, "status": "available"}
         )
         if in_stock == 0:
             raise HTTPException(400, f"{product['name']} ({DURATIONS[item.duration]}) is sold out")
+        if in_stock < qty:
+            raise HTTPException(400, f"Only {in_stock} left of {product['name']} ({DURATIONS[item.duration]})")
         unit_cents = int(round(float(price) * 100 * (1 - discount_pct / 100)))
-        subtotal_cents += int(round(float(price) * 100))
-        total_cents += unit_cents
+        subtotal_cents += int(round(float(price) * 100)) * qty
+        total_cents += unit_cents * qty
         order_items.append({
             "product_id": product["id"], "name": product["name"], "game": product["game"],
             "duration": item.duration, "duration_label": DURATIONS[item.duration],
-            "unit_price": unit_cents / 100.0, "license_key": None,
+            "unit_price": unit_cents / 100.0, "license_key": None, "qty": qty,
         })
     return order_items, subtotal_cents, total_cents, discount_pct, coupon_code
 
@@ -1017,7 +1313,7 @@ async def create_checkout(body: CheckoutIn):
                 "unit_amount": int(round(it["unit_price"] * 100)),
                 "product_data": {"name": f"{it['name']} — {it['duration_label']}", "tax_code": "txcd_10000000"},
             },
-            "quantity": 1,
+            "quantity": int(it.get("qty", 1)),
         }
         for it in order_items
     ]

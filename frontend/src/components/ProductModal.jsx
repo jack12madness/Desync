@@ -97,6 +97,12 @@ export default function ProductModal({ product, onClose }) {
               ))}
             </div>
 
+            {(product.min_buy || 1) > 1 && (
+              <div className="mt-4 p-3 rounded-lg bg-[#2E6BFF]/10 border border-[#2E6BFF]/30 text-xs text-[#8FB8E8] leading-relaxed" data-testid="modal-min-buy-note">
+                Sold in packs — minimum {product.min_buy} per purchase. Price shown is per unit; you can raise the quantity in the cart.
+              </div>
+            )}
+
             <div className="mt-7 flex gap-3">
               {soldOut ? (
                 <div
