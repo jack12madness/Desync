@@ -173,7 +173,9 @@ async def send_order_email(order: dict) -> None:
                '<div style="color:#F5C158;font-size:12px;margin-top:8px">Key is being assigned — it will appear on your My Orders page shortly.</div>')
             + ('<div style="margin-top:10px"><a href="' + STORE_URL + it["download_url"] + '" '
                'style="display:inline-block;background:#2E6BFF;color:#ffffff;font-size:13px;font-weight:600;'
-               'padding:9px 16px;border-radius:8px;text-decoration:none">Download loader — ' + escape(it.get("loader_filename", "loader")) + '</a></div>'
+               'padding:9px 16px;border-radius:8px;text-decoration:none">Download loader</a>'
+               + ('<span style="color:#64748B;font-size:11px;margin-left:8px">' + escape(it["loader_filename"]) + '</span>' if it.get("loader_filename") else '')
+               + '</div>'
                if it.get("download_url") and STORE_URL else '')
             + '</td></tr>'
         )

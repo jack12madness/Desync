@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Pencil, Trash2, LogOut, Terminal } from "lucide-react";
+import { Plus, Pencil, Trash2, LogOut, Terminal, Mail } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -317,6 +317,16 @@ export default function AdminDashboard() {
     }
   };
 
+  const resendEmail = async (orderId) => {
+    try {
+      const { data } = await api.post(`/admin/orders/${orderId}/resend-email`);
+      toast.success(`Delivery email resent to ${data.email}`);
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
+
+
   if (!admin) {
     return (
       <div className="min-h-screen flex items-center justify-center font-mono text-sm text-slate-500 uppercase tracking-[0.25em]">
@@ -453,6 +463,15 @@ export default function AdminDashboard() {
                         className="px-3 py-1.5 rounded-lg bg-amber-400/10 border border-amber-400/40 text-amber-300 text-xs font-medium hover:bg-amber-400/20 transition-colors"
                       >
                         Keys pending — assign now
+                      </button>
+                    )}
+                    {o.payment_status === "paid" && (
+                      <button
+                        onClick={() => resendEmail(o.id)}
+                        data-testid={`resend-email-${o.id}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-400/10 border border-blue-400/40 text-blue-300 text-xs font-medium hover:bg-blue-400/20 transition-colors"
+                      >
+                        <Mail className="w-3.5 h-3.5" /> Resend email
                       </button>
                     )}
                   </div>

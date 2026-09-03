@@ -12,6 +12,12 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-03 — Admin resend order email
+- POST /api/admin/orders/{id}/resend-email (paid orders only, 400 otherwise, 401 unauth); attaches fresh loader links before sending; sets email_sent
+- "Resend email" button on each paid order row in admin Orders tab
+- Fixed email validator conflict: loader filename moved out of anchor text (anti-phishing G3 rule rejects host-like anchor text such as .exe filenames) — button now says "Download loader", filename shown as plain text beside it
+- Note: provider rejects fake @test.com recipients (502) — expected; real buyer emails deliver
+
 ### 2026-09-03 — Per-product loader files
 - Bug fix (same day): frontend download button built link with double `/api/api/` (API const already includes /api) → 404 on live site. Fixed: api.js exports BASE_URL (bare backend origin), KeyRow uses BASE_URL + download_url. Verified end-to-end: href correct, 200 download, bytes match
 - Admins attach a loader (.exe/.zip, max 150MB) per product in the product create/edit form; replace or remove supported. Files live in Emergent object storage (desync/loaders/...), metadata on product doc

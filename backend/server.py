@@ -732,6 +732,23 @@ async def admin_assign_keys(order_id: str, admin: dict = Depends(get_admin)):
     return {"assigned": assigned, "keys_pending": still_pending, "items": items}
 
 
+@api_router.post("/admin/orders/{order_id}/resend-email")
+async def admin_resend_order_email(order_id: str, admin: dict = Depends(get_admin)):
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order.get("payment_status") != "paid":
+        raise HTTPException(400, "Only paid orders can be resent")
+    await _attach_loader_links(order)
+    try:
+        await send_order_email(order)
+    except Exception as e:
+        logger.error("Resend order email failed for %s: %s", order_id, e)
+        raise HTTPException(500, f"Email send failed: {e}")
+    await db.orders.update_one({"id": order_id}, {"$set": {"email_sent": True}})
+    return {"sent": True, "email": order["email"]}
+
+
 # ---------- coupons ----------
 
 class CouponIn(BaseModel):
