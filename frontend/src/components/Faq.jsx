@@ -15,7 +15,7 @@ const FAQS = [
   },
   {
     q: "Can I get a refund?",
-    a: "If a product is broken on our end and we can't fix it within 72 hours, you get replacement time or a refund. Change-of-mind refunds aren't possible on digital keys — Discord support will always try to make it right.",
+    a: "No — all purchases are final. Because our products are digital and delivered instantly, we do not offer refunds, exchanges or store credit, including for change of mind or purchasing the wrong product. The only exception is where a remedy is required by law, such as under the Australian Consumer Law. Full details are in our Terms of Service (linked in the footer).",
   },
 ];
 
