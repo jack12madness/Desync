@@ -7,6 +7,7 @@ import { CartProvider } from "@/context/CartContext";
 import CartDrawer from "@/components/CartDrawer";
 import SplashScreen from "@/components/SplashScreen";
 import Home from "@/pages/Home";
+import ProductPage from "@/pages/ProductPage";
 import StatusPage from "@/pages/StatusPage";
 import OrderLookup from "@/pages/OrderLookup";
 import PaymentSuccess from "@/pages/PaymentSuccess";
@@ -46,6 +47,7 @@ function App() {
           <AnimatePresence>{splash && <SplashScreen key="splash" />}</AnimatePresence>
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/product/:id" element={<ProductPage />} />
             <Route path="/status" element={<StatusPage />} />
             <Route path="/orders" element={<OrderLookup />} />
             <Route path="/terms" element={<TermsPage />} />

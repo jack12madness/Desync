@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Check, ShoppingCart, Zap, ShieldCheck } from "lucide-react";
+import { Check, ShoppingCart, Zap, ShieldCheck, Share2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import StatusPill from "@/components/StatusPill";
 import { useCart, DURATION_LABELS } from "@/context/CartContext";
-import { eur } from "@/lib/api";
+import { eur, BASE_URL } from "@/lib/api";
+import { toast } from "@/components/ui/sonner";
 
 const DURATION_ORDER = ["day", "week", "month", "lifetime"];
 
@@ -37,10 +38,25 @@ export default function ProductModal({ product, onClose }) {
 
           <div className="p-6 sm:p-8">
             <DialogHeader>
-              <div className="text-sm font-medium text-[#5B8CFF] mb-1">{product.game}</div>
-              <DialogTitle className="font-display text-2xl font-bold tracking-tight text-white">
-                {product.name}
-              </DialogTitle>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-[#5B8CFF] mb-1">{product.game}</div>
+                  <DialogTitle className="font-display text-2xl font-bold tracking-tight text-white">
+                    {product.name}
+                  </DialogTitle>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${BASE_URL}/api/share/product/${product.id}`);
+                    toast.success("Share link copied — paste it in Discord");
+                  }}
+                  data-testid="share-product-button"
+                  title="Copy share link"
+                  className="shrink-0 mt-1 p-2 rounded-lg border border-[#2E6BFF]/40 text-[#8FB8E8] hover:bg-[#2E6BFF]/10 transition-all duration-200"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
+              </div>
             </DialogHeader>
 
             <p className="mt-3 text-sm text-slate-400 leading-relaxed">{product.description}</p>

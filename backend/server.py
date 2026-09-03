@@ -6,11 +6,13 @@ sys.path.insert(0, _HERE)
 load_dotenv(os.path.join(_HERE, ".env"))
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Response, File, UploadFile
+from fastapi.responses import HTMLResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict
 import time, uuid, logging, secrets, string, asyncio
+import html, json
 from datetime import datetime, timezone, timedelta
 import httpx
 import requests
@@ -512,6 +514,53 @@ async def download_loader(order_id: str, product_id: str, token: str = ""):
         content=data, media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+
+
+# ---------- share links (crawler-friendly OG previews) ----------
+
+SITE_URL = (os.environ.get("STORE_URL") or "").rstrip("/")
+
+
+@api_router.get("/share/product/{product_id}", response_class=HTMLResponse)
+async def share_product(product_id: str):
+    product = await db.products.find_one({"id": product_id, "active": True}, {"_id": 0})
+    if not product:
+        raise HTTPException(404, "Product not found")
+    esc = html.escape
+    target = f"{SITE_URL}/product/{product['id']}"
+    img = product.get("image_url") or "/images/og-banner.png"
+    if not img.startswith("http"):
+        img = f"{SITE_URL}{img}"
+    prices = [v for v in (product.get("prices") or {}).values() if v is not None]
+    price_txt = f"from €{min(prices):.2f}" if prices else ""
+    title = f"{product['name']} — Desync"
+    desc = product.get("description") or "Undetected software. Instant key delivery."
+    if price_txt:
+        desc = f"{desc} · {price_txt}"
+    page = f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>{esc(title)}</title>
+<meta name="theme-color" content="#2E6BFF" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Desync" />
+<meta property="og:title" content="{esc(title)}" />
+<meta property="og:description" content="{esc(desc)}" />
+<meta property="og:url" content="{esc(target)}" />
+<meta property="og:image" content="{esc(img)}" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{esc(title)}" />
+<meta name="twitter:description" content="{esc(desc)}" />
+<meta name="twitter:image" content="{esc(img)}" />
+<meta http-equiv="refresh" content="0;url={esc(target)}" />
+<script>location.replace({json.dumps(target)});</script>
+</head>
+<body style="background:#050B18;color:#94A3B8;font-family:sans-serif;text-align:center;padding-top:20vh">
+Redirecting to <a style="color:#7FB0FF" href="{esc(target)}">{esc(title)}</a>…
+</body>
+</html>"""
+    return HTMLResponse(page)
 
 
 # ---------- admin: orders ----------

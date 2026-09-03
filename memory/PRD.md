@@ -12,6 +12,13 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-03 — Per-product share links with artwork previews
+- New route /product/{id} (ProductPage.jsx) — opens that product's modal directly, deep-linkable
+- Backend GET /api/share/product/{id} serves crawler HTML with that product's og:image (its artwork), og:title, price in description; humans are meta-refresh/JS redirected to /product/{id}; 404 for unknown ids
+- Share button (Share2 icon) in product modal copies the share link; Discord/Twitter show the product's artwork in the embed
+- Share URLs use STORE_URL env (preview → preview URL, production → desync.website)
+- Verified: crawler curl shows correct og tags + product image, browser page opens modal, clipboard copy works
+
 ### 2026-09-03 — Link preview banner (Open Graph)
 - User-supplied Desync banner (960×540, "UNDETECTED. UNMATCHED.") saved as /app/frontend/public/images/og-banner.png
 - index.html: og:/twitter: meta tags (summary_large_image) pointing at https://desync.website/images/og-banner.png; theme-color #2E6BFF (Discord embed strip). Discord/Twitter crawls read these static tags — works for all routes since SPA serves same HTML
