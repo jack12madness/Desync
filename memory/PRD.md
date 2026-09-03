@@ -12,6 +12,11 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-03 — Link preview banner (Open Graph)
+- User-supplied Desync banner (960×540, "UNDETECTED. UNMATCHED.") saved as /app/frontend/public/images/og-banner.png
+- index.html: og:/twitter: meta tags (summary_large_image) pointing at https://desync.website/images/og-banner.png; theme-color #2E6BFF (Discord embed strip). Discord/Twitter crawls read these static tags — works for all routes since SPA serves same HTML
+- Needs a deploy for the banner image to exist on desync.website; Discord caches embeds — re-paste link after deploy (cache can take hours)
+
 ### 2026-09-03 — FAQ cleanup
 - Removed the "Do I need the HWID spoofer?" FAQ entry (references deleted GHOST product); FAQ now 4 items. Only remaining HWID mention is in unused ReviewsMarquee.jsx
 - Refund FAQ rewritten to "all purchases are final / no refunds" except where required by law (matches TOS section 4)
