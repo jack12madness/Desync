@@ -342,7 +342,7 @@ async def send_bank_transfer_email(order: dict, bank: dict, reference: str, expi
     )
 
 
-async def send_bank_expired_email(order: dict) -> None:
+async def send_bank_expired_email(order: dict, reason: str = "no payment arrived within 48 hours") -> None:
     link_html = ""
     if STORE_URL:
         link_html = (
@@ -353,8 +353,8 @@ async def send_bank_expired_email(order: dict) -> None:
     inner = (
         '<p style="color:#F1F5F9;font-size:15px;margin:0 0 10px">Your bank-transfer order has expired.</p>'
         '<p style="color:#94A3B8;font-size:13px;margin:0">Order <strong style="color:#F1F5F9">'
-        + escape(order["id"][:8].upper()) + '</strong> was cancelled because no payment arrived within '
-        '48 hours. If you still want the product, just place a new order — nothing was charged.</p>'
+        + escape(order["id"][:8].upper()) + '</strong> was cancelled because '
+        + escape(reason) + '. If you still want the product, just place a new order — nothing was charged.</p>'
         + link_html
     )
     await send_email(

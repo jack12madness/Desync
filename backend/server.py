@@ -904,6 +904,62 @@ async def bank_transfer_details(order_id: str):
     }
 
 
+@api_router.post("/payments/bank-transfer/{order_id}/confirm")
+async def bank_transfer_confirm(order_id: str):
+    order = await db.orders.find_one({"id": order_id, "provider": "bank_transfer"}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order.get("payment_status") != "awaiting_payment":
+        raise HTTPException(400, "Order is no longer awaiting payment")
+    if order.get("payment_reported"):
+        return {"reported": True, "already": True}
+    now = datetime.now(timezone.utc).isoformat()
+    reserved, wanted = 0, 0
+    for item in order["items"]:
+        qty = max(1, int(item.get("qty") or 1))
+        wanted += qty
+        for _ in range(qty):
+            res = await db.keystock.find_one_and_update(
+                {"product_id": item["product_id"], "duration": item["duration"], "status": "available"},
+                {"$set": {"status": "reserved", "reserved_order_id": order_id, "reserved_at": now}},
+                sort=[("created_at", 1)],
+            )
+            if res:
+                reserved += 1
+            else:
+                break
+    await db.orders.update_one(
+        {"id": order_id},
+        {"$set": {"payment_reported": True, "reported_at": now,
+                  "reserved_count": reserved, "reserved_all": reserved >= wanted,
+                  "updated_at": now}},
+    )
+    return {"reported": True, "already": False, "reserved": reserved, "reserved_all": reserved >= wanted}
+
+
+@api_router.post("/admin/orders/{order_id}/cancel")
+async def admin_cancel_order(order_id: str, admin: dict = Depends(get_admin)):
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order.get("payment_status") != "awaiting_payment":
+        raise HTTPException(400, "Only orders awaiting payment can be cancelled")
+    now = datetime.now(timezone.utc).isoformat()
+    rel = await db.keystock.update_many(
+        {"reserved_order_id": order_id, "status": "reserved"},
+        {"$set": {"status": "available"}, "$unset": {"reserved_order_id": "", "reserved_at": ""}},
+    )
+    await db.orders.update_one(
+        {"id": order_id},
+        {"$set": {"payment_status": "cancelled", "status": "cancelled", "updated_at": now}},
+    )
+    try:
+        await send_bank_expired_email(order, "we could not verify your payment")
+    except Exception as e:
+        logger.error("Cancel email failed for %s: %s", order_id, e)
+    return {"cancelled": True, "released": rel.modified_count}
+
+
 @api_router.post("/admin/orders/{order_id}/mark-paid")
 async def admin_mark_paid(order_id: str, admin: dict = Depends(get_admin)):
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
@@ -926,11 +982,16 @@ async def _bank_expiry_loop():
                 {"_id": 0},
             ).to_list(100)
             for o in expired:
+                rel = await db.keystock.update_many(
+                    {"reserved_order_id": o["id"], "status": "reserved"},
+                    {"$set": {"status": "available"}, "$unset": {"reserved_order_id": "", "reserved_at": ""}},
+                )
                 res = await db.orders.update_one(
                     {"id": o["id"], "payment_status": "awaiting_payment"},
                     {"$set": {"payment_status": "cancelled", "status": "cancelled", "updated_at": now}},
                 )
                 if res.modified_count:
+                    logger.info("Bank order %s expired, released %d reserved keys", o["id"], rel.modified_count)
                     try:
                         await send_bank_expired_email(o)
                     except Exception as e:
@@ -1197,15 +1258,23 @@ async def _fulfill_order(where: dict) -> Optional[dict]:
         if item.get("license_key") and not deliverables:
             deliverables = [{"license_key": item["license_key"], "account": item.get("account")}]
         while len(deliverables) < qty:
+            assign_set = {
+                "status": "assigned",
+                "assigned_order_id": order["id"],
+                "assigned_at": datetime.now(timezone.utc).isoformat(),
+            }
             key_doc = await db.keystock.find_one_and_update(
-                {"product_id": item["product_id"], "duration": item["duration"], "status": "available"},
-                {"$set": {
-                    "status": "assigned",
-                    "assigned_order_id": order["id"],
-                    "assigned_at": datetime.now(timezone.utc).isoformat(),
-                }},
+                {"product_id": item["product_id"], "duration": item["duration"],
+                 "status": "reserved", "reserved_order_id": order["id"]},
+                {"$set": assign_set, "$unset": {"reserved_order_id": "", "reserved_at": ""}},
                 sort=[("created_at", 1)],
             )
+            if not key_doc:
+                key_doc = await db.keystock.find_one_and_update(
+                    {"product_id": item["product_id"], "duration": item["duration"], "status": "available"},
+                    {"$set": assign_set},
+                    sort=[("created_at", 1)],
+                )
             if not key_doc:
                 break
             deliverables.append({"license_key": key_doc["key"], "account": key_doc.get("account")})

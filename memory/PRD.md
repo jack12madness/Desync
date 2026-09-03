@@ -12,6 +12,14 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-03 — Bank transfer "payment sent" reservation flow
+- Buyer clicks "I have sent the payment" on the bank-pending page → stock instantly reserved (keystock status "reserved" + reserved_order_id), cart cleared, reported state shown. Idempotent (double-click safe)
+- Admin orders: "buyer says paid" badge + "Cancel & release stock" button (releases reserved keys back to available, emails buyer "we could not verify your payment")
+- Mark-paid consumes the reserved keys first (fallback to available); 48h auto-expiry also releases reserved stock
+- KeyManager shows "Reserved · ORDERID" chip on reserved keys
+- Verified: stock 1→0 on report, idempotent re-report, restore on cancel, reserved key delivered on mark-paid; UI flow incl. cart clear. 9/9 regression pass
+
+
 ### 2026-09-03 — Account products as first-class type
 - ProductIn.kind ("cheat"|"account"); admin Products header has two buttons: Add Cheat (blue) / Add Account (violet)
 - Account product form hides Status, Anti-cheat and Loader fields; title "New Discord Account"; min-buy field present

@@ -356,6 +356,17 @@ export default function AdminDashboard() {
     }
   };
 
+  const cancelOrder = async (orderId) => {
+    if (!window.confirm("Cancel this order? Reserved stock goes back on sale and the buyer is emailed.")) return;
+    try {
+      await api.post(`/admin/orders/${orderId}/cancel`);
+      toast.success("Order cancelled — stock released");
+      loadOrders();
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
+
 
   if (!admin) {
     return (
@@ -529,15 +540,29 @@ export default function AdminDashboard() {
                     {o.provider === "bank_transfer" && o.reference && (
                       <span className="text-[10px] font-mono text-slate-500" data-testid={`order-reference-${o.id}`}>ref {o.reference}</span>
                     )}
+                    {o.payment_reported && o.payment_status === "awaiting_payment" && (
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded-lg bg-emerald-400/10 border border-emerald-400/50 text-emerald-300" data-testid={`payment-reported-${o.id}`}>
+                        buyer says paid
+                      </span>
+                    )}
                     <span className="text-[10px] font-mono text-slate-600">{new Date(o.created_at).toLocaleString()}</span>
                     {o.payment_status === "awaiting_payment" && o.provider === "bank_transfer" && (
-                      <button
-                        onClick={() => markPaid(o.id)}
-                        data-testid={`mark-paid-${o.id}`}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-400/10 border border-emerald-400/40 text-emerald-300 text-xs font-medium hover:bg-emerald-400/20 transition-colors"
-                      >
-                        Payment arrived — mark paid
-                      </button>
+                      <>
+                        <button
+                          onClick={() => markPaid(o.id)}
+                          data-testid={`mark-paid-${o.id}`}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-400/10 border border-emerald-400/40 text-emerald-300 text-xs font-medium hover:bg-emerald-400/20 transition-colors"
+                        >
+                          Payment arrived — mark paid
+                        </button>
+                        <button
+                          onClick={() => cancelOrder(o.id)}
+                          data-testid={`cancel-order-${o.id}`}
+                          className="px-3 py-1.5 rounded-lg bg-rose-400/10 border border-rose-400/40 text-rose-300 text-xs font-medium hover:bg-rose-400/20 transition-colors"
+                        >
+                          Cancel & release stock
+                        </button>
+                      </>
                     )}
                     {o.keys_pending && (
                       <button

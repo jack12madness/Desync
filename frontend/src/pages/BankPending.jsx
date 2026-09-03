@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Landmark, Copy, Clock } from "lucide-react";
+import { Landmark, Copy, Clock, CheckCircle2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { api, eur } from "@/lib/api";
+import { api, apiError, eur } from "@/lib/api";
+import { useCart } from "@/context/CartContext";
 import { toast } from "@/components/ui/sonner";
 
 function CopyRow({ label, value, testid }) {
@@ -32,8 +33,25 @@ function CopyRow({ label, value, testid }) {
 export default function BankPending() {
   const [params] = useSearchParams();
   const orderId = params.get("order");
+  const { clearCart } = useCart();
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
+  const [reported, setReported] = useState(false);
+  const [reporting, setReporting] = useState(false);
+
+  const reportPayment = async () => {
+    setReporting(true);
+    try {
+      await api.post(`/payments/bank-transfer/${orderId}/confirm`);
+      setReported(true);
+      clearCart();
+      toast.success("Payment reported — we'll verify it now");
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setReporting(false);
+    }
+  };
 
   useEffect(() => {
     if (!orderId) {
@@ -101,13 +119,35 @@ export default function BankPending() {
                 <CopyRow label="Account name" value={data.bank?.bank_account_name} testid="bank-account-name" />
               </div>
 
-              <div className="flex items-start gap-3 p-4 rounded-lg border border-dashed border-[#2E6BFF]/30 text-sm text-slate-400 mb-8">
+              <div className="flex items-start gap-3 p-4 rounded-lg border border-dashed border-[#2E6BFF]/30 text-sm text-slate-400 mb-6">
                 <Clock className="w-4 h-4 mt-0.5 text-[#5B8CFF] shrink-0" />
                 <span>
                   This reservation expires 48 hours after creation — if no payment arrives, the order
                   is cancelled automatically and nothing is charged. We've also emailed these details to you.
                 </span>
               </div>
+
+              {reported ? (
+                <div className="mb-8 p-5 rounded-xl bg-emerald-400/10 border border-emerald-400/40 flex items-start gap-3" data-testid="payment-reported-box">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-300 shrink-0 mt-0.5" />
+                  <div className="text-sm text-slate-300 leading-relaxed">
+                    <span className="text-emerald-300 font-semibold block mb-1">Payment reported</span>
+                    We've set aside your stock and will verify the transfer. Once confirmed, your key or
+                    account details are emailed to you and appear on My Orders. If we can't verify it, the
+                    stock is released and the order is cancelled.
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={reportPayment}
+                  disabled={reporting}
+                  data-testid="report-payment-button"
+                  className="w-full mb-8 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-[#050B18] text-sm font-bold disabled:opacity-40 transition-all duration-200 active:scale-95"
+                >
+                  <CheckCircle2 className="w-5 h-5" />
+                  {reporting ? "Reporting..." : "I have sent the payment"}
+                </button>
+              )}
 
               <div className="flex gap-3">
                 <Link

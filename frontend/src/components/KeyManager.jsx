@@ -174,6 +174,10 @@ export default function KeyManager({ product, onClose, onChanged }) {
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </>
+              ) : k.status === "reserved" ? (
+                <span className="text-xs px-2.5 py-1 rounded-full bg-sky-400/10 border border-sky-400/30 text-sky-300">
+                  Reserved {k.reserved_order_id ? `· ${k.reserved_order_id.slice(0, 8).toUpperCase()}` : ""}
+                </span>
               ) : (
                 <span className="text-xs px-2.5 py-1 rounded-full bg-slate-500/10 border border-slate-600 text-slate-400">
                   Sold {k.assigned_order_id ? `· ${k.assigned_order_id.slice(0, 8).toUpperCase()}` : ""}
