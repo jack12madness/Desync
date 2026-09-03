@@ -14,10 +14,6 @@ const FAQS = [
     a: "We pull it to Updating status immediately, push a fix, and compensate active subscribers with frozen time. The status page is updated before we touch anything else.",
   },
   {
-    q: "Do I need the HWID spoofer?",
-    a: "Only if your machine is already flagged by an anti-cheat, or you want an extra safety layer. GHOST // HWID Spoofer works alongside every product we sell.",
-  },
-  {
     q: "Can I get a refund?",
     a: "If a product is broken on our end and we can't fix it within 72 hours, you get replacement time or a refund. Change-of-mind refunds aren't possible on digital keys — Discord support will always try to make it right.",
   },

@@ -12,6 +12,9 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-03 — FAQ cleanup
+- Removed the "Do I need the HWID spoofer?" FAQ entry (references deleted GHOST product); FAQ now 4 items. Only remaining HWID mention is in unused ReviewsMarquee.jsx
+
 ### 2026-09-03 — Admin resend order email
 - POST /api/admin/orders/{id}/resend-email (paid orders only, 400 otherwise, 401 unauth); attaches fresh loader links before sending; sets email_sent
 - "Resend email" button on each paid order row in admin Orders tab
