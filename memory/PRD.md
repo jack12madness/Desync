@@ -13,6 +13,7 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 ## What's implemented (latest first)
 
 ### 2026-09-03 — Per-product loader files
+- Bug fix (same day): frontend download button built link with double `/api/api/` (API const already includes /api) → 404 on live site. Fixed: api.js exports BASE_URL (bare backend origin), KeyRow uses BASE_URL + download_url. Verified end-to-end: href correct, 200 download, bytes match
 - Admins attach a loader (.exe/.zip, max 150MB) per product in the product create/edit form; replace or remove supported. Files live in Emergent object storage (desync/loaders/...), metadata on product doc
 - Buyers get a secure per-order download link (order download_token, works forever for paid orders): on payment success page, in My Orders, and as a button in the order email (replaced old "Discord #downloads" setup text)
 - Download endpoint: GET /api/orders/{order_id}/loader/{product_id}?token=... — validates paid order + token (403 otherwise) + item in order; streams with attachment filename. Public products list exposes only has_loader (storage path hidden)
