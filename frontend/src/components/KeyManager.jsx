@@ -9,10 +9,14 @@ import { DURATION_LABELS } from "@/context/CartContext";
 const DURATIONS = ["day", "week", "month", "lifetime"];
 
 export default function KeyManager({ product, onClose, onChanged }) {
+  const isAccountProduct = product.kind === "account";
   const [keys, setKeys] = useState(null);
   const [input, setInput] = useState("");
-  const [duration, setDuration] = useState("day");
-  const [mode, setMode] = useState("keys");
+  const [duration, setDuration] = useState(() => {
+    const ds = DURATIONS.filter((d) => product.prices && product.prices[d] != null);
+    return ds[0] || "day";
+  });
+  const [mode, setMode] = useState(isAccountProduct ? "accounts" : "keys");
   const [adding, setAdding] = useState(false);
 
   const load = () =>
@@ -82,6 +86,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
         </div>
 
         <div className="mt-5">
+          {!isAccountProduct && (
           <div className="flex gap-2 mb-3" data-testid="keys-mode-toggle">
             {[["keys", "License keys"], ["accounts", "Discord accounts"]].map(([m, label]) => (
               <button
@@ -98,6 +103,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
               </button>
             ))}
           </div>
+          )}
           <label className="text-sm text-slate-300 block mb-2">
             {mode === "keys"
               ? "Add keys — one per line, into a duration pool"

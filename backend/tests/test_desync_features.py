@@ -35,13 +35,16 @@ def test_products_only_fivem_and_have_stock():
     assert r.status_code == 200
     data = r.json()
     assert isinstance(data, list)
-    assert len(data) == 2, f"Expected 2 products, got {len(data)}: {[p['name'] for p in data]}"
+    assert len(data) >= 2, f"Expected at least 2 products, got {len(data)}"
     for p in data:
         assert p["game"] == "FiveM", f"Non-FiveM product: {p}"
         assert "stock" in p and isinstance(p["stock"], dict)
+        assert "loader" not in p, "loader storage path must not leak publicly"
     names = {p["name"] for p in data}
     assert "SPECTRE // FiveM Executor" in names
     assert "PHANTOM // FiveM Mod Menu" in names
+    accounts = [p for p in data if p.get("kind") == "account"]
+    assert accounts, "Expected the demo Discord account product to exist"
 
 
 # --------- categories ----------

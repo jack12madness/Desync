@@ -32,7 +32,16 @@ export default function ProductModal({ product, onClose }) {
             <img src={product.image_url} alt={product.name} className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-[#0A1628] via-transparent to-transparent" />
             <div className="absolute top-4 left-4">
-              <StatusPill status={product.status} testid="modal-status-badge" />
+              {product.kind === "account" ? (
+                <span
+                  data-testid="modal-status-badge"
+                  className="px-2.5 py-1 rounded-md bg-violet-400/15 border border-violet-400/40 text-violet-300 text-[10px] font-mono font-bold uppercase tracking-[0.2em]"
+                >
+                  Discord Account
+                </span>
+              ) : (
+                <StatusPill status={product.status} testid="modal-status-badge" />
+              )}
             </div>
           </div>
 

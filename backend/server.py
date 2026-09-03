@@ -166,6 +166,7 @@ class ProductIn(BaseModel):
     anticheat: str = ""
     prices: Dict[str, float] = {}
     min_buy: int = 1
+    kind: str = "cheat"  # "cheat" or "account"
     active: bool = True
     sort_order: int = 0
 

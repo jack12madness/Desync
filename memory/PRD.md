@@ -12,6 +12,14 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-03 — Account products as first-class type
+- ProductIn.kind ("cheat"|"account"); admin Products header has two buttons: Add Cheat (blue) / Add Account (violet)
+- Account product form hides Status, Anti-cheat and Loader fields; title "New Discord Account"; min-buy field present
+- KeyManager for account products forces accounts paste mode (toggle hidden); pool selector defaults to first priced duration
+- Storefront: account cards/modals show violet stock-count badge ("N in stock") instead of detection StatusPill
+- Demo product "Aged Discord Accounts" (kind=account, lifetime €2.50, 3 test accounts shop1-3) created in PREVIEW only
+
+
 ### 2026-09-03 — Discord account sales + min-buy quantity
 - Stock items can now be Discord accounts: keystock docs carry `account: {email, email_password, discord_password, discord_token}`; bulk paste in KeyManager with "License keys / Discord accounts" mode toggle — format `email:emailpass:discordpass:token` per line (colons in discord password handled; invalid lines + dupes reported)
 - Delivery: fulfilled orders carry `deliverables` list; email renders credential blocks (4 fields) or key boxes; My Orders KeyRow shows all deliverables with per-field copy buttons; PaymentSuccess shows account-specific setup steps

@@ -19,7 +19,7 @@ import ExpensesTab from "@/components/ExpensesTab";
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
   features: [], anticheat: "", prices: { day: "", week: "", month: "", lifetime: "" },
-  min_buy: 1, active: true, sort_order: 0,
+  min_buy: 1, kind: "cheat", active: true, sort_order: 0,
 };
 
 function ProductForm({ initial, categories, onSave, onClose }) {
@@ -47,7 +47,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
     }
     onSave({
       game: form.game, name: form.name, description: form.description,
-      image_url: form.image_url, status: form.status, anticheat: form.anticheat,
+      image_url: form.image_url, status: form.status, anticheat: form.anticheat, kind: form.kind || "cheat",
       features: typeof form.features === "string"
         ? form.features.split(",").map((s) => s.trim()).filter(Boolean)
         : form.features,
@@ -63,7 +63,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
       <DialogContent className="max-w-2xl bg-[#0A1628] border-blue-500/20 text-slate-100 max-h-[90vh] overflow-y-auto" data-testid="product-form-modal">
         <DialogHeader>
           <DialogTitle className="font-display text-xl font-bold uppercase tracking-tight">
-            {initial ? "Edit Product" : "New Product"}
+            {initial?.id ? "Edit Product" : form.kind === "account" ? "New Discord Account" : "New Cheat"}
           </DialogTitle>
         </DialogHeader>
         <div className="grid sm:grid-cols-2 gap-4 mt-2">
@@ -97,28 +97,33 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             <label className={labelCls}>Image URL</label>
             <Input value={form.image_url} onChange={(e) => set("image_url", e.target.value)} data-testid="product-form-image" className={fieldCls} />
           </div>
-          <div>
-            <label className={labelCls}>Status</label>
-            <Select value={form.status} onValueChange={(v) => set("status", v)}>
-              <SelectTrigger data-testid="admin-status-select" className={fieldCls}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
-                <SelectItem value="undetected">Undetected</SelectItem>
-                <SelectItem value="updating">Updating</SelectItem>
-                <SelectItem value="testing">Testing</SelectItem>
-                <SelectItem value="detected">Detected</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className={labelCls}>Anti-Cheat Target</label>
-            <Input value={form.anticheat} onChange={(e) => set("anticheat", e.target.value)} placeholder="EAC / FiveM Guard" data-testid="product-form-anticheat" className={fieldCls} />
-          </div>
+          {form.kind !== "account" && (
+            <>
+              <div>
+                <label className={labelCls}>Status</label>
+                <Select value={form.status} onValueChange={(v) => set("status", v)}>
+                  <SelectTrigger data-testid="admin-status-select" className={fieldCls}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
+                    <SelectItem value="undetected">Undetected</SelectItem>
+                    <SelectItem value="updating">Updating</SelectItem>
+                    <SelectItem value="testing">Testing</SelectItem>
+                    <SelectItem value="detected">Detected</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className={labelCls}>Anti-Cheat Target</label>
+                <Input value={form.anticheat} onChange={(e) => set("anticheat", e.target.value)} placeholder="EAC / FiveM Guard" data-testid="product-form-anticheat" className={fieldCls} />
+              </div>
+            </>
+          )}
           <div className="sm:col-span-2">
             <label className={labelCls}>Features (comma separated)</label>
             <Input value={form.features} onChange={(e) => set("features", e.target.value)} placeholder="Aimbot, ESP, Stream Proof" data-testid="product-form-features" className={fieldCls} />
           </div>
+          {form.kind !== "account" && (
           <div className="sm:col-span-2">
             <label className={labelCls}>Loader file (.exe or .zip) — buyers get it after payment</label>
             {initial?.loader && !removeLoader ? (
@@ -154,6 +159,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
               </>
             )}
           </div>
+          )}
           {["day", "week", "month", "lifetime"].map((d) => (
             <div key={d}>
               <label className={labelCls}>{DURATION_LABELS[d]} Price (€) — blank to hide</label>
@@ -199,6 +205,7 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState([]);
   const [users, setUsers] = useState([]);
   const [editing, setEditing] = useState(null); // null | {} (new) | product
+  const [newKind, setNewKind] = useState("cheat");
   const [keysFor, setKeysFor] = useState(null); // product whose keys are being managed
   const [stockCounts, setStockCounts] = useState({});
   const [categories, setCategories] = useState([]);
@@ -395,13 +402,22 @@ export default function AdminDashboard() {
           <TabsContent value="products">
             <div className="flex justify-between items-center mb-6">
               <h2 className="font-display text-xl font-bold uppercase tracking-tight">{products.length} Products</h2>
-              <button
-                onClick={() => setEditing({})}
-                data-testid="admin-add-product-button"
-                className="rounded-lg inline-flex items-center gap-2 px-4 py-2 bg-blue-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-blue-300 transition-all"
-              >
-                <Plus className="w-4 h-4" /> Add Product
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setNewKind("cheat"); setEditing({}); }}
+                  data-testid="admin-add-product-button"
+                  className="rounded-lg inline-flex items-center gap-2 px-4 py-2 bg-blue-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-blue-300 transition-all"
+                >
+                  <Plus className="w-4 h-4" /> Add Cheat
+                </button>
+                <button
+                  onClick={() => { setNewKind("account"); setEditing({}); }}
+                  data-testid="admin-add-account-button"
+                  className="rounded-lg inline-flex items-center gap-2 px-4 py-2 bg-violet-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-violet-300 transition-all"
+                >
+                  <Plus className="w-4 h-4" /> Add Account
+                </button>
+              </div>
             </div>
             <div className="space-y-3" data-testid="admin-products-list">
               {products.map((p) => (
@@ -414,7 +430,13 @@ export default function AdminDashboard() {
                       {!p.active && <span className="text-rose-400 ml-2">HIDDEN</span>}
                     </div>
                   </div>
-                  <StatusPill status={p.status} testid={`admin-product-status-${p.id}`} />
+                  {p.kind === "account" ? (
+                    <span className="text-[10px] px-2 py-1 rounded-full bg-violet-400/10 border border-violet-400/40 text-violet-300 font-mono uppercase tracking-widest" data-testid={`admin-product-kind-${p.id}`}>
+                      Account
+                    </span>
+                  ) : (
+                    <StatusPill status={p.status} testid={`admin-product-status-${p.id}`} />
+                  )}
                   <button
                     onClick={() => setKeysFor(p)}
                     data-testid={`admin-keys-button-${p.id}`}
@@ -609,7 +631,7 @@ export default function AdminDashboard() {
 
       {editing !== null && (
         <ProductForm
-          initial={editing.id ? editing : null}
+          initial={editing.id ? editing : { ...EMPTY_PRODUCT, kind: newKind }}
           categories={categories}
           onSave={saveProduct}
           onClose={() => setEditing(null)}

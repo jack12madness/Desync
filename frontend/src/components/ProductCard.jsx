@@ -28,7 +28,16 @@ export default function ProductCard({ product, index, onSelect }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#050B18] via-[#050B18]/25 to-transparent" />
         <div className="absolute top-4 left-4 z-10">
-          <StatusPill status={product.status} testid={`product-status-badge-${product.id}`} />
+          {product.kind === "account" ? (
+            <span
+              data-testid={`product-stock-badge-${product.id}`}
+              className="px-2.5 py-1 rounded-md bg-violet-400/15 border border-violet-400/40 text-violet-300 text-[10px] font-mono font-bold uppercase tracking-[0.2em]"
+            >
+              {soldOut ? "Discord Accounts" : `${durations.reduce((s, d) => s + (product.stock?.[d] || 0), 0)} in stock`}
+            </span>
+          ) : (
+            <StatusPill status={product.status} testid={`product-status-badge-${product.id}`} />
+          )}
         </div>
         {soldOut && (
           <div className="absolute top-4 right-4 z-10" data-testid={`product-soldout-badge-${product.id}`}>
