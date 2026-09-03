@@ -171,6 +171,10 @@ async def send_order_email(order: dict) -> None:
             + escape(it["game"]) + ' &middot; ' + escape(it["duration_label"]) + '</div>'
             + (_key_box(it["license_key"]) if it.get("license_key") else
                '<div style="color:#F5C158;font-size:12px;margin-top:8px">Key is being assigned — it will appear on your My Orders page shortly.</div>')
+            + ('<div style="margin-top:10px"><a href="' + STORE_URL + it["download_url"] + '" '
+               'style="display:inline-block;background:#2E6BFF;color:#ffffff;font-size:13px;font-weight:600;'
+               'padding:9px 16px;border-radius:8px;text-decoration:none">Download loader — ' + escape(it.get("loader_filename", "loader")) + '</a></div>'
+               if it.get("download_url") and STORE_URL else '')
             + '</td></tr>'
         )
     link_html = ""
@@ -184,8 +188,8 @@ async def send_order_email(order: dict) -> None:
         '<p style="color:#94A3B8;font-size:13px;margin:0 0 8px">Order <strong style="color:#F1F5F9">'
         + escape(order["id"][:8].upper()) + '</strong></p>'
         '<table role="presentation" width="100%">' + rows + '</table>'
-        '<p style="color:#94A3B8;font-size:12px;margin-top:18px">Setup: download the loader from our Discord '
-        '#downloads channel, run it as Administrator, paste your key, launch your game and press INSERT.</p>'
+        '<p style="color:#94A3B8;font-size:12px;margin-top:18px">Setup: download your loader using the button '
+        'next to your product above, run it as Administrator, paste your key, launch your game and press INSERT.</p>'
         + link_html
     )
     await send_email(

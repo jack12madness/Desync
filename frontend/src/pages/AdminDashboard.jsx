@@ -29,6 +29,8 @@ function ProductForm({ initial, categories, onSave, onClose }) {
       features: (initial.features || []).join(", "),
     };
   });
+  const [loaderFile, setLoaderFile] = useState(null);
+  const [removeLoader, setRemoveLoader] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setPrice = (k, v) => setForm((f) => ({ ...f, prices: { ...f.prices, [k]: v } }));
 
@@ -48,7 +50,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
         ? form.features.split(",").map((s) => s.trim()).filter(Boolean)
         : form.features,
       prices, active: form.active, sort_order: Number(form.sort_order) || 0,
-    });
+    }, loaderFile, removeLoader);
   };
 
   const fieldCls = "bg-[#050B18] border-slate-700 focus-visible:ring-blue-400 font-mono text-sm";
@@ -114,6 +116,41 @@ function ProductForm({ initial, categories, onSave, onClose }) {
           <div className="sm:col-span-2">
             <label className={labelCls}>Features (comma separated)</label>
             <Input value={form.features} onChange={(e) => set("features", e.target.value)} placeholder="Aimbot, ESP, Stream Proof" data-testid="product-form-features" className={fieldCls} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Loader file (.exe or .zip) — buyers get it after payment</label>
+            {initial?.loader && !removeLoader ? (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-[#050B18] border border-slate-700" data-testid="product-form-loader-current">
+                <span className="font-mono text-sm text-slate-200 flex-1 truncate">{initial.loader.filename}</span>
+                <span className="text-[10px] font-mono text-slate-500">{(initial.loader.size / 1024 / 1024).toFixed(1)} MB</span>
+                <button
+                  type="button"
+                  onClick={() => setRemoveLoader(true)}
+                  data-testid="product-form-loader-remove"
+                  className="text-xs font-mono text-rose-400 hover:text-rose-300 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <>
+                {removeLoader && (
+                  <div className="text-[10px] font-mono text-amber-400 mb-1.5">Current loader will be removed on save unless you pick a new one</div>
+                )}
+                <input
+                  type="file"
+                  accept=".exe,.zip"
+                  onChange={(e) => setLoaderFile(e.target.files[0] || null)}
+                  data-testid="product-form-loader"
+                  className="block w-full text-sm text-slate-400 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-400 file:px-4 file:py-2 file:text-xs file:font-mono file:font-bold file:uppercase file:text-[#050B18] hover:file:bg-blue-300 file:cursor-pointer"
+                />
+                {loaderFile && (
+                  <div className="text-[10px] font-mono text-emerald-400 mt-1.5" data-testid="product-form-loader-selected">
+                    {loaderFile.name} — uploads on save
+                  </div>
+                )}
+              </>
+            )}
           </div>
           {["day", "week", "month", "lifetime"].map((d) => (
             <div key={d}>
@@ -199,14 +236,27 @@ export default function AdminDashboard() {
   const loadUsers = () => api.get("/admin/users").then(({ data }) => setUsers(data)).catch(() => {});
   const loadCategories = () => api.get("/categories").then(({ data }) => setCategories(data)).catch(() => {});
 
-  const saveProduct = async (payload) => {
+  const saveProduct = async (payload, loaderFile, removeLoader) => {
     try {
+      let productId;
       if (editing && editing.id) {
-        await api.put(`/admin/products/${editing.id}`, payload);
+        const { data } = await api.put(`/admin/products/${editing.id}`, payload);
+        productId = data.id;
         toast.success("Product updated");
       } else {
-        await api.post("/admin/products", payload);
+        const { data } = await api.post("/admin/products", payload);
+        productId = data.id;
         toast.success("Product created");
+      }
+      if (removeLoader) {
+        await api.delete(`/admin/products/${productId}/loader`);
+        toast.success("Loader removed");
+      }
+      if (loaderFile) {
+        const fd = new FormData();
+        fd.append("file", loaderFile);
+        await api.post(`/admin/products/${productId}/loader`, fd);
+        toast.success("Loader uploaded");
       }
       setEditing(null);
       loadProducts();

@@ -5,14 +5,15 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)
 load_dotenv(os.path.join(_HERE, ".env"))
 
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Response
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Response, File, UploadFile
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict
-import time, uuid, logging, secrets, string
+import time, uuid, logging, secrets, string, asyncio
 from datetime import datetime, timezone, timedelta
 import httpx
+import requests
 
 import bcrypt
 import jwt
@@ -101,6 +102,53 @@ def product_out(doc: dict) -> dict:
     doc = dict(doc)
     doc.pop("_id", None)
     return doc
+
+
+# ---------- object storage (Emergent) ----------
+
+STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
+STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
+APP_NAME = "desync"
+_storage_key = None
+
+
+def init_storage(force: bool = False) -> str:
+    global _storage_key
+    if _storage_key and not force:
+        return _storage_key
+    resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
+    resp.raise_for_status()
+    _storage_key = resp.json()["storage_key"]
+    return _storage_key
+
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    key = init_storage()
+    resp = requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data, timeout=300,
+    )
+    if resp.status_code == 404:
+        key = init_storage(force=True)
+        resp = requests.put(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": key, "Content-Type": content_type},
+            data=data, timeout=300,
+        )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_object(path: str) -> tuple:
+    key = init_storage()
+    resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=300)
+    if resp.status_code == 404:
+        key = init_storage(force=True)
+        resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=300)
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
 
 
 # ---------- models ----------
@@ -207,6 +255,11 @@ async def startup():
     await db.waitlist.create_index("email", unique=True)
     await db.keystock.create_index([("product_id", 1), ("status", 1)])
     await db.categories.create_index("id", unique=True)
+    try:
+        init_storage()
+        logger.info("Object storage initialized")
+    except Exception as e:
+        logger.error("Storage init failed: %s", e)
     await seed_admin()
     await seed_products()
 
@@ -238,6 +291,7 @@ async def list_products():
     stock = await _available_stock_map()
     for d in docs:
         d["stock"] = stock.get(d["id"], {})
+        d["has_loader"] = bool(d.pop("loader", None))
     return docs
 
 
@@ -292,6 +346,9 @@ async def order_lookup(body: LookupIn):
     docs = await db.orders.find(
         {"email": email, "payment_status": "paid"}, {"_id": 0}
     ).sort("created_at", -1).to_list(50)
+    for d in docs:
+        await _attach_loader_links(d)
+        d.pop("download_token", None)
     return docs
 
 
@@ -380,6 +437,81 @@ async def admin_delete_product(product_id: str, admin: dict = Depends(get_admin)
     if res.deleted_count == 0:
         raise HTTPException(404, "Product not found")
     return {"deleted": True}
+
+
+# ---------- admin: product loaders ----------
+
+LOADER_TYPES = {
+    "exe": "application/vnd.microsoft.portable-executable",
+    "zip": "application/zip",
+}
+MAX_LOADER_BYTES = 150 * 1024 * 1024
+
+
+@api_router.post("/admin/products/{product_id}/loader")
+async def admin_upload_loader(product_id: str, file: UploadFile = File(...), admin: dict = Depends(get_admin)):
+    product = await db.products.find_one({"id": product_id}, {"_id": 0, "id": 1})
+    if not product:
+        raise HTTPException(404, "Product not found")
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
+    if ext not in LOADER_TYPES:
+        raise HTTPException(400, "Only .exe or .zip files are allowed")
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "Empty file")
+    if len(data) > MAX_LOADER_BYTES:
+        raise HTTPException(400, "Loader too large (max 150 MB)")
+    path = f"{APP_NAME}/loaders/{product_id}/{uuid.uuid4()}.{ext}"
+    result = await asyncio.to_thread(put_object, path, data, LOADER_TYPES[ext])
+    loader = {
+        "storage_path": result["path"], "filename": file.filename,
+        "size": result.get("size", len(data)), "content_type": LOADER_TYPES[ext],
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.products.update_one({"id": product_id}, {"$set": {"loader": loader, "updated_at": loader["updated_at"]}})
+    return loader
+
+
+@api_router.delete("/admin/products/{product_id}/loader")
+async def admin_delete_loader(product_id: str, admin: dict = Depends(get_admin)):
+    res = await db.products.update_one({"id": product_id}, {"$unset": {"loader": ""}})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Product not found")
+    return {"deleted": True}
+
+
+# ---------- buyer: gated loader downloads ----------
+
+async def _attach_loader_links(order: dict) -> dict:
+    token = order.get("download_token")
+    if not token:
+        token = secrets.token_urlsafe(24)
+        await db.orders.update_one({"id": order["id"]}, {"$set": {"download_token": token}})
+        order["download_token"] = token
+    for it in order.get("items", []):
+        prod = await db.products.find_one({"id": it.get("product_id")}, {"_id": 0, "loader": 1})
+        if prod and prod.get("loader"):
+            it["loader_filename"] = prod["loader"]["filename"]
+            it["download_url"] = f"/api/orders/{order['id']}/loader/{it['product_id']}?token={token}"
+    return order
+
+
+@api_router.get("/orders/{order_id}/loader/{product_id}")
+async def download_loader(order_id: str, product_id: str, token: str = ""):
+    order = await db.orders.find_one({"id": order_id, "payment_status": "paid"})
+    if not order or not order.get("download_token") or not secrets.compare_digest(order["download_token"], token):
+        raise HTTPException(403, "Invalid download link")
+    if not any(it.get("product_id") == product_id for it in order.get("items", [])):
+        raise HTTPException(404, "Product not in this order")
+    product = await db.products.find_one({"id": product_id}, {"_id": 0, "loader": 1})
+    if not product or not product.get("loader"):
+        raise HTTPException(404, "No loader available for this product")
+    data, _ = await asyncio.to_thread(get_object, product["loader"]["storage_path"])
+    fname = product["loader"].get("filename", "loader.exe").replace('"', "")
+    return Response(
+        content=data, media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 # ---------- admin: orders ----------
@@ -755,6 +887,7 @@ async def _fulfill_order(where: dict) -> Optional[dict]:
         if updated.get("coupon_code"):
             await db.coupons.update_one({"code": updated["coupon_code"]}, {"$inc": {"used_count": 1}})
         try:
+            await _attach_loader_links(updated)
             await send_order_email(updated)
             await db.orders.update_one({"id": updated["id"]}, {"$set": {"email_sent": True}})
         except Exception as e:
@@ -859,6 +992,7 @@ async def create_checkout(body: CheckoutIn):
         "subtotal": subtotal_cents / 100.0, "discount_percent": discount_pct,
         "coupon_code": coupon_code,
         "status": "initiated", "payment_status": "pending",
+        "download_token": secrets.token_urlsafe(24),
         "created_at": now, "updated_at": now,
     })
     return {"checkout_url": session.url, "session_id": session.id}
@@ -878,6 +1012,9 @@ async def payment_status(session_id: str):
                 order.pop("_id", None)
         except stripe.error.StripeError:
             pass
+    if order.get("payment_status") == "paid":
+        await _attach_loader_links(order)
+        order.pop("download_token", None)
     return {
         "session_id": session_id,
         "status": order["status"],
@@ -985,6 +1122,7 @@ async def paypal_create(body: PayPalCreateIn):
         "subtotal": subtotal_cents / 100.0, "discount_percent": discount_pct,
         "coupon_code": coupon_code,
         "status": "initiated", "payment_status": "pending",
+        "download_token": secrets.token_urlsafe(24),
         "created_at": now, "updated_at": now,
     })
     return {"paypal_order_id": pp["id"], "order_id": order_id}
@@ -1015,6 +1153,8 @@ async def order_by_id(order_id: str):
     order = await db.orders.find_one({"id": order_id, "payment_status": "paid"}, {"_id": 0})
     if not order:
         raise HTTPException(404, "Order not found")
+    await _attach_loader_links(order)
+    order.pop("download_token", None)
     return order
 
 

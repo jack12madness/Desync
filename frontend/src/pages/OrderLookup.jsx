@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Copy, KeyRound } from "lucide-react";
+import { Search, Copy, KeyRound, Download } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Input } from "@/components/ui/input";
-import { api, apiError, eur } from "@/lib/api";
+import { api, apiError, eur, API } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 
 export function KeyRow({ item }) {
@@ -19,6 +19,15 @@ export function KeyRow({ item }) {
         <div className="text-xs text-slate-500">
           {item.game} · {item.duration_label}
         </div>
+        {item.download_url && (
+          <a
+            href={`${API}${item.download_url}`}
+            data-testid={`download-loader-${item.product_id}-${item.duration}`}
+            className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-xs font-semibold transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" /> Download loader{item.loader_filename ? ` — ${item.loader_filename}` : ""}
+          </a>
+        )}
       </div>
       {item.license_key ? (
         <div className="flex items-center gap-2">

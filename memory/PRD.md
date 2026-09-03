@@ -12,6 +12,13 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-03 — Per-product loader files
+- Admins attach a loader (.exe/.zip, max 150MB) per product in the product create/edit form; replace or remove supported. Files live in Emergent object storage (desync/loaders/...), metadata on product doc
+- Buyers get a secure per-order download link (order download_token, works forever for paid orders): on payment success page, in My Orders, and as a button in the order email (replaced old "Discord #downloads" setup text)
+- Download endpoint: GET /api/orders/{order_id}/loader/{product_id}?token=... — validates paid order + token (403 otherwise) + item in order; streams with attachment filename. Public products list exposes only has_loader (storage path hidden)
+- Endpoints: POST/DELETE /api/admin/products/{id}/loader; orders get download_token at creation, older orders lazily backfilled
+- Verified: upload .exe ok, .txt rejected 400, download bytes match with valid token, 403 wrong token, My Orders shows button, admin form shows current loader; 9/9 regression tests pass
+
 ### 2026-09-02 — TOS checkbox, Privacy Policy, admin tab cleanup
 - Cart now requires agreeing to Terms of Service + Privacy Policy (checkbox, links to /terms and /privacy) before the Pay button enables; toast error if skipped
 - New Privacy Policy page at /privacy (13 sections, Australian privacy law, footer link)

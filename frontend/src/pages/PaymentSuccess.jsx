@@ -93,7 +93,7 @@ export default function PaymentSuccess() {
                 </div>
                 <div className="mt-6 p-4 border border-dashed border-[#2E6BFF]/30 rounded-lg text-sm text-slate-400 leading-relaxed">
                   <span className="text-white font-semibold block mb-2">Setup in 60 seconds</span>
-                  1. Download the loader from the Discord #downloads channel.
+                  1. Download your loader using the button next to your product above (also in your email).
                   2. Run as Administrator and paste your key.
                   3. Launch your game and press INSERT to open the menu.
                 </div>
