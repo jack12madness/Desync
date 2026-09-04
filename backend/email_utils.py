@@ -161,10 +161,20 @@ def _key_box(key: str) -> str:
     )
 
 
+_ACCOUNT_FIELDS = [
+    ("email", "Email"),
+    ("email_password", "Email password"),
+    ("password", "Password"),
+    ("discord_password", "Discord password"),
+    ("discord_token", "Discord token"),
+]
+
+
 def _account_box(account: dict) -> str:
     rows = ""
-    for label, field in (("Email", "email"), ("Email password", "email_password"),
-                         ("Discord password", "discord_password"), ("Discord token", "discord_token")):
+    for field, label in _ACCOUNT_FIELDS:
+        if not account.get(field):
+            continue
         rows += (
             '<tr><td style="color:#64748B;font-size:12px;padding:3px 0">' + label + '</td>'
             '<td style="font-family:Courier,monospace;font-size:13px;color:#7FB0FF;text-align:right;word-break:break-all">'

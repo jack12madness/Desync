@@ -12,6 +12,13 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-04 — Steam/Rockstar accounts + collections-first shop
+- Account types: ProductIn.account_type (discord|steam|rockstar, shown in account product form with format hints). Steam/Rockstar paste format: email:password (colons in password OK). Delivery/email render only the fields present (dynamic _account_box + ACCOUNT_FIELDS in KeyRow)
+- Categories: image_url field (create + inline edit in CategoriesTab); GET /api/categories enriches with product_count, min_price, max_price; PUT /admin/categories/{id} (rename cascades to products)
+- Shop redesigned: collections-first — big category cards (photo, COLLECTION tag, price range, product count, arrow) → click shows that category's products with "All collections" back button. Filter pills removed. testids: collection-card-*, collections-grid, back-to-collections
+- Verified: steam bulk add (2 ok, colon-password, 1 invalid), steam account delivered end-to-end, category image/count/range, collections UI click-through. 9/9 regression pass
+
+
 ### 2026-09-04 — Discord username at checkout + multi-send
 - CheckoutIn.discord_username stored on orders (Stripe/PayPal/bank); cart has required "Discord username" field (buttons disabled + toast until filled, persisted in localStorage); admin orders show "discord: name" per order
 - Customers Send-key dialog has "How many to send" qty input (1-100); backend validates stock >= qty, pulls N keys/accounts into one $0 order with deliverables list, email renders all

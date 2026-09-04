@@ -31,6 +31,14 @@ function CredentialRow({ label, value, testid }) {
   );
 }
 
+const ACCOUNT_FIELDS = [
+  ["email", "Email"],
+  ["email_password", "Email Password"],
+  ["password", "Password"],
+  ["discord_password", "Discord Password"],
+  ["discord_token", "Discord Token"],
+];
+
 export function KeyRow({ item }) {
   const copy = (key) => {
     navigator.clipboard.writeText(key);
@@ -67,10 +75,9 @@ export function KeyRow({ item }) {
               )}
               {d.account ? (
                 <div className="space-y-1.5" data-testid={`account-details-${item.product_id}-${item.duration}-${di}`}>
-                  <CredentialRow label="Email" value={d.account.email} testid={`account-email-${item.product_id}-${item.duration}-${di}`} />
-                  <CredentialRow label="Email Password" value={d.account.email_password} testid={`account-email-password-${item.product_id}-${item.duration}-${di}`} />
-                  <CredentialRow label="Discord Password" value={d.account.discord_password} testid={`account-discord-password-${item.product_id}-${item.duration}-${di}`} />
-                  <CredentialRow label="Discord Token" value={d.account.discord_token} testid={`account-discord-token-${item.product_id}-${item.duration}-${di}`} />
+                  {ACCOUNT_FIELDS.filter(([f]) => d.account[f]).map(([f, label]) => (
+                    <CredentialRow key={f} label={label} value={d.account[f]} testid={`account-${f.replace(/_/g, "-")}-${item.product_id}-${item.duration}-${di}`} />
+                  ))}
                 </div>
               ) : (
                 <div className="flex items-center gap-2">

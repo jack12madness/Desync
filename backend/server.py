@@ -167,6 +167,7 @@ class ProductIn(BaseModel):
     prices: Dict[str, float] = {}
     min_buy: int = 1
     kind: str = "cheat"  # "cheat" or "account"
+    account_type: Optional[str] = None  # for kind=account: "discord" | "steam" | "rockstar"
     active: bool = True
     sort_order: int = 0
 
@@ -310,11 +311,20 @@ async def list_products():
 class CategoryIn(BaseModel):
     name: str
     sort_order: int = 0
+    image_url: Optional[str] = None
 
 
 @api_router.get("/categories")
 async def list_categories():
-    return await db.categories.find({}, {"_id": 0}).sort("sort_order", 1).to_list(200)
+    cats = await db.categories.find({}, {"_id": 0}).sort("sort_order", 1).to_list(200)
+    products = await db.products.find({"active": True}, {"_id": 0, "game": 1, "prices": 1}).to_list(500)
+    for c in cats:
+        prods = [p for p in products if p.get("game") == c["name"]]
+        prices = [v for p in prods for v in (p.get("prices") or {}).values() if v is not None]
+        c["product_count"] = len(prods)
+        c["min_price"] = round(min(prices), 2) if prices else None
+        c["max_price"] = round(max(prices), 2) if prices else None
+    return cats
 
 
 @api_router.post("/admin/categories")
@@ -326,10 +336,30 @@ async def admin_create_category(body: CategoryIn, admin: dict = Depends(get_admi
         raise HTTPException(409, "Category already exists")
     doc = {
         "id": str(uuid.uuid4()), "name": name, "sort_order": body.sort_order,
+        "image_url": body.image_url,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.categories.insert_one(doc)
     return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@api_router.put("/admin/categories/{category_id}")
+async def admin_update_category(category_id: str, body: CategoryIn, admin: dict = Depends(get_admin)):
+    cat = await db.categories.find_one({"id": category_id})
+    if not cat:
+        raise HTTPException(404, "Category not found")
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(400, "Name required")
+    if name.lower() != cat["name"].lower():
+        if await db.categories.find_one({"name": {"$regex": f"^{name}$", "$options": "i"}}):
+            raise HTTPException(409, "Category already exists")
+        await db.products.update_many({"game": cat["name"]}, {"$set": {"game": name}})
+    await db.categories.update_one(
+        {"id": category_id},
+        {"$set": {"name": name, "sort_order": body.sort_order, "image_url": body.image_url}},
+    )
+    return {"updated": True}
 
 
 @api_router.delete("/admin/categories/{category_id}")
@@ -627,7 +657,7 @@ async def keystock_list(product_id: str, admin: dict = Depends(get_admin)):
 
 @api_router.post("/admin/keystock")
 async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
-    product = await db.products.find_one({"id": body.product_id}, {"_id": 0, "id": 1})
+    product = await db.products.find_one({"id": body.product_id}, {"_id": 0, "id": 1, "account_type": 1})
     if not product:
         raise HTTPException(404, "Product not found")
     if body.duration not in DURATIONS:
@@ -636,6 +666,7 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
     lines = [k for k in lines if k]
     if not lines:
         raise HTTPException(400, "No keys provided")
+    account_type = product.get("account_type") or "discord"
     seen = set()
     added, skipped, invalid = 0, 0, 0
     now = datetime.now(timezone.utc).isoformat()
@@ -643,16 +674,24 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
         account = None
         key = line
         if body.mode == "accounts":
-            parts = line.split(":")
-            if len(parts) < 4 or not all(parts[i].strip() for i in (0, 1, 2)) or not parts[-1].strip():
-                invalid += 1
-                continue
-            account = {
-                "email": parts[0].strip(),
-                "email_password": parts[1].strip(),
-                "discord_password": ":".join(parts[2:-1]).strip(),
-                "discord_token": parts[-1].strip(),
-            }
+            parts = [p.strip() for p in line.split(":")]
+            if account_type in ("steam", "rockstar"):
+                # format: email:password
+                if len(parts) < 2 or not parts[0] or not parts[-1]:
+                    invalid += 1
+                    continue
+                account = {"email": parts[0], "password": ":".join(parts[1:])}
+            else:
+                # format: email:email password:discord password:discord token
+                if len(parts) < 4 or not parts[0] or not parts[1] or not parts[-1] or not ":".join(parts[2:-1]):
+                    invalid += 1
+                    continue
+                account = {
+                    "email": parts[0],
+                    "email_password": parts[1],
+                    "discord_password": ":".join(parts[2:-1]),
+                    "discord_token": parts[-1],
+                }
             key = account["email"]
         if key in seen:
             skipped += 1

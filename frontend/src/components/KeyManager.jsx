@@ -107,7 +107,9 @@ export default function KeyManager({ product, onClose, onChanged }) {
           <label className="text-sm text-slate-300 block mb-2">
             {mode === "keys"
               ? "Add keys — one per line, into a duration pool"
-              : "Add Discord accounts — one per line as email:email password:discord password:discord token"}
+              : (product.account_type === "steam" || product.account_type === "rockstar")
+                ? `Add ${product.account_type === "steam" ? "Steam" : "Rockstar"} accounts — one per line as email:password`
+                : "Add Discord accounts — one per line as email:email password:discord password:discord token"}
           </label>
           <div className="flex gap-3 mb-3">
             <Select value={duration} onValueChange={setDuration}>
@@ -127,7 +129,9 @@ export default function KeyManager({ product, onClose, onChanged }) {
             rows={4}
             placeholder={mode === "keys"
               ? "XXXX-XXXX-XXXX-XXXX\nYYYY-YYYY-YYYY-YYYY"
-              : "buyer@mail.com:emailpass123:discordpass456:MTIzNDU2.token.xyz\nnext@mail.com:pass2:dpass2:OTk4.token.abc"}
+              : (product.account_type === "steam" || product.account_type === "rockstar")
+                ? "account@mail.com:password123\nanother@mail.com:pass456"
+                : "buyer@mail.com:emailpass123:discordpass456:MTIzNDU2.token.xyz\nnext@mail.com:pass2:dpass2:OTk4.token.abc"}
             data-testid="keys-input"
             className="w-full rounded-lg bg-[#050B18] border border-[#1E2D4A] focus:border-[#2E6BFF] focus:outline-none font-mono text-sm p-3 text-slate-100 placeholder:text-slate-600"
           />

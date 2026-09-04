@@ -19,7 +19,7 @@ import ExpensesTab from "@/components/ExpensesTab";
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
   features: [], anticheat: "", prices: { day: "", week: "", month: "", lifetime: "" },
-  min_buy: 1, kind: "cheat", active: true, sort_order: 0,
+  min_buy: 1, kind: "cheat", account_type: "discord", active: true, sort_order: 0,
 };
 
 function ProductForm({ initial, categories, onSave, onClose }) {
@@ -51,7 +51,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
       features: typeof form.features === "string"
         ? form.features.split(",").map((s) => s.trim()).filter(Boolean)
         : form.features,
-      prices, min_buy: Math.max(1, parseInt(form.min_buy) || 1), active: form.active, sort_order: Number(form.sort_order) || 0,
+      prices, min_buy: Math.max(1, parseInt(form.min_buy) || 1), account_type: form.kind === "account" ? (form.account_type || "discord") : null, active: form.active, sort_order: Number(form.sort_order) || 0,
     }, loaderFile, removeLoader);
   };
 
@@ -97,6 +97,21 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             <label className={labelCls}>Image URL</label>
             <Input value={form.image_url} onChange={(e) => set("image_url", e.target.value)} data-testid="product-form-image" className={fieldCls} />
           </div>
+          {form.kind === "account" && (
+            <div>
+              <label className={labelCls}>Account type</label>
+              <Select value={form.account_type || "discord"} onValueChange={(v) => set("account_type", v)}>
+                <SelectTrigger data-testid="product-form-account-type" className={fieldCls}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
+                  <SelectItem value="discord">Discord (email:email pass:discord pass:token)</SelectItem>
+                  <SelectItem value="steam">Steam (email:password)</SelectItem>
+                  <SelectItem value="rockstar">Rockstar (email:password)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {form.kind !== "account" && (
             <>
               <div>
