@@ -528,6 +528,9 @@ export default function AdminDashboard() {
                 <div key={o.id} className="p-4 bg-[#0F1F38] border border-blue-900/40 rounded-lg" data-testid={`admin-order-row-${o.id}`}>
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-3">
                     <span className="font-mono text-sm text-blue-300">{o.email}</span>
+                    {o.discord_username && (
+                      <span className="text-xs font-mono text-violet-300" data-testid={`order-discord-${o.id}`}>discord: {o.discord_username}</span>
+                    )}
                     <span className="font-mono text-sm font-bold text-slate-100">{eur(o.total)}</span>
                     <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 border rounded-lg ${
                       o.payment_status === "paid" ? "text-emerald-400 border-emerald-400/40"

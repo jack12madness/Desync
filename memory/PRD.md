@@ -12,6 +12,12 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-04 — Discord username at checkout + multi-send
+- CheckoutIn.discord_username stored on orders (Stripe/PayPal/bank); cart has required "Discord username" field (buttons disabled + toast until filled, persisted in localStorage); admin orders show "discord: name" per order
+- Customers Send-key dialog has "How many to send" qty input (1-100); backend validates stock >= qty, pulls N keys/accounts into one $0 order with deliverables list, email renders all
+- Verified: username stored + displayed, qty=2 sends 2 accounts, over-stock rejected 400. 9/9 regression pass
+
+
 ### 2026-09-03 — Bank transfer "payment sent" reservation flow
 - Buyer clicks "I have sent the payment" on the bank-pending page → stock instantly reserved (keystock status "reserved" + reserved_order_id), cart cleared, reported state shown. Idempotent (double-click safe)
 - Admin orders: "buyer says paid" badge + "Cancel & release stock" button (releases reserved keys back to available, emails buyer "we could not verify your payment")

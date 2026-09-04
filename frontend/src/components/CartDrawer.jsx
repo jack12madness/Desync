@@ -15,6 +15,7 @@ export default function CartDrawer() {
   const { items, removeItem, setQty, total, isOpen, closeCart } = useCart();
   const navigate = useNavigate();
   const [email, setEmail] = useState(() => localStorage.getItem("void_email") || "");
+  const [discordUser, setDiscordUser] = useState(() => localStorage.getItem("void_discord") || "");
   const [couponInput, setCouponInput] = useState("");
   const [coupon, setCoupon] = useState(null);
   const [agreed, setAgreed] = useState(false);
@@ -27,6 +28,7 @@ export default function CartDrawer() {
   const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
   const cartPayload = () => ({
     email,
+    discord_username: discordUser.trim(),
     items: items.map((i) => ({ product_id: i.product.id, duration: i.duration, qty: i.qty || 1 })),
     coupon: coupon ? coupon.code : null,
   });
@@ -48,6 +50,10 @@ export default function CartDrawer() {
   const checkout = async () => {
     if (!validEmail) {
       toast.error("Enter a valid email — your keys are delivered there");
+      return;
+    }
+    if (!discordUser.trim()) {
+      toast.error("Enter your Discord username");
       return;
     }
     if (!agreed) {
@@ -72,6 +78,10 @@ export default function CartDrawer() {
   const bankCheckout = async () => {
     if (!validEmail) {
       toast.error("Enter a valid email — your keys are delivered there");
+      return;
+    }
+    if (!discordUser.trim()) {
+      toast.error("Enter your Discord username");
       return;
     }
     if (!agreed) {
@@ -223,6 +233,22 @@ export default function CartDrawer() {
             />
           </div>
 
+          <div>
+            <label className="text-sm text-slate-300 block mb-2">
+              Discord username — for support & delivery
+            </label>
+            <Input
+              value={discordUser}
+              onChange={(e) => {
+                setDiscordUser(e.target.value);
+                localStorage.setItem("void_discord", e.target.value);
+              }}
+              placeholder="e.g. desyncuser"
+              data-testid="cart-discord-input"
+              className="bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] text-sm h-11"
+            />
+          </div>
+
           <label className="flex items-start gap-3 cursor-pointer select-none" data-testid="terms-agree-label">
             <input
               type="checkbox"
@@ -246,7 +272,7 @@ export default function CartDrawer() {
 
           <button
             onClick={checkout}
-            disabled={loading || items.length === 0 || !agreed}
+            disabled={loading || items.length === 0 || !agreed || !discordUser.trim()}
             data-testid="cart-checkout-button"
             className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold shadow-[0_8px_24px_rgba(46,107,255,0.35)] disabled:opacity-40 disabled:pointer-events-none transition-all duration-200 active:scale-95"
           >
@@ -257,7 +283,7 @@ export default function CartDrawer() {
 
           <button
             onClick={bankCheckout}
-            disabled={loading || items.length === 0 || !agreed}
+            disabled={loading || items.length === 0 || !agreed || !discordUser.trim()}
             data-testid="cart-bank-transfer-button"
             className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg border border-[#2E6BFF]/40 text-[#8FB8E8] text-sm font-semibold hover:bg-[#2E6BFF]/10 disabled:opacity-40 disabled:pointer-events-none transition-all duration-200"
           >

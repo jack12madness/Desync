@@ -18,6 +18,7 @@ export default function CustomersTab() {
   const [sending, setSending] = useState(null);
   const [sendProduct, setSendProduct] = useState("");
   const [sendDuration, setSendDuration] = useState("");
+  const [sendQty, setSendQty] = useState(1);
 
   const load = () => api.get("/admin/customers").then(({ data }) => setCustomers(data)).catch(() => {});
 
@@ -44,12 +45,12 @@ export default function CustomersTab() {
       return;
     }
     try {
-      await api.post("/admin/customers/send-key", {
-        email: sending.email, product_id: sendProduct, duration: sendDuration,
+      const { data } = await api.post("/admin/customers/send-key", {
+        email: sending.email, product_id: sendProduct, duration: sendDuration, qty: sendQty,
       });
-      toast.success(`Key emailed to ${sending.email}`);
+      toast.success(`${data.sent_count} key${data.sent_count === 1 ? "" : "s"} emailed to ${sending.email}`);
       setSending(null);
-      setSendProduct(""); setSendDuration("");
+      setSendProduct(""); setSendDuration(""); setSendQty(1);
       load();
     } catch (e) {
       toast.error(apiError(e));
@@ -158,8 +159,22 @@ export default function CustomersTab() {
                 ))}
               </SelectContent>
             </Select>
+            <div>
+              <label className="text-[10px] font-mono uppercase tracking-widest text-slate-500 block mb-1.5">
+                How many to send
+              </label>
+              <Input
+                type="number"
+                min="1"
+                max="100"
+                value={sendQty}
+                onChange={(e) => setSendQty(Math.max(1, parseInt(e.target.value) || 1))}
+                data-testid="send-key-qty"
+                className={fieldCls}
+              />
+            </div>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              Pulls one key from stock, records a $0 order, and emails the key with the loader download link.
+              Pulls {sendQty > 1 ? `${sendQty} keys/accounts` : "one key"} from stock, records a $0 order, and emails everything with download links.
             </p>
             <button
               onClick={sendKey}

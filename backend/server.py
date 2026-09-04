@@ -190,6 +190,7 @@ class CartItemIn(BaseModel):
 
 class CheckoutIn(BaseModel):
     email: EmailStr
+    discord_username: Optional[str] = None
     items: List[CartItemIn]
     coupon: Optional[str] = None
     origin_url: str
@@ -868,6 +869,7 @@ async def bank_transfer_checkout(body: CheckoutIn):
     now = datetime.now(timezone.utc)
     order = {
         "id": order_id, "email": body.email.lower(), "items": items,
+        "discord_username": (body.discord_username or "").strip() or None,
         "subtotal": subtotal_cents / 100.0, "total": total,
         "discount": round((subtotal_cents - total_cents) / 100.0, 2),
         "currency": "eur", "provider": "bank_transfer",
@@ -1013,6 +1015,7 @@ class SendKeyIn(BaseModel):
     email: EmailStr
     product_id: str
     duration: str
+    qty: int = 1
 
 
 @api_router.get("/admin/customers")
@@ -1064,23 +1067,35 @@ async def admin_send_key(body: SendKeyIn, admin: dict = Depends(get_admin)):
         raise HTTPException(404, "Product not found")
     if body.duration not in DURATIONS or product.get("prices", {}).get(body.duration) is None:
         raise HTTPException(400, "Duration not available for this product")
-    order_id = str(uuid.uuid4())
-    key_doc = await db.keystock.find_one_and_update(
-        {"product_id": body.product_id, "duration": body.duration, "status": "available"},
-        {"$set": {"status": "assigned", "assigned_order_id": order_id,
-                  "assigned_at": datetime.now(timezone.utc).isoformat()}},
-        sort=[("created_at", 1)],
+    qty = max(1, min(100, int(body.qty or 1)))
+    in_stock = await db.keystock.count_documents(
+        {"product_id": body.product_id, "duration": body.duration, "status": "available"}
     )
-    if not key_doc:
+    if in_stock < qty:
+        raise HTTPException(400, f"Only {in_stock} in stock for this product + duration")
+    order_id = str(uuid.uuid4())
+    deliverables = []
+    for _ in range(qty):
+        key_doc = await db.keystock.find_one_and_update(
+            {"product_id": body.product_id, "duration": body.duration, "status": "available"},
+            {"$set": {"status": "assigned", "assigned_order_id": order_id,
+                      "assigned_at": datetime.now(timezone.utc).isoformat()}},
+            sort=[("created_at", 1)],
+        )
+        if not key_doc:
+            break
+        deliverables.append({"license_key": key_doc["key"], "account": key_doc.get("account")})
+    if not deliverables:
         raise HTTPException(400, "No keys in stock for this product + duration")
     now = datetime.now(timezone.utc).isoformat()
     item = {
         "product_id": product["id"], "name": product["name"], "game": product["game"],
         "duration": body.duration, "duration_label": DURATIONS[body.duration],
-        "unit_price": 0.0, "license_key": key_doc["key"],
+        "unit_price": 0.0, "qty": qty, "deliverables": deliverables,
+        "license_key": deliverables[0]["license_key"],
+        "account": deliverables[0].get("account"),
+        "key_pending": len(deliverables) < qty,
     }
-    if key_doc.get("account"):
-        item["account"] = key_doc["account"]
     order = {
         "id": order_id, "email": body.email.lower(),
         "items": [item],
@@ -1097,8 +1112,8 @@ async def admin_send_key(body: SendKeyIn, admin: dict = Depends(get_admin)):
         await db.orders.update_one({"id": order_id}, {"$set": {"email_sent": True}})
     except Exception as e:
         logger.error("Manual key email failed for %s: %s", order_id, e)
-        raise HTTPException(500, "Key assigned but email failed — check the order in the Orders tab")
-    return {"sent": True, "order_id": order_id}
+        raise HTTPException(500, "Key(s) assigned but email failed — check the order in the Orders tab")
+    return {"sent": True, "order_id": order_id, "sent_count": len(deliverables)}
 
 
 # ---------- admin: expenses ----------
@@ -1420,6 +1435,7 @@ async def create_checkout(body: CheckoutIn):
     now = datetime.now(timezone.utc).isoformat()
     await db.orders.insert_one({
         "id": order_id, "session_id": session.id, "email": email,
+        "discord_username": (body.discord_username or "").strip() or None,
         "items": order_items, "total": total_cents / 100.0, "currency": "eur",
         "subtotal": subtotal_cents / 100.0, "discount_percent": discount_pct,
         "coupon_code": coupon_code,
@@ -1550,6 +1566,7 @@ async def paypal_create(body: PayPalCreateIn):
     await db.orders.insert_one({
         "id": order_id, "session_id": None, "paypal_order_id": pp["id"],
         "payment_provider": "paypal", "email": email,
+        "discord_username": (body.discord_username or "").strip() or None,
         "items": order_items, "total": total_cents / 100.0, "currency": "eur",
         "subtotal": subtotal_cents / 100.0, "discount_percent": discount_pct,
         "coupon_code": coupon_code,
