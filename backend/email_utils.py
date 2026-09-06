@@ -167,6 +167,8 @@ _ACCOUNT_FIELDS = [
     ("password", "Password"),
     ("discord_password", "Discord password"),
     ("discord_token", "Discord token"),
+    ("twofa_key", "2FA key"),
+    ("twofa_redeem", "2FA redeem"),
 ]
 
 

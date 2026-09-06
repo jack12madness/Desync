@@ -12,6 +12,12 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-04 — Rockstar 2FA format
+- Rockstar bulk paste accepts the user's labeled pipe format: `E-Mail: x | Rockstar Password: y | 2FA Key: z | 2FA Redeem: url` (plain email:password also works as fallback)
+- Account schema adds twofa_key + twofa_redeem; email + My Orders render only present fields (both _account_box and KeyRow ACCOUNT_FIELDS are dynamic)
+- Demo "Rockstar Accounts" product (lifetime €3.00) created in PREVIEW with 2 test accounts; verified delivery shows all 4 fields incl. redeem URL. 9/9 regression pass
+
+
 ### 2026-09-04 — Steam/Rockstar accounts + collections-first shop
 - Account types: ProductIn.account_type (discord|steam|rockstar, shown in account product form with format hints). Steam/Rockstar paste format: email:password (colons in password OK). Delivery/email render only the fields present (dynamic _account_box + ACCOUNT_FIELDS in KeyRow)
 - Categories: image_url field (create + inline edit in CategoriesTab); GET /api/categories enriches with product_count, min_price, max_price; PUT /admin/categories/{id} (rename cascades to products)

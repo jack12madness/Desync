@@ -675,7 +675,31 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
         key = line
         if body.mode == "accounts":
             parts = [p.strip() for p in line.split(":")]
-            if account_type in ("steam", "rockstar"):
+            if account_type == "rockstar":
+                # preferred: E-Mail: x | Rockstar Password: y | 2FA Key: z | 2FA Redeem: url
+                # fallback:  email:password
+                if "|" in line:
+                    fields = {}
+                    for seg in line.split("|"):
+                        if ":" in seg:
+                            k, v = seg.split(":", 1)
+                            fields[k.strip().lower()] = v.strip()
+                    email = fields.get("e-mail") or fields.get("email")
+                    password = fields.get("rockstar password") or fields.get("password")
+                    if not email or not password:
+                        invalid += 1
+                        continue
+                    account = {"email": email, "password": password}
+                    if fields.get("2fa key"):
+                        account["twofa_key"] = fields["2fa key"]
+                    if fields.get("2fa redeem"):
+                        account["twofa_redeem"] = fields["2fa redeem"]
+                else:
+                    if len(parts) < 2 or not parts[0] or not parts[-1]:
+                        invalid += 1
+                        continue
+                    account = {"email": parts[0], "password": ":".join(parts[1:])}
+            elif account_type == "steam":
                 # format: email:password
                 if len(parts) < 2 or not parts[0] or not parts[-1]:
                     invalid += 1

@@ -37,6 +37,8 @@ const ACCOUNT_FIELDS = [
   ["password", "Password"],
   ["discord_password", "Discord Password"],
   ["discord_token", "Discord Token"],
+  ["twofa_key", "2FA Key"],
+  ["twofa_redeem", "2FA Redeem"],
 ];
 
 export function KeyRow({ item }) {

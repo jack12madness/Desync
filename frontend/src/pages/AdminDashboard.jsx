@@ -107,7 +107,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
                 <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
                   <SelectItem value="discord">Discord (email:email pass:discord pass:token)</SelectItem>
                   <SelectItem value="steam">Steam (email:password)</SelectItem>
-                  <SelectItem value="rockstar">Rockstar (email:password)</SelectItem>
+                  <SelectItem value="rockstar">Rockstar (email | password | 2FA key | redeem link)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -107,8 +107,10 @@ export default function KeyManager({ product, onClose, onChanged }) {
           <label className="text-sm text-slate-300 block mb-2">
             {mode === "keys"
               ? "Add keys — one per line, into a duration pool"
-              : (product.account_type === "steam" || product.account_type === "rockstar")
-                ? `Add ${product.account_type === "steam" ? "Steam" : "Rockstar"} accounts — one per line as email:password`
+              : product.account_type === "rockstar"
+                ? "Add Rockstar accounts — one per line: E-Mail: x | Rockstar Password: y | 2FA Key: z | 2FA Redeem: url"
+                : product.account_type === "steam"
+                ? "Add Steam accounts — one per line as email:password"
                 : "Add Discord accounts — one per line as email:email password:discord password:discord token"}
           </label>
           <div className="flex gap-3 mb-3">
@@ -129,7 +131,9 @@ export default function KeyManager({ product, onClose, onChanged }) {
             rows={4}
             placeholder={mode === "keys"
               ? "XXXX-XXXX-XXXX-XXXX\nYYYY-YYYY-YYYY-YYYY"
-              : (product.account_type === "steam" || product.account_type === "rockstar")
+              : product.account_type === "rockstar"
+                ? "E-Mail: buyer@mail.com | Rockstar Password: pass123 | 2FA Key: ABCDEF123 | 2FA Redeem: https://totp.danhersam.com/"
+                : product.account_type === "steam"
                 ? "account@mail.com:password123\nanother@mail.com:pass456"
                 : "buyer@mail.com:emailpass123:discordpass456:MTIzNDU2.token.xyz\nnext@mail.com:pass2:dpass2:OTk4.token.abc"}
             data-testid="keys-input"
