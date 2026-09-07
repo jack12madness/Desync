@@ -92,7 +92,14 @@ export default function PaymentSuccess() {
                   ))}
                 </div>
                 <div className="mt-6 p-4 border border-dashed border-[#2E6BFF]/30 rounded-lg text-sm text-slate-400 leading-relaxed">
-                  {state.order.items.some((i) => i.account) ? (
+                  {state.order.items.some((i) => i.ticket_url) ? (
+                    <>
+                      <span className="text-white font-semibold block mb-2">Claim via Discord ticket</span>
+                      1. Click "Open a ticket in Discord" next to your product above.
+                      2. Open a ticket and drop your order ID + Discord username.
+                      3. Our team sets you up — no key needed, this one never sells out.
+                    </>
+                  ) : state.order.items.some((i) => i.account) ? (
                     <>
                       <span className="text-white font-semibold block mb-2">Your Discord account</span>
                       1. Open Discord and log in with the email and Discord password above.

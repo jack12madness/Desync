@@ -7,7 +7,7 @@ export default function ProductCard({ product, index, onSelect }) {
   const prices = Object.values(product.prices || {});
   const minPrice = prices.length ? Math.min(...prices) : 0;
   const durations = Object.keys(product.prices || {});
-  const soldOut = durations.length > 0 && durations.every((d) => !(product.stock?.[d] > 0));
+  const soldOut = product.delivery !== "ticket" && durations.length > 0 && durations.every((d) => !(product.stock?.[d] > 0));
 
   return (
     <motion.article

@@ -58,6 +58,27 @@ export default function KeyManager({ product, onClose, onChanged }) {
   const countFor = (d) => (keys || []).filter((k) => k.status === "available" && k.duration === d).length;
   const productDurations = DURATIONS.filter((d) => product.prices && product.prices[d] != null);
   const sorted = [...(keys || [])].sort((a, b) => (a.duration || "").localeCompare(b.duration || ""));
+  const isTicket = product.delivery === "ticket";
+
+  if (isTicket) {
+    return (
+      <Dialog open onOpenChange={(o) => !o && onClose()}>
+        <DialogContent className="max-w-2xl bg-[#0A1628] border-[#1E2D4A] text-slate-100 rounded-xl" data-testid="key-manager-modal">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-[#5B8CFF]" /> Key Stock — {product.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-5 rounded-lg bg-[#050B18] border border-[#2E6BFF]/30 text-sm text-slate-400 leading-relaxed" data-testid="ticket-mode-note">
+            This product uses <span className="text-white font-semibold">Discord ticket delivery</span> — infinite
+            stock, never sold out. After paying, buyers are sent to{" "}
+            <span className="font-mono text-[#8FB8E8]">{product.ticket_url || "https://discord.gg/de-sync"}</span>{" "}
+            to open a ticket. Nothing to manage here.
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>

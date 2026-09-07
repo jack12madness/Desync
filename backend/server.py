@@ -168,6 +168,8 @@ class ProductIn(BaseModel):
     min_buy: int = 1
     kind: str = "cheat"  # "cheat" or "account"
     account_type: Optional[str] = None  # for kind=account: "discord" | "steam" | "rockstar"
+    delivery: str = "stock"  # "stock" (limited keys) or "ticket" (infinite, claim via Discord ticket)
+    ticket_url: Optional[str] = None
     active: bool = True
     sort_order: int = 0
 
@@ -852,6 +854,13 @@ async def admin_assign_keys(order_id: str, admin: dict = Depends(get_admin)):
     for item in items:
         qty = max(1, int(item.get("qty") or 1))
         deliverables = item.get("deliverables") or []
+        prod = await db.products.find_one(
+            {"id": item["product_id"]}, {"_id": 0, "delivery": 1, "ticket_url": 1}
+        )
+        if prod and prod.get("delivery") == "ticket":
+            item["ticket_url"] = prod.get("ticket_url") or "https://discord.gg/de-sync"
+            item["key_pending"] = False
+            continue
         if item.get("license_key") and not deliverables:
             deliverables = [{"license_key": item["license_key"], "account": item.get("account")}]
         while len(deliverables) < qty:
@@ -1333,6 +1342,13 @@ async def _fulfill_order(where: dict) -> Optional[dict]:
     for item in items:
         qty = max(1, int(item.get("qty") or 1))
         deliverables = item.get("deliverables") or []
+        prod = await db.products.find_one(
+            {"id": item["product_id"]}, {"_id": 0, "delivery": 1, "ticket_url": 1}
+        )
+        if prod and prod.get("delivery") == "ticket":
+            item["ticket_url"] = prod.get("ticket_url") or "https://discord.gg/de-sync"
+            item["key_pending"] = False
+            continue
         if item.get("license_key") and not deliverables:
             deliverables = [{"license_key": item["license_key"], "account": item.get("account")}]
         while len(deliverables) < qty:
@@ -1428,13 +1444,14 @@ async def _price_cart(items: List[CartItemIn], coupon: Optional[str]):
         qty = max(1, int(getattr(item, "qty", 1) or 1))
         if qty < min_buy:
             raise HTTPException(400, f"{product['name']} has a minimum purchase of {min_buy}")
-        in_stock = await db.keystock.count_documents(
-            {"product_id": product["id"], "duration": item.duration, "status": "available"}
-        )
-        if in_stock == 0:
-            raise HTTPException(400, f"{product['name']} ({DURATIONS[item.duration]}) is sold out")
-        if in_stock < qty:
-            raise HTTPException(400, f"Only {in_stock} left of {product['name']} ({DURATIONS[item.duration]})")
+        if product.get("delivery") != "ticket":
+            in_stock = await db.keystock.count_documents(
+                {"product_id": product["id"], "duration": item.duration, "status": "available"}
+            )
+            if in_stock == 0:
+                raise HTTPException(400, f"{product['name']} ({DURATIONS[item.duration]}) is sold out")
+            if in_stock < qty:
+                raise HTTPException(400, f"Only {in_stock} left of {product['name']} ({DURATIONS[item.duration]})")
         unit_cents = int(round(float(price) * 100 * (1 - discount_pct / 100)))
         subtotal_cents += int(round(float(price) * 100)) * qty
         total_cents += unit_cents * qty

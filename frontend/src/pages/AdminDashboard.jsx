@@ -19,7 +19,7 @@ import ExpensesTab from "@/components/ExpensesTab";
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
   features: [], anticheat: "", prices: { day: "", week: "", month: "", lifetime: "" },
-  min_buy: 1, kind: "cheat", account_type: "discord", active: true, sort_order: 0,
+  min_buy: 1, kind: "cheat", account_type: "discord", delivery: "stock", ticket_url: "", active: true, sort_order: 0,
 };
 
 function ProductForm({ initial, categories, onSave, onClose }) {
@@ -51,7 +51,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
       features: typeof form.features === "string"
         ? form.features.split(",").map((s) => s.trim()).filter(Boolean)
         : form.features,
-      prices, min_buy: Math.max(1, parseInt(form.min_buy) || 1), account_type: form.kind === "account" ? (form.account_type || "discord") : null, active: form.active, sort_order: Number(form.sort_order) || 0,
+      prices, min_buy: Math.max(1, parseInt(form.min_buy) || 1), account_type: form.kind === "account" ? (form.account_type || "discord") : null, delivery: form.delivery || "stock", ticket_url: form.delivery === "ticket" ? (form.ticket_url?.trim() || "https://discord.gg/de-sync") : null, active: form.active, sort_order: Number(form.sort_order) || 0,
     }, loaderFile, removeLoader);
   };
 
@@ -189,6 +189,27 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             <label className={labelCls}>Min per purchase (e.g. 5 for account packs)</label>
             <Input type="number" min="1" value={form.min_buy} onChange={(e) => set("min_buy", e.target.value)} data-testid="product-form-min-buy" className={fieldCls} />
           </div>
+          <div>
+            <label className={labelCls}>Delivery method</label>
+            <Select value={form.delivery || "stock"} onValueChange={(v) => set("delivery", v)}>
+              <SelectTrigger data-testid="product-form-delivery" className={fieldCls}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
+                <SelectItem value="stock">Stocked keys — limited inventory</SelectItem>
+                <SelectItem value="ticket">Discord ticket — infinite, never sold out</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {form.delivery === "ticket" && (
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Discord ticket link</label>
+              <Input value={form.ticket_url} onChange={(e) => set("ticket_url", e.target.value)} placeholder="https://discord.gg/de-sync" data-testid="product-form-ticket-url" className={fieldCls} />
+              <div className="text-[10px] font-mono text-slate-500 mt-1.5">
+                Buyers are sent here to open a ticket after payment — no keys needed, never sold out
+              </div>
+            </div>
+          )}
           <div className="flex items-end pb-1">
             <label className="flex items-center gap-3 cursor-pointer">
               <input

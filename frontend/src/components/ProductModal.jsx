@@ -16,7 +16,7 @@ export default function ProductModal({ product, onClose }) {
   const [duration, setDuration] = useState(null);
   const selected = duration && durations.includes(duration) ? duration : durations[0];
   const soldOut = product
-    ? durations.length > 0 && durations.every((d) => !(product.stock?.[d] > 0))
+    ? product.delivery !== "ticket" && durations.length > 0 && durations.every((d) => !(product.stock?.[d] > 0))
     : false;
 
   if (!product) return null;

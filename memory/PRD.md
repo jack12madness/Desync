@@ -12,6 +12,12 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-07 — Ticket-delivery (generator) products
+- ProductIn.delivery ("stock"|"ticket") + ticket_url (default https://discord.gg/de-sync); product form has Delivery method select + ticket link input
+- Ticket products: skip all stock checks (infinite, never sold out), fulfillment sets item.ticket_url instead of keys; email renders "Claim via Discord ticket" box with button; My Orders/success show claim box + link; KeyManager shows info note instead of stock UI
+- Verified: created generator product with 0 stock → sold → fulfilled with ticket_url, no pending; shop shows no sold-out badge; claim link correct. 9/9 regression pass
+
+
 ### 2026-09-04 — Rockstar 2FA format
 - Rockstar bulk paste accepts the user's labeled pipe format: `E-Mail: x | Rockstar Password: y | 2FA Key: z | 2FA Redeem: url` (plain email:password also works as fallback)
 - Account schema adds twofa_key + twofa_redeem; email + My Orders render only present fields (both _account_box and KeyRow ACCOUNT_FIELDS are dynamic)

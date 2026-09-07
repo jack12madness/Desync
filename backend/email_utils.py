@@ -190,7 +190,21 @@ def _account_box(account: dict) -> str:
     )
 
 
+def _ticket_box(ticket_url: str) -> str:
+    return (
+        '<div style="background:#050B18;border:1px solid #2E6BFF;border-radius:8px;padding:14px 16px;margin:8px 0">'
+        '<div style="color:#F1F5F9;font-size:14px;font-weight:600;margin-bottom:6px">Claim via Discord ticket</div>'
+        '<div style="color:#94A3B8;font-size:12px;margin-bottom:10px">This product is delivered through our '
+        'Discord — open a ticket and our team will set you up right away.</div>'
+        '<a href="' + escape(ticket_url) + '" style="display:inline-block;background:#5865F2;color:#ffffff;'
+        'font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;text-decoration:none">Open a ticket in Discord</a>'
+        '</div>'
+    )
+
+
 def _deliverables_html(it: dict) -> str:
+    if it.get("ticket_url"):
+        return _ticket_box(it["ticket_url"])
     dels = it.get("deliverables") or []
     if not dels and it.get("license_key"):
         dels = [{"license_key": it["license_key"], "account": it.get("account")}]

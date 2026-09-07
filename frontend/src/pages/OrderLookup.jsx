@@ -68,7 +68,22 @@ export function KeyRow({ item }) {
           </a>
         )}
       </div>
-      {deliverables.length > 0 ? (
+      {item.ticket_url ? (
+        <div className="w-full sm:w-auto sm:min-w-80" data-testid={`ticket-claim-${item.product_id}-${item.duration}`}>
+          <div className="p-3 rounded-lg bg-[#5865F2]/10 border border-[#5865F2]/40">
+            <div className="text-xs text-slate-300 mb-2">Claimed via Discord ticket — our team sets you up right away</div>
+            <a
+              href={item.ticket_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid={`ticket-claim-link-${item.product_id}-${item.duration}`}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-semibold transition-colors"
+            >
+              Open a ticket in Discord
+            </a>
+          </div>
+        </div>
+      ) : deliverables.length > 0 ? (
         <div className="w-full sm:w-auto sm:min-w-80 space-y-2" data-testid={`deliverables-${item.product_id}-${item.duration}`}>
           {deliverables.map((d, di) => (
             <div key={di} className={deliverables.length > 1 ? "pt-2 border-t border-[#1E2D4A] first:border-0 first:pt-0" : ""}>
