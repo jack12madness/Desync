@@ -12,7 +12,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict
 import time, uuid, logging, secrets, string, asyncio
-import html, json
+import html, json, re
 from datetime import datetime, timezone, timedelta
 import httpx
 import requests
@@ -479,6 +479,63 @@ async def admin_delete_product(product_id: str, admin: dict = Depends(get_admin)
     if res.deleted_count == 0:
         raise HTTPException(404, "Product not found")
     return {"deleted": True}
+
+
+# ---------- admin: product/category images ----------
+
+IMAGE_TYPES = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+
+async def _store_image(file: UploadFile) -> str:
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else ""
+    if ext not in IMAGE_TYPES:
+        raise HTTPException(400, "Only PNG, JPG or WebP images are allowed")
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "Empty file")
+    if len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(400, "Image too large (max 10 MB)")
+    name = f"{uuid.uuid4()}.{ext}"
+    await asyncio.to_thread(put_object, f"{APP_NAME}/images/{name}", data, IMAGE_TYPES[ext])
+    return f"/api/media/{name}"
+
+
+@api_router.post("/admin/products/{product_id}/image")
+async def admin_upload_product_image(product_id: str, file: UploadFile = File(...), admin: dict = Depends(get_admin)):
+    product = await db.products.find_one({"id": product_id}, {"_id": 0, "id": 1})
+    if not product:
+        raise HTTPException(404, "Product not found")
+    url = await _store_image(file)
+    await db.products.update_one(
+        {"id": product_id},
+        {"$set": {"image_url": url, "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return {"image_url": url}
+
+
+@api_router.post("/admin/categories/{category_id}/image")
+async def admin_upload_category_image(category_id: str, file: UploadFile = File(...), admin: dict = Depends(get_admin)):
+    cat = await db.categories.find_one({"id": category_id}, {"_id": 0, "id": 1})
+    if not cat:
+        raise HTTPException(404, "Category not found")
+    url = await _store_image(file)
+    await db.categories.update_one({"id": category_id}, {"$set": {"image_url": url}})
+    return {"image_url": url}
+
+
+@api_router.get("/media/{filename}")
+async def get_media(filename: str):
+    if not re.fullmatch(r"[0-9a-f-]{36}\.(png|jpe?g|webp)", filename):
+        raise HTTPException(404, "Not found")
+    try:
+        data, ctype = await asyncio.to_thread(get_object, f"{APP_NAME}/images/{filename}")
+    except Exception:
+        raise HTTPException(404, "Not found")
+    return Response(
+        content=data, media_type=ctype,
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
 
 
 # ---------- admin: product loaders ----------

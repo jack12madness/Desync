@@ -8,8 +8,9 @@ export default function CategoriesTab({ onChanged }) {
   const [categories, setCategories] = useState([]);
   const [name, setName] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [imageFile, setImageFile] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(null); // {id, name, image_url}
+  const [editing, setEditing] = useState(null); // {id, name, image_url, file}
 
   const load = () =>
     api.get("/categories").then(({ data }) => setCategories(data)).catch(() => {});
@@ -18,15 +19,22 @@ export default function CategoriesTab({ onChanged }) {
     load();
   }, []);
 
+  const uploadImage = async (categoryId, file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    await api.post(`/admin/categories/${categoryId}/image`, fd);
+  };
+
   const create = async () => {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      await api.post("/admin/categories", {
+      const { data } = await api.post("/admin/categories", {
         name: name.trim(), sort_order: categories.length + 1, image_url: imageUrl.trim() || null,
       });
+      if (imageFile) await uploadImage(data.id, imageFile);
       toast.success(`Category '${name.trim()}' created`);
-      setName(""); setImageUrl("");
+      setName(""); setImageUrl(""); setImageFile(null);
       load();
       onChanged?.();
     } catch (e) {
@@ -42,6 +50,7 @@ export default function CategoriesTab({ onChanged }) {
       await api.put(`/admin/categories/${editing.id}`, {
         name: editing.name.trim(), image_url: editing.image_url?.trim() || null,
       });
+      if (editing.file) await uploadImage(editing.id, editing.file);
       toast.success("Category updated");
       setEditing(null);
       load();
@@ -82,13 +91,18 @@ export default function CategoriesTab({ onChanged }) {
             data-testid="category-name-input"
             className={fieldCls}
           />
-          <Input
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="Photo URL (e.g. /images/og-banner.png)"
-            data-testid="category-image-input"
-            className={fieldCls}
-          />
+          <div>
+            <input
+              type="file"
+              accept=".png,.jpg,.jpeg,.webp"
+              onChange={(e) => setImageFile(e.target.files[0] || null)}
+              data-testid="category-image-upload"
+              className="block w-full text-sm text-slate-400 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-400 file:px-3 file:py-1.5 file:text-xs file:font-mono file:font-bold file:uppercase file:text-[#050B18] hover:file:bg-blue-300 file:cursor-pointer"
+            />
+            {imageFile && (
+              <div className="text-[10px] font-mono text-emerald-400 mt-1">{imageFile.name}</div>
+            )}
+          </div>
           <button
             onClick={create}
             disabled={saving || !name.trim()}
@@ -97,6 +111,9 @@ export default function CategoriesTab({ onChanged }) {
           >
             <Plus className="w-4 h-4" /> Create
           </button>
+        </div>
+        <div className="text-[10px] font-mono text-slate-600 mt-2">
+          Upload a photo for the collection card — stored on Desync storage, never expires (Discord links die after a few days)
         </div>
       </div>
       <div className="space-y-2" data-testid="categories-list">
@@ -124,12 +141,12 @@ export default function CategoriesTab({ onChanged }) {
                   data-testid={`category-edit-name-${c.id}`}
                   className={`${fieldCls} h-9`}
                 />
-                <Input
-                  value={editing.image_url || ""}
-                  onChange={(e) => setEditing({ ...editing, image_url: e.target.value })}
-                  placeholder="Photo URL"
+                <input
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.webp"
+                  onChange={(e) => setEditing({ ...editing, file: e.target.files[0] || null })}
                   data-testid={`category-edit-image-${c.id}`}
-                  className={`${fieldCls} h-9`}
+                  className="block w-full text-xs text-slate-400 file:mr-2 file:rounded file:border-0 file:bg-blue-400 file:px-2 file:py-1 file:text-[10px] file:font-mono file:font-bold file:uppercase file:text-[#050B18] file:cursor-pointer"
                 />
                 <button onClick={saveEdit} data-testid={`category-edit-save-${c.id}`} className="p-1.5 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 rounded transition-colors">
                   <Check className="w-3.5 h-3.5" />

@@ -12,6 +12,13 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-09 — Uploaded product/category photos (no more expiring Discord links)
+- POST /api/admin/products/{id}/image and /api/admin/categories/{id}/image (PNG/JPG/WebP, max 10MB) → stored in Emergent object storage at desync/images/, product image_url becomes /api/media/{uuid}.{ext}
+- GET /api/media/{filename} — public, sanitized (uuid.ext only, traversal blocked), streams from storage
+- ProductForm: file upload + current photo preview (URL input replaced by upload); CategoriesTab: photo upload on create + edit
+- Verified: upload→serve byte-exact, bad ext 400, traversal 404, storefront + form render uploaded images. NOTE: live products still use Discord URLs — re-upload each photo once via live admin after deploy
+
+
 ### 2026-09-07 — Ticket-delivery (generator) products
 - ProductIn.delivery ("stock"|"ticket") + ticket_url (default https://discord.gg/de-sync); product form has Delivery method select + ticket link input
 - Ticket products: skip all stock checks (infinite, never sold out), fulfillment sets item.ticket_url instead of keys; email renders "Claim via Discord ticket" box with button; My Orders/success show claim box + link; KeyManager shows info note instead of stock UI

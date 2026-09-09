@@ -32,6 +32,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
     };
   });
   const [loaderFile, setLoaderFile] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
   const [removeLoader, setRemoveLoader] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setPrice = (k, v) => setForm((f) => ({ ...f, prices: { ...f.prices, [k]: v } }));
@@ -52,7 +53,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
         ? form.features.split(",").map((s) => s.trim()).filter(Boolean)
         : form.features,
       prices, min_buy: Math.max(1, parseInt(form.min_buy) || 1), account_type: form.kind === "account" ? (form.account_type || "discord") : null, delivery: form.delivery || "stock", ticket_url: form.delivery === "ticket" ? (form.ticket_url?.trim() || "https://discord.gg/de-sync") : null, active: form.active, sort_order: Number(form.sort_order) || 0,
-    }, loaderFile, removeLoader);
+    }, loaderFile, removeLoader, imageFile);
   };
 
   const fieldCls = "bg-[#050B18] border-slate-700 focus-visible:ring-blue-400 font-mono text-sm";
@@ -94,8 +95,28 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             <Input value={form.description} onChange={(e) => set("description", e.target.value)} data-testid="product-form-description" className={fieldCls} />
           </div>
           <div className="sm:col-span-2">
-            <label className={labelCls}>Image URL</label>
-            <Input value={form.image_url} onChange={(e) => set("image_url", e.target.value)} data-testid="product-form-image" className={fieldCls} />
+            <label className={labelCls}>Product photo — upload a PNG/JPG (never expires)</label>
+            {form.image_url && (
+              <div className="flex items-center gap-3 mb-2">
+                <img src={form.image_url} alt="" className="w-16 h-16 rounded-lg object-cover border border-slate-700" data-testid="product-form-image-preview" />
+                <span className="text-[10px] font-mono text-slate-500 truncate flex-1">{form.image_url}</span>
+              </div>
+            )}
+            <input
+              type="file"
+              accept=".png,.jpg,.jpeg,.webp"
+              onChange={(e) => setImageFile(e.target.files[0] || null)}
+              data-testid="product-form-image-upload"
+              className="block w-full text-sm text-slate-400 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-400 file:px-4 file:py-2 file:text-xs file:font-mono file:font-bold file:uppercase file:text-[#050B18] hover:file:bg-blue-300 file:cursor-pointer"
+            />
+            {imageFile && (
+              <div className="text-[10px] font-mono text-emerald-400 mt-1.5" data-testid="product-form-image-selected">
+                {imageFile.name} — uploads on save
+              </div>
+            )}
+            <div className="text-[10px] font-mono text-slate-600 mt-1.5">
+              Uploaded files are stored on Desync storage — Discord links expire after a few days
+            </div>
           </div>
           {form.kind === "account" && (
             <div>
@@ -292,7 +313,7 @@ export default function AdminDashboard() {
   const loadUsers = () => api.get("/admin/users").then(({ data }) => setUsers(data)).catch(() => {});
   const loadCategories = () => api.get("/categories").then(({ data }) => setCategories(data)).catch(() => {});
 
-  const saveProduct = async (payload, loaderFile, removeLoader) => {
+  const saveProduct = async (payload, loaderFile, removeLoader, imageFile) => {
     try {
       let productId;
       if (editing && editing.id) {
@@ -303,6 +324,12 @@ export default function AdminDashboard() {
         const { data } = await api.post("/admin/products", payload);
         productId = data.id;
         toast.success("Product created");
+      }
+      if (imageFile) {
+        const fd = new FormData();
+        fd.append("file", imageFile);
+        await api.post(`/admin/products/${productId}/image`, fd);
+        toast.success("Product photo uploaded");
       }
       if (removeLoader) {
         await api.delete(`/admin/products/${productId}/loader`);

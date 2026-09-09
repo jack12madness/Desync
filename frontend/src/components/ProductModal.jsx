@@ -24,7 +24,7 @@ export default function ProductModal({ product, onClose }) {
   return (
     <Dialog open={!!product} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="max-w-3xl bg-[#0A1628] border-[#1E2D4A] text-slate-100 p-0 overflow-hidden rounded-xl"
+        className="max-w-3xl bg-[#0A1628] border-[#1E2D4A] text-slate-100 p-0 rounded-xl max-h-[92dvh] overflow-y-auto"
         data-testid="product-detail-modal"
       >
         <div className="grid md:grid-cols-2">
