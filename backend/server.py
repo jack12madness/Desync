@@ -759,11 +759,33 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
                         continue
                     account = {"email": parts[0], "password": ":".join(parts[1:])}
             elif account_type == "steam":
-                # format: email:password
-                if len(parts) < 2 or not parts[0] or not parts[-1]:
-                    invalid += 1
-                    continue
-                account = {"email": parts[0], "password": ":".join(parts[1:])}
+                # preferred: Steam Username: x | Steam Password: y | E-Mail: z | Password: w | Webmail: url
+                # fallback:  email:password
+                if "|" in line:
+                    fields = {}
+                    for seg in line.split("|"):
+                        if ":" in seg:
+                            k, v = seg.split(":", 1)
+                            fields[k.strip().lower()] = v.strip()
+                    email = fields.get("e-mail") or fields.get("email")
+                    steam_user = fields.get("steam username")
+                    steam_pass = fields.get("steam password")
+                    mail_pass = fields.get("password")
+                    if not email or not mail_pass:
+                        invalid += 1
+                        continue
+                    account = {"email": email, "password": mail_pass}
+                    if steam_user:
+                        account["steam_username"] = steam_user
+                    if steam_pass:
+                        account["steam_password"] = steam_pass
+                    if fields.get("webmail"):
+                        account["webmail"] = fields["webmail"]
+                else:
+                    if len(parts) < 2 or not parts[0] or not parts[-1]:
+                        invalid += 1
+                        continue
+                    account = {"email": parts[0], "password": ":".join(parts[1:])}
             else:
                 # format: email:email password:discord password:discord token
                 if len(parts) < 4 or not parts[0] or not parts[1] or not parts[-1] or not ":".join(parts[2:-1]):

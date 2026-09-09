@@ -12,6 +12,12 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-09 — Steam 5-field template
+- Steam bulk paste now accepts: `Steam Username: x | Steam Password: y | E-Mail: z | Password: w | Webmail: url` (plain email:password fallback retained)
+- Account schema adds steam_username, steam_password, webmail; email + My Orders render them (dynamic field lists); webmail shown as copyable text (http URLs can't be email links per validator)
+- Verified with the user's exact sample line: parsed to all 5 fields, delivered end-to-end, buyer page shows all rows with copy buttons. 9/9 regression pass
+
+
 ### 2026-09-09 — Discord webhook alerts
 - Settings discord_webhooks map: orders / payments / bank / low_stock — each posts embeds to its own Discord channel (user creates channel webhooks in Discord: Edit Channel → Integrations → Webhooks)
 - New admin "Alerts" tab: 4 channel cards with webhook URL inputs, Save, and per-channel Test button (POST /api/admin/discord-test validates Discord accepts it)

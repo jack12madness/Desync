@@ -32,13 +32,16 @@ function CredentialRow({ label, value, testid }) {
 }
 
 const ACCOUNT_FIELDS = [
+  ["steam_username", "Steam Username"],
+  ["steam_password", "Steam Password"],
   ["email", "Email"],
   ["email_password", "Email Password"],
-  ["password", "Password"],
+  ["password", "Email Password"],
   ["discord_password", "Discord Password"],
   ["discord_token", "Discord Token"],
   ["twofa_key", "2FA Key"],
   ["twofa_redeem", "2FA Redeem"],
+  ["webmail", "Webmail"],
 ];
 
 export function KeyRow({ item }) {

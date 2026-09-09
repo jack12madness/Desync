@@ -162,13 +162,16 @@ def _key_box(key: str) -> str:
 
 
 _ACCOUNT_FIELDS = [
+    ("steam_username", "Steam username"),
+    ("steam_password", "Steam password"),
     ("email", "Email"),
     ("email_password", "Email password"),
-    ("password", "Password"),
+    ("password", "Email password"),
     ("discord_password", "Discord password"),
     ("discord_token", "Discord token"),
     ("twofa_key", "2FA key"),
     ("twofa_redeem", "2FA redeem"),
+    ("webmail", "Webmail"),
 ]
 
 

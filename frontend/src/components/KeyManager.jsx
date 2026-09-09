@@ -131,7 +131,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
               : product.account_type === "rockstar"
                 ? "Add Rockstar accounts — one per line: E-Mail: x | Rockstar Password: y | 2FA Key: z | 2FA Redeem: url"
                 : product.account_type === "steam"
-                ? "Add Steam accounts — one per line as email:password"
+                ? "Add Steam accounts — one per line: Steam Username: x | Steam Password: y | E-Mail: z | Password: w | Webmail: url"
                 : "Add Discord accounts — one per line as email:email password:discord password:discord token"}
           </label>
           <div className="flex gap-3 mb-3">
@@ -155,7 +155,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
               : product.account_type === "rockstar"
                 ? "E-Mail: buyer@mail.com | Rockstar Password: pass123 | 2FA Key: ABCDEF123 | 2FA Redeem: https://totp.danhersam.com/"
                 : product.account_type === "steam"
-                ? "account@mail.com:password123\nanother@mail.com:pass456"
+                ? "Steam Username: ertau410256 | Steam Password: pass123 | E-Mail: acc@mail.com | Password: mailpass | Webmail: https://webmail.example.com"
                 : "buyer@mail.com:emailpass123:discordpass456:MTIzNDU2.token.xyz\nnext@mail.com:pass2:dpass2:OTk4.token.abc"}
             data-testid="keys-input"
             className="w-full rounded-lg bg-[#050B18] border border-[#1E2D4A] focus:border-[#2E6BFF] focus:outline-none font-mono text-sm p-3 text-slate-100 placeholder:text-slate-600"
