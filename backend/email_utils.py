@@ -176,6 +176,12 @@ _ACCOUNT_FIELDS = [
 
 
 def _account_box(account: dict) -> str:
+    if account.get("raw"):
+        return (
+            '<div style="font-family:Courier,monospace;font-size:13px;color:#7FB0FF;background:#050B18;'
+            'border:1px solid #1E2D4A;border-radius:8px;padding:12px 16px;margin:8px 0;word-break:break-all">'
+            + escape(account["raw"]) + '</div>'
+        )
     rows = ""
     for field, label in _ACCOUNT_FIELDS:
         if not account.get(field):

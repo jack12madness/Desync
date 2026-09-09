@@ -94,11 +94,29 @@ export function KeyRow({ item }) {
                 <div className="text-[10px] font-mono text-slate-600 mb-1">#{di + 1}</div>
               )}
               {d.account ? (
+                d.account.raw ? (
+                  <div className="flex items-center gap-2" data-testid={`account-raw-${item.product_id}-${item.duration}-${di}`}>
+                    <code className="font-mono text-xs text-[#8FB8E8] bg-[#2E6BFF]/10 border border-[#2E6BFF]/30 px-2 py-1.5 rounded break-all flex-1">
+                      {d.account.raw}
+                    </code>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(d.account.raw);
+                        toast.success("Account details copied");
+                      }}
+                      data-testid={`copy-raw-${item.product_id}-${item.duration}-${di}`}
+                      className="p-1.5 border border-[#2E6BFF]/30 text-[#8FB8E8] hover:bg-[#2E6BFF]/10 rounded-md transition-colors shrink-0"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
                 <div className="space-y-1.5" data-testid={`account-details-${item.product_id}-${item.duration}-${di}`}>
                   {ACCOUNT_FIELDS.filter(([f]) => d.account[f]).map(([f, label]) => (
                     <CredentialRow key={f} label={label} value={d.account[f]} testid={`account-${f.replace(/_/g, "-")}-${item.product_id}-${item.duration}-${di}`} />
                   ))}
                 </div>
+                )
               ) : (
                 <div className="flex items-center gap-2">
                   <code

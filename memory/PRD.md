@@ -12,6 +12,19 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-09 — Universal account drop-in (reverted strict Email/Webmail type)
+- Removed the "email" account_type option added earlier (user: accounts come in too many formats)
+- keystock_add: strict parsers (discord/steam/rockstar) still pretty-print; ANY unmatched line is stored as account.raw (verbatim) with email regex-extracted for dedupe; response returns {added, skipped, raw}
+- Delivery: email + My Orders render raw lines as clean mono blocks with copy button; parsed accounts still show per-field rows
+- Demo "Email Accounts" product deleted; verified mixed-format paste (1 parsed, 2 raw incl. weird unlabeled line) and raw delivery. 9/9 regression pass
+
+
+### 2026-09-09 — Email/Webmail account type
+- New account_type "email" ("Email / Webmail" in product form): paste format `email : password : webmail :` (space-colon separated), plain `email:password(:webmail)` also works
+- User's 30 myrambler.ru accounts were converted from labeled format to the new format (delivered in chat)
+- Demo "Email Accounts" product (€1.00 lifetime) in PREVIEW with 3 test entries; delivery shows Email + Email Password + Webmail. 9/9 regression pass
+
+
 ### 2026-09-09 — Steam 5-field template
 - Steam bulk paste now accepts: `Steam Username: x | Steam Password: y | E-Mail: z | Password: w | Webmail: url` (plain email:password fallback retained)
 - Account schema adds steam_username, steam_password, webmail; email + My Orders render them (dynamic field lists); webmail shown as copyable text (http URLs can't be email links per validator)

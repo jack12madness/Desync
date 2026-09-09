@@ -33,7 +33,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
     try {
       const { data } = await api.post("/admin/keystock", { product_id: product.id, duration, keys: input, mode });
       const noun = mode === "accounts" ? "account" : "key";
-      toast.success(`${data.added} ${noun}${data.added === 1 ? "" : "s"} added to ${DURATION_LABELS[duration]}${data.skipped ? `, ${data.skipped} duplicates skipped` : ""}${data.invalid ? `, ${data.invalid} invalid lines skipped` : ""}`);
+      toast.success(`${data.added} ${noun}${data.added === 1 ? "" : "s"} added to ${DURATION_LABELS[duration]}${data.skipped ? `, ${data.skipped} duplicates skipped` : ""}${data.raw ? `, ${data.raw} stored as pasted` : ""}`);
       setInput("");
       load();
       onChanged && onChanged();
@@ -134,6 +134,11 @@ export default function KeyManager({ product, onClose, onChanged }) {
                 ? "Add Steam accounts — one per line: Steam Username: x | Steam Password: y | E-Mail: z | Password: w | Webmail: url"
                 : "Add Discord accounts — one per line as email:email password:discord password:discord token"}
           </label>
+          {mode === "accounts" && (
+            <div className="text-[10px] font-mono text-slate-500 -mt-1.5 mb-2">
+              Any format works — lines we don't recognise are delivered exactly as pasted
+            </div>
+          )}
           <div className="flex gap-3 mb-3">
             <Select value={duration} onValueChange={setDuration}>
               <SelectTrigger data-testid="keys-duration-select" className="w-44 bg-[#050B18] border-[#1E2D4A]">

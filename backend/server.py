@@ -727,77 +727,60 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
         raise HTTPException(400, "No keys provided")
     account_type = product.get("account_type") or "discord"
     seen = set()
-    added, skipped, invalid = 0, 0, 0
+    added, skipped, raw_count = 0, 0, 0
     now = datetime.now(timezone.utc).isoformat()
     for line in lines:
         account = None
         key = line
         if body.mode == "accounts":
             parts = [p.strip() for p in line.split(":")]
+            fields = {}
+            if "|" in line:
+                for seg in line.split("|"):
+                    if ":" in seg:
+                        k, v = seg.split(":", 1)
+                        fields[k.strip().lower()] = v.strip()
             if account_type == "rockstar":
-                # preferred: E-Mail: x | Rockstar Password: y | 2FA Key: z | 2FA Redeem: url
-                # fallback:  email:password
-                if "|" in line:
-                    fields = {}
-                    for seg in line.split("|"):
-                        if ":" in seg:
-                            k, v = seg.split(":", 1)
-                            fields[k.strip().lower()] = v.strip()
-                    email = fields.get("e-mail") or fields.get("email")
-                    password = fields.get("rockstar password") or fields.get("password")
-                    if not email or not password:
-                        invalid += 1
-                        continue
+                email = fields.get("e-mail") or fields.get("email")
+                password = fields.get("rockstar password") or fields.get("password")
+                if email and password:
                     account = {"email": email, "password": password}
                     if fields.get("2fa key"):
                         account["twofa_key"] = fields["2fa key"]
                     if fields.get("2fa redeem"):
                         account["twofa_redeem"] = fields["2fa redeem"]
-                else:
-                    if len(parts) < 2 or not parts[0] or not parts[-1]:
-                        invalid += 1
-                        continue
+                elif not fields and len(parts) >= 2 and parts[0] and parts[-1]:
                     account = {"email": parts[0], "password": ":".join(parts[1:])}
             elif account_type == "steam":
-                # preferred: Steam Username: x | Steam Password: y | E-Mail: z | Password: w | Webmail: url
-                # fallback:  email:password
-                if "|" in line:
-                    fields = {}
-                    for seg in line.split("|"):
-                        if ":" in seg:
-                            k, v = seg.split(":", 1)
-                            fields[k.strip().lower()] = v.strip()
-                    email = fields.get("e-mail") or fields.get("email")
-                    steam_user = fields.get("steam username")
-                    steam_pass = fields.get("steam password")
-                    mail_pass = fields.get("password")
-                    if not email or not mail_pass:
-                        invalid += 1
-                        continue
+                email = fields.get("e-mail") or fields.get("email")
+                mail_pass = fields.get("password")
+                if email and mail_pass:
                     account = {"email": email, "password": mail_pass}
-                    if steam_user:
-                        account["steam_username"] = steam_user
-                    if steam_pass:
-                        account["steam_password"] = steam_pass
+                    if fields.get("steam username"):
+                        account["steam_username"] = fields["steam username"]
+                    if fields.get("steam password"):
+                        account["steam_password"] = fields["steam password"]
                     if fields.get("webmail"):
                         account["webmail"] = fields["webmail"]
-                else:
-                    if len(parts) < 2 or not parts[0] or not parts[-1]:
-                        invalid += 1
-                        continue
+                elif not fields and len(parts) >= 2 and parts[0] and parts[-1]:
                     account = {"email": parts[0], "password": ":".join(parts[1:])}
             else:
-                # format: email:email password:discord password:discord token
-                if len(parts) < 4 or not parts[0] or not parts[1] or not parts[-1] or not ":".join(parts[2:-1]):
-                    invalid += 1
-                    continue
-                account = {
-                    "email": parts[0],
-                    "email_password": parts[1],
-                    "discord_password": ":".join(parts[2:-1]),
-                    "discord_token": parts[-1],
-                }
-            key = account["email"]
+                # discord: email:email password:discord password:discord token
+                if len(parts) >= 4 and parts[0] and parts[1] and parts[-1] and ":".join(parts[2:-1]):
+                    account = {
+                        "email": parts[0],
+                        "email_password": parts[1],
+                        "discord_password": ":".join(parts[2:-1]),
+                        "discord_token": parts[-1],
+                    }
+            if account is None:
+                # universal fallback — store the line exactly as pasted, deliver verbatim
+                m = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", line)
+                account = {"raw": line}
+                if m:
+                    account["email"] = m.group(0)
+                raw_count += 1
+            key = account.get("email") or line
         if key in seen:
             skipped += 1
             continue
@@ -815,7 +798,7 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
             doc["account"] = account
         await db.keystock.insert_one(doc)
         added += 1
-    return {"added": added, "skipped": skipped, "invalid": invalid}
+    return {"added": added, "skipped": skipped, "raw": raw_count}
 
 
 @api_router.delete("/admin/keystock/{key_id}")
