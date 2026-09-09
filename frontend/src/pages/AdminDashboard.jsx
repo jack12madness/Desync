@@ -20,7 +20,7 @@ import AlertsTab from "@/components/AlertsTab";
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
   features: [], anticheat: "", prices: { day: "", week: "", month: "", lifetime: "" },
-  min_buy: 1, kind: "cheat", account_type: "discord", delivery: "stock", ticket_url: "", active: true, sort_order: 0,
+  min_buy: 1, kind: "cheat", account_type: "discord", delivery: "stock", ticket_url: "", loader_link: "", active: true, sort_order: 0,
 };
 
 function ProductForm({ initial, categories, onSave, onClose }) {
@@ -50,6 +50,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
     onSave({
       game: form.game, name: form.name, description: form.description,
       image_url: form.image_url, status: form.status, anticheat: form.anticheat, kind: form.kind || "cheat",
+      loader_link: form.loader_link?.trim() || null,
       features: typeof form.features === "string"
         ? form.features.split(",").map((s) => s.trim()).filter(Boolean)
         : form.features,
@@ -162,11 +163,13 @@ function ProductForm({ initial, categories, onSave, onClose }) {
           </div>
           {form.kind !== "account" && (
           <div className="sm:col-span-2">
-            <label className={labelCls}>Loader file (.exe or .zip) — buyers get it after payment</label>
+            <label className={labelCls}>Loader — upload a file (.exe/.zip) or paste a download link</label>
             {initial?.loader && !removeLoader ? (
               <div className="flex items-center gap-3 p-3 rounded-lg bg-[#050B18] border border-slate-700" data-testid="product-form-loader-current">
                 <span className="font-mono text-sm text-slate-200 flex-1 truncate">{initial.loader.filename}</span>
-                <span className="text-[10px] font-mono text-slate-500">{(initial.loader.size / 1024 / 1024).toFixed(1)} MB</span>
+                <span className="text-[10px] font-mono text-slate-500">
+                  {initial.loader.link ? "external link" : `${(initial.loader.size / 1024 / 1024).toFixed(1)} MB`}
+                </span>
                 <button
                   type="button"
                   onClick={() => setRemoveLoader(true)}
@@ -179,7 +182,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             ) : (
               <>
                 {removeLoader && (
-                  <div className="text-[10px] font-mono text-amber-400 mb-1.5">Current loader will be removed on save unless you pick a new one</div>
+                  <div className="text-[10px] font-mono text-amber-400 mb-1.5">Current loader will be removed on save unless you pick a new one or set a link</div>
                 )}
                 <input
                   type="file"
@@ -193,6 +196,16 @@ function ProductForm({ initial, categories, onSave, onClose }) {
                     {loaderFile.name} — uploads on save
                   </div>
                 )}
+                <div className="flex items-center gap-3 mt-3">
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-slate-600">or</span>
+                  <Input
+                    value={form.loader_link || ""}
+                    onChange={(e) => set("loader_link", e.target.value)}
+                    placeholder="https://download link for the loader (must start https://)"
+                    data-testid="product-form-loader-link"
+                    className={`${fieldCls} flex-1`}
+                  />
+                </div>
               </>
             )}
           </div>

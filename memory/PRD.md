@@ -12,6 +12,11 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-09 — Dupe-detection fix + loader links
+- Bug: lines starting with labels like "E-Mail:" parsed "E-Mail" as the address → every line duped. Fix: strict parsers require a real email shape (regex) before accepting; otherwise raw fallback with regex-extracted email for dedupe. Verified with user's space-labeled myrambler lines (3 added, 0 skipped)
+- Loader links: ProductIn.loader_link (https:// required) — product form has "or paste a download link" next to file upload; loader doc {link, filename, size:0}; download endpoint 302-redirects to the link (still order-token gated); form shows "external link" for link loaders
+
+
 ### 2026-09-09 — Universal account drop-in (reverted strict Email/Webmail type)
 - Removed the "email" account_type option added earlier (user: accounts come in too many formats)
 - keystock_add: strict parsers (discord/steam/rockstar) still pretty-print; ANY unmatched line is stored as account.raw (verbatim) with email regex-extracted for dedupe; response returns {added, skipped, raw}

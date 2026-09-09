@@ -6,7 +6,7 @@ sys.path.insert(0, _HERE)
 load_dotenv(os.path.join(_HERE, ".env"))
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, Response, File, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
@@ -170,6 +170,7 @@ class ProductIn(BaseModel):
     account_type: Optional[str] = None  # for kind=account: "discord" | "steam" | "rockstar"
     delivery: str = "stock"  # "stock" (limited keys) or "ticket" (infinite, claim via Discord ticket)
     ticket_url: Optional[str] = None
+    loader_link: Optional[str] = None  # external download URL instead of an uploaded file
     active: bool = True
     sort_order: int = 0
 
@@ -455,6 +456,11 @@ async def admin_create_product(body: ProductIn, admin: dict = Depends(get_admin)
         raise HTTPException(400, "Invalid status")
     now = datetime.now(timezone.utc).isoformat()
     doc = body.model_dump()
+    loader_link = doc.pop("loader_link", None)
+    if loader_link:
+        if not loader_link.startswith("https://"):
+            raise HTTPException(400, "Download link must start with https://")
+        doc["loader"] = {"link": loader_link, "filename": loader_link.rstrip("/").split("/")[-1] or "Download link", "size": 0, "updated_at": now}
     doc.update({"id": str(uuid.uuid4()), "created_at": now, "updated_at": now})
     await db.products.insert_one(doc)
     return product_out(doc)
@@ -465,7 +471,13 @@ async def admin_update_product(product_id: str, body: ProductIn, admin: dict = D
     if body.status not in STATUSES:
         raise HTTPException(400, "Invalid status")
     doc = body.model_dump()
-    doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+    loader_link = doc.pop("loader_link", None)
+    now = datetime.now(timezone.utc).isoformat()
+    if loader_link:
+        if not loader_link.startswith("https://"):
+            raise HTTPException(400, "Download link must start with https://")
+        doc["loader"] = {"link": loader_link, "filename": loader_link.rstrip("/").split("/")[-1] or "Download link", "size": 0, "updated_at": now}
+    doc["updated_at"] = now
     res = await db.products.update_one({"id": product_id}, {"$set": doc})
     if res.matched_count == 0:
         raise HTTPException(404, "Product not found")
@@ -605,6 +617,8 @@ async def download_loader(order_id: str, product_id: str, token: str = ""):
     product = await db.products.find_one({"id": product_id}, {"_id": 0, "loader": 1})
     if not product or not product.get("loader"):
         raise HTTPException(404, "No loader available for this product")
+    if product["loader"].get("link"):
+        return RedirectResponse(product["loader"]["link"], status_code=302)
     data, _ = await asyncio.to_thread(get_object, product["loader"]["storage_path"])
     fname = product["loader"].get("filename", "loader.exe").replace('"', "")
     return Response(
@@ -726,6 +740,7 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
     if not lines:
         raise HTTPException(400, "No keys provided")
     account_type = product.get("account_type") or "discord"
+    email_re = re.compile(r"^[\w.+-]+@[\w-]+\.[\w.-]+$")
     seen = set()
     added, skipped, raw_count = 0, 0, 0
     now = datetime.now(timezone.utc).isoformat()
@@ -749,7 +764,7 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
                         account["twofa_key"] = fields["2fa key"]
                     if fields.get("2fa redeem"):
                         account["twofa_redeem"] = fields["2fa redeem"]
-                elif not fields and len(parts) >= 2 and parts[0] and parts[-1]:
+                elif not fields and len(parts) >= 2 and email_re.match(parts[0]) and parts[-1]:
                     account = {"email": parts[0], "password": ":".join(parts[1:])}
             elif account_type == "steam":
                 email = fields.get("e-mail") or fields.get("email")
@@ -762,11 +777,11 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
                         account["steam_password"] = fields["steam password"]
                     if fields.get("webmail"):
                         account["webmail"] = fields["webmail"]
-                elif not fields and len(parts) >= 2 and parts[0] and parts[-1]:
+                elif not fields and len(parts) >= 2 and email_re.match(parts[0]) and parts[-1]:
                     account = {"email": parts[0], "password": ":".join(parts[1:])}
             else:
                 # discord: email:email password:discord password:discord token
-                if len(parts) >= 4 and parts[0] and parts[1] and parts[-1] and ":".join(parts[2:-1]):
+                if len(parts) >= 4 and email_re.match(parts[0]) and parts[1] and parts[-1] and ":".join(parts[2:-1]):
                     account = {
                         "email": parts[0],
                         "email_password": parts[1],
