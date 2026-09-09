@@ -815,6 +815,7 @@ class SettingsIn(BaseModel):
     bank_bsb: Optional[str] = None
     bank_account_number: Optional[str] = None
     bank_account_name: Optional[str] = None
+    discord_webhooks: Optional[Dict[str, str]] = None
 
 
 @api_router.get("/admin/settings")
@@ -828,12 +829,46 @@ async def put_settings(body: SettingsIn, admin: dict = Depends(get_admin)):
     updates = body.model_dump(exclude_none=True)
     if "drop_date" in updates and updates["drop_date"] == "":
         updates.pop("drop_date")
+    hooks = updates.get("discord_webhooks")
+    if hooks:
+        for kind, url in hooks.items():
+            if kind not in DISCORD_ALERT_KINDS:
+                raise HTTPException(400, f"Unknown alert kind: {kind}")
+            if url and not url.startswith("https://discord"):
+                raise HTTPException(400, "Webhook URLs must start with https://discord.com/api/webhooks/")
+        updates["discord_webhooks"] = {k: v.strip() for k, v in hooks.items()}
     await db.settings.update_one(
         {"id": "main"},
         {"$set": {"id": "main", **updates}},
         upsert=True,
     )
     return await db.settings.find_one({"id": "main"}, {"_id": 0})
+
+
+class DiscordTestIn(BaseModel):
+    kind: str
+
+
+@api_router.post("/admin/discord-test")
+async def admin_discord_test(body: DiscordTestIn, admin: dict = Depends(get_admin)):
+    if body.kind not in DISCORD_ALERT_KINDS:
+        raise HTTPException(400, "Unknown alert kind")
+    settings = await db.settings.find_one({"id": "main"}, {"_id": 0, "discord_webhooks": 1})
+    url = ((settings or {}).get("discord_webhooks") or {}).get(body.kind)
+    if not url:
+        raise HTTPException(400, f"No webhook URL saved for '{body.kind}' — paste one and save first")
+    embed = {
+        "title": "Desync alert test",
+        "description": f"This channel now receives **{body.kind}** alerts from your store.",
+        "color": 0x2E6BFF,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "footer": {"text": "Desync"},
+    }
+    async with httpx.AsyncClient(timeout=10) as h:
+        r = await h.post(url, json={"embeds": [embed]})
+    if r.status_code not in (200, 204):
+        raise HTTPException(400, f"Discord rejected the webhook (HTTP {r.status_code}) — check the URL")
+    return {"sent": True, "kind": body.kind}
 
 
 # ---------- public: drop config ----------
@@ -972,6 +1007,50 @@ async def admin_resend_order_email(order_id: str, admin: dict = Depends(get_admi
     return {"sent": True, "email": order["email"]}
 
 
+# ---------- discord webhook alerts ----------
+
+DISCORD_ALERT_KINDS = ("orders", "payments", "low_stock", "bank")
+
+
+def _order_fields(order: dict) -> list:
+    items_txt = ", ".join(
+        f"{i['name']} ({i['duration_label']})" + (f" x{i['qty']}" if (i.get("qty") or 1) > 1 else "")
+        for i in order.get("items", [])
+    )
+    fields = [
+        {"name": "Order", "value": f"`{order['id'][:8].upper()}`", "inline": True},
+        {"name": "Total", "value": f"€{order.get('total', 0):.2f}", "inline": True},
+        {"name": "Items", "value": items_txt or "—", "inline": False},
+        {"name": "Email", "value": order.get("email", "—"), "inline": False},
+    ]
+    if order.get("discord_username"):
+        fields.append({"name": "Discord", "value": order["discord_username"], "inline": True})
+    if order.get("reference"):
+        fields.append({"name": "Reference", "value": f"`{order['reference']}`", "inline": True})
+    return fields
+
+
+async def _discord_alert(kind: str, title: str, description: str = "", fields: list = None, color: int = 0x2E6BFF):
+    try:
+        settings = await db.settings.find_one({"id": "main"}, {"_id": 0, "discord_webhooks": 1})
+        url = ((settings or {}).get("discord_webhooks") or {}).get(kind)
+        if not url:
+            return
+        embed = {
+            "title": title, "description": description, "color": color,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "footer": {"text": "Desync"},
+        }
+        if fields:
+            embed["fields"] = fields
+        async with httpx.AsyncClient(timeout=10) as h:
+            r = await h.post(url, json={"embeds": [embed]})
+            if r.status_code not in (200, 204):
+                logger.warning("Discord webhook %s returned %s", kind, r.status_code)
+    except Exception as e:
+        logger.error("Discord alert failed (%s): %s", kind, e)
+
+
 # ---------- payments: bank transfer (PayID / BSB) ----------
 
 BANK_ORDER_TTL_HOURS = 48
@@ -1015,6 +1094,10 @@ async def bank_transfer_checkout(body: CheckoutIn):
         await send_bank_transfer_email(order, bank, reference, order["expires_at"])
     except Exception as e:
         logger.error("Bank transfer email failed for %s: %s", order_id, e)
+    await _discord_alert(
+        "bank", "New bank transfer order", "Awaiting payment — watch for the transfer.",
+        fields=_order_fields(order), color=0x38BDF8,
+    )
     return {
         "order_id": order_id, "reference": reference, "total": total,
         "expires_at": order["expires_at"], "bank": bank,
@@ -1065,6 +1148,10 @@ async def bank_transfer_confirm(order_id: str):
                   "reserved_count": reserved, "reserved_all": reserved >= wanted,
                   "updated_at": now}},
     )
+    await _discord_alert(
+        "bank", "Buyer reports payment sent", "Stock reserved — verify the transfer, then mark paid or cancel.",
+        fields=_order_fields({**order, "items": order["items"]}), color=0xF5C158,
+    )
     return {"reported": True, "already": False, "reserved": reserved, "reserved_all": reserved >= wanted}
 
 
@@ -1088,6 +1175,10 @@ async def admin_cancel_order(order_id: str, admin: dict = Depends(get_admin)):
         await send_bank_expired_email(order, "we could not verify your payment")
     except Exception as e:
         logger.error("Cancel email failed for %s: %s", order_id, e)
+    await _discord_alert(
+        "bank", "Bank order cancelled", f"Released {rel.modified_count} reserved item(s) back to stock.",
+        fields=_order_fields(order), color=0xEF4444,
+    )
     return {"cancelled": True, "released": rel.modified_count}
 
 
@@ -1242,6 +1333,10 @@ async def admin_send_key(body: SendKeyIn, admin: dict = Depends(get_admin)):
     except Exception as e:
         logger.error("Manual key email failed for %s: %s", order_id, e)
         raise HTTPException(500, "Key(s) assigned but email failed — check the order in the Orders tab")
+    await _discord_alert(
+        "orders", "Manual key sent", "Staff sent key(s) manually from the Customers tab.",
+        fields=_order_fields(order), color=0xA78BFA,
+    )
     return {"sent": True, "order_id": order_id, "sent_count": len(deliverables)}
 
 
@@ -1442,6 +1537,12 @@ async def _fulfill_order(where: dict) -> Optional[dict]:
                         )
                     except Exception as e:
                         logger.error("Low stock email failed: %s", e)
+                await _discord_alert(
+                    "low_stock",
+                    "Out of stock" if remaining == 0 else "Low stock",
+                    f"**{item['name']}** ({DURATIONS[item['duration']]}) has **{remaining}** left.",
+                    color=0xEF4444 if remaining == 0 else 0xF5C158,
+                )
         if deliverables:
             item["deliverables"] = deliverables
             item["license_key"] = deliverables[0]["license_key"]
@@ -1469,6 +1570,11 @@ async def _fulfill_order(where: dict) -> Optional[dict]:
             await db.orders.update_one({"id": updated["id"]}, {"$set": {"email_sent": True}})
         except Exception as e:
             logger.error("Order email failed for %s: %s", updated.get("id"), e)
+        provider = updated.get("provider") or ("paypal" if updated.get("payment_provider") == "paypal" else "stripe")
+        await _discord_alert(
+            "payments", "Payment received", f"Order paid via **{provider}** and fulfilled.",
+            fields=_order_fields(updated), color=0x22C55E,
+        )
     return updated
 
 
@@ -1570,7 +1676,7 @@ async def create_checkout(body: CheckoutIn):
         raise HTTPException(502, f"Payment provider error: {e.user_message or str(e)}")
 
     now = datetime.now(timezone.utc).isoformat()
-    await db.orders.insert_one({
+    new_order = {
         "id": order_id, "session_id": session.id, "email": email,
         "discord_username": (body.discord_username or "").strip() or None,
         "items": order_items, "total": total_cents / 100.0, "currency": "eur",
@@ -1579,7 +1685,12 @@ async def create_checkout(body: CheckoutIn):
         "status": "initiated", "payment_status": "pending",
         "download_token": secrets.token_urlsafe(24),
         "created_at": now, "updated_at": now,
-    })
+    }
+    await db.orders.insert_one(new_order)
+    await _discord_alert(
+        "orders", "New order (card checkout)", "Stripe checkout session created — awaiting payment.",
+        fields=_order_fields(new_order), color=0x8B9CF9,
+    )
     return {"checkout_url": session.url, "session_id": session.id}
 
 

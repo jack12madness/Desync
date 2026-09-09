@@ -15,6 +15,7 @@ import CouponsTab from "@/components/CouponsTab";
 import CategoriesTab from "@/components/CategoriesTab";
 import CustomersTab from "@/components/CustomersTab";
 import ExpensesTab from "@/components/ExpensesTab";
+import AlertsTab from "@/components/AlertsTab";
 
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
@@ -468,6 +469,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="coupons" data-testid="admin-tab-coupons" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Coupons</TabsTrigger>
             <TabsTrigger value="customers" data-testid="admin-tab-customers" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Customers</TabsTrigger>
             <TabsTrigger value="expenses" data-testid="admin-tab-expenses" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Expenses</TabsTrigger>
+            <TabsTrigger value="alerts" data-testid="admin-tab-alerts" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Alerts</TabsTrigger>
             {admin.role === "owner" && (
               <TabsTrigger value="staff" data-testid="admin-tab-staff" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Staff</TabsTrigger>
             )}
@@ -672,6 +674,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="expenses">
             <ExpensesTab />
+          </TabsContent>
+
+          <TabsContent value="alerts">
+            <AlertsTab />
           </TabsContent>
 
           {admin.role === "owner" && (

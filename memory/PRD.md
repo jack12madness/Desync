@@ -12,6 +12,14 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 
 ## What's implemented (latest first)
 
+### 2026-09-09 — Discord webhook alerts
+- Settings discord_webhooks map: orders / payments / bank / low_stock — each posts embeds to its own Discord channel (user creates channel webhooks in Discord: Edit Channel → Integrations → Webhooks)
+- New admin "Alerts" tab: 4 channel cards with webhook URL inputs, Save, and per-channel Test button (POST /api/admin/discord-test validates Discord accepts it)
+- Triggers: card checkout created → orders; bank order created/reported/cancelled → bank; any fulfillment (stripe/paypal/manual/mark-paid) → payments; stock hits 4 or 0 → low_stock; manual send-key → orders
+- Embeds include order ref, total, items+qty, email, discord username. Alerts fail silently (never break checkout). URL validation: must start https://discord. Settings PUT validates + stores
+- Verified: validation errors, test-endpoint error paths, order flows unaffected with fake URLs; real delivery needs user's webhook URLs (Test button). 9/9 regression pass
+
+
 ### 2026-09-09 — Uploaded product/category photos (no more expiring Discord links)
 - POST /api/admin/products/{id}/image and /api/admin/categories/{id}/image (PNG/JPG/WebP, max 10MB) → stored in Emergent object storage at desync/images/, product image_url becomes /api/media/{uuid}.{ext}
 - GET /api/media/{filename} — public, sanitized (uuid.ext only, traversal blocked), streams from storage
