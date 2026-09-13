@@ -11,6 +11,18 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-13 — Category admin, drag ordering, per-product Discord/instructions, My Orders OTP
+- Admin Products tab: category cards first (ProductsTab.jsx), click a category to manage its products; Add Cheat/Add Account pre-fill that category
+- Drag-and-drop product ordering per category (HTML5 DnD, grip handles) → POST /api/admin/products/reorder {game, product_ids} validates exact membership, sets sort_order (storefront follows)
+- ProductIn adds discord_url (https:// enforced) + instructions (multiline). _attach_loader_links also attaches instructions/discord_url to order items at read time (email, success, My Orders, resend). Ticket claim link = discord_url or legacy ticket_url or store default
+- Product form: Discord URL input + instructions textarea; description is now a rich textarea (## heading, - bullet, **bold**) rendered by RichDescription under the product image in ProductModal
+- My Orders OTP: POST /orders/lookup/request-code (6-digit, sha256-hashed in lookup_codes, 10min TTL index, 60s resend cooldown), /orders/lookup/verify (5 attempts, single-use) → buyer_lookup JWT (2h); /orders/lookup requires {email, token}. Frontend: 2-step UI, sessionStorage token per email, any email can verify (no orders → "No purchases made with this email yet")
+- KeyManager: scrollable key list region (max-h-38vh) + filter input + 100-row cap with show-all (large inventories no longer freeze the modal)
+- SalesStats by-product rows keyed by product id (fixes duplicate-key warnings)
+- Tests: 32/32 pass incl. new test_otp_reorder.py (OTP hash/expiry/rate-limit/single-use/token-scope, reorder auth+membership+ordering, discord_url validation). Testing agent iteration_2: all UI flows pass
+- NOTE: email relay (Emergent Resend) rate-limits under heavy test volume (429 → endpoint surfaces 500 "try again"); transient, retry after 60s. Test recipient whitelist: delivered@resend.dev
+
+
 
 ### 2026-09-09 — Dupe-detection fix + loader links
 - Bug: lines starting with labels like "E-Mail:" parsed "E-Mail" as the address → every line duped. Fix: strict parsers require a real email shape (regex) before accepting; otherwise raw fallback with regex-extracted email for dedupe. Verified with user's space-labeled myrambler lines (3 added, 0 skipped)

@@ -8,6 +8,9 @@
 import os
 import re
 import uuid
+import hashlib
+from datetime import datetime, timedelta, timezone
+
 import pytest
 import requests
 
@@ -15,6 +18,27 @@ BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE}/api"
 ADMIN_USER = "voidowner"
 ADMIN_PASS = "VoidGhost!26"
+
+
+def _lookup(email):
+    """My Orders lookup is OTP-gated: mint a code doc directly, verify, then look up."""
+    from dotenv import load_dotenv
+    from pymongo import MongoClient
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+    db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
+    code = "735912"
+    now = datetime.now(timezone.utc)
+    db.lookup_codes.insert_one({
+        "id": str(uuid.uuid4()), "email": email.lower(),
+        "code_hash": hashlib.sha256(code.encode()).hexdigest(),
+        "attempts": 0, "used": False,
+        "created_dt": now, "expires_dt": now + timedelta(minutes=10),
+    })
+    v = requests.post(f"{API}/orders/lookup/verify", json={"email": email, "code": code}, timeout=15)
+    assert v.status_code == 200, v.text
+    r = requests.post(f"{API}/orders/lookup", json={"email": email, "token": v.json()["token"]}, timeout=15)
+    assert r.status_code == 200, r.text
+    return r.json()
 
 
 @pytest.fixture(scope="session")
@@ -156,9 +180,7 @@ class TestBankTransferFlow:
         assert o["items"][0].get("license_key")
 
         # Order lookup by email should surface it
-        r4 = requests.post(f"{API}/orders/lookup", json={"email": email}, timeout=15)
-        assert r4.status_code == 200
-        got = r4.json()
+        got = _lookup(email)
         assert any(x["id"] == order_id for x in got)
 
         # Cannot mark-paid again
@@ -216,7 +238,7 @@ class TestCustomers:
         # 200 = full success; 500 = key assigned but email failed (acceptable for fake @test.com)
         assert r.status_code in (200, 500), r.text
         # Regardless, an order should exist for this email as paid
-        rows = requests.post(f"{API}/orders/lookup", json={"email": email}, timeout=15).json()
+        rows = _lookup(email)
         assert len(rows) >= 1
         assert rows[0]["items"][0].get("license_key")
         assert rows[0]["total"] == 0.0
@@ -302,8 +324,10 @@ class TestDiscordAccounts:
                           headers=admin_headers, timeout=20)
         assert r.status_code == 200, r.text
         data = r.json()
-        assert data["added"] == 2, data
-        assert data["invalid"] == 2, data
+        # universal fallback: unmatched lines are stored raw, not dropped
+        assert data["added"] == 4, data
+        assert data["raw"] == 2, data
+        assert data["skipped"] == 0, data
 
         # verify records have account block
         rows = requests.get(f"{API}/admin/keystock/{prod['id']}", headers=admin_headers, timeout=15).json()
@@ -316,6 +340,8 @@ class TestDiscordAccounts:
                 # multi-colon password preserved
                 assert "dc:pw:with:colons" in acc["discord_password"]
 
-        # cleanup
-        for m in mine:
-            requests.delete(f"{API}/admin/keystock/{m['id']}", headers=admin_headers, timeout=10)
+        # cleanup (parsed + raw rows added by this test)
+        for x in rows:
+            k = x.get("key", "")
+            if f"_{u}" in k or k == "invalid-line-no-colons":
+                requests.delete(f"{API}/admin/keystock/{x['id']}", headers=admin_headers, timeout=10)

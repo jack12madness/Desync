@@ -55,7 +55,8 @@ export function KeyRow({ item }) {
       ? [{ license_key: item.license_key, account: item.account }]
       : [];
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-[#050B18] border border-[#1E2D4A] rounded-lg">
+    <div className="p-4 bg-[#050B18] border border-[#1E2D4A] rounded-lg">
+    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold text-white">{item.name}</div>
         <div className="text-xs text-slate-500">
@@ -146,26 +147,103 @@ export function KeyRow({ item }) {
         </span>
       )}
     </div>
+    {(item.instructions || (item.discord_url && !item.ticket_url)) && (
+      <div className="mt-3 p-3 rounded-lg bg-[#0A1628] border border-[#1E2D4A]" data-testid={`instructions-${item.product_id}-${item.duration}`}>
+        {item.instructions && (
+          <>
+            <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500 mb-1.5">Setup instructions</div>
+            <div className="text-xs text-slate-300 whitespace-pre-line leading-relaxed">{item.instructions}</div>
+          </>
+        )}
+        {item.discord_url && !item.ticket_url && (
+          <a
+            href={item.discord_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid={`product-discord-${item.product_id}-${item.duration}`}
+            className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-semibold transition-colors"
+          >
+            Join the Discord for this product
+          </a>
+        )}
+      </div>
+    )}
+    </div>
   );
 }
 
+const tokenKey = (em) => `desync_lookup_${em}`;
+
 export default function OrderLookup() {
   const [email, setEmail] = useState("");
+  const [stage, setStage] = useState("email"); // email | code | done
+  const [code, setCode] = useState("");
   const [orders, setOrders] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const lookup = async () => {
-    if (!email) return;
+  const lookupWithToken = async (em, token) => {
     setLoading(true);
     try {
-      const { data } = await api.post("/orders/lookup", { email });
+      const { data } = await api.post("/orders/lookup", { email: em, token });
       setOrders(data);
+      setStage("done");
     } catch (e) {
-      toast.error(apiError(e));
-      setOrders([]);
+      if (e?.response?.status === 401) {
+        sessionStorage.removeItem(tokenKey(em));
+        setStage("code");
+        toast.error("Verification expired — enter the latest code from your inbox");
+      } else {
+        toast.error(apiError(e));
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const submitEmail = async () => {
+    const em = email.trim().toLowerCase();
+    if (!em) return;
+    const saved = sessionStorage.getItem(tokenKey(em));
+    if (saved) {
+      await lookupWithToken(em, saved);
+      return;
+    }
+    await requestCode(em);
+  };
+
+  const requestCode = async (em) => {
+    setLoading(true);
+    try {
+      await api.post("/orders/lookup/request-code", { email: em });
+      setStage("code");
+      setCode("");
+      toast.success("Code sent — check your inbox");
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verify = async () => {
+    const em = email.trim().toLowerCase();
+    if (!code.trim()) return;
+    setLoading(true);
+    try {
+      const { data } = await api.post("/orders/lookup/verify", { email: em, code: code.trim() });
+      sessionStorage.setItem(tokenKey(em), data.token);
+      await lookupWithToken(em, data.token);
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reset = () => {
+    setStage("email");
+    setOrders(null);
+    setCode("");
   };
 
   return (
@@ -179,35 +257,94 @@ export default function OrderLookup() {
               Find your keys
             </h1>
             <p className="text-sm text-slate-400 mb-8">
-              Enter the email you used at checkout. Every paid order and its license keys will appear.
+              {stage === "done"
+                ? "Verified. Every paid order and its license keys are below."
+                : "Enter the email you used at checkout — we'll send a one-time code to prove it's yours."}
             </p>
           </motion.div>
 
-          <div className="flex gap-3">
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && lookup()}
-              placeholder="you@example.com"
-              data-testid="lookup-email-input"
-              className="bg-[#0A1628] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] text-sm h-12"
-            />
-            <button
-              onClick={lookup}
-              disabled={loading}
-              data-testid="lookup-submit-button"
-              className="shrink-0 inline-flex items-center gap-2 px-6 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold shadow-[0_8px_24px_rgba(46,107,255,0.35)] disabled:opacity-40 transition-all duration-200 active:scale-95"
-            >
-              <Search className="w-4 h-4" /> {loading ? "..." : "Search"}
-            </button>
-          </div>
+          {stage === "email" && (
+            <div className="flex gap-3">
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && submitEmail()}
+                placeholder="you@example.com"
+                data-testid="lookup-email-input"
+                className="bg-[#0A1628] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] text-sm h-12"
+              />
+              <button
+                onClick={submitEmail}
+                disabled={loading}
+                data-testid="lookup-submit-button"
+                className="shrink-0 inline-flex items-center gap-2 px-6 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold shadow-[0_8px_24px_rgba(46,107,255,0.35)] disabled:opacity-40 transition-all duration-200 active:scale-95"
+              >
+                <Search className="w-4 h-4" /> {loading ? "..." : "Send code"}
+              </button>
+            </div>
+          )}
 
-          {orders !== null && (
+          {stage === "code" && (
+            <div data-testid="otp-code-step">
+              <div className="text-xs text-slate-400 mb-3">
+                We emailed a 6-digit code to <span className="text-slate-200">{email.trim().toLowerCase()}</span>. It expires in 10 minutes.
+              </div>
+              <div className="flex gap-3">
+                <Input
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                  onKeyDown={(e) => e.key === "Enter" && verify()}
+                  placeholder="6-digit code"
+                  inputMode="numeric"
+                  autoFocus
+                  data-testid="otp-code-input"
+                  className="bg-[#0A1628] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] text-sm h-12 font-mono tracking-[0.4em]"
+                />
+                <button
+                  onClick={verify}
+                  disabled={loading || code.length !== 6}
+                  data-testid="otp-verify-button"
+                  className="shrink-0 inline-flex items-center gap-2 px-6 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold shadow-[0_8px_24px_rgba(46,107,255,0.35)] disabled:opacity-40 transition-all duration-200 active:scale-95"
+                >
+                  <KeyRound className="w-4 h-4" /> {loading ? "..." : "Verify"}
+                </button>
+              </div>
+              <div className="flex items-center gap-4 mt-3">
+                <button
+                  onClick={() => requestCode(email.trim().toLowerCase())}
+                  disabled={loading}
+                  data-testid="otp-resend-button"
+                  className="text-xs text-[#8FB8E8] hover:text-white transition-colors disabled:opacity-40"
+                >
+                  Resend code
+                </button>
+                <button
+                  onClick={reset}
+                  data-testid="lookup-change-email"
+                  className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  Use a different email
+                </button>
+              </div>
+            </div>
+          )}
+
+          {stage === "done" && orders !== null && (
             <div className="mt-10 space-y-8" data-testid="lookup-results">
+              <div className="flex justify-end">
+                <button
+                  onClick={reset}
+                  data-testid="lookup-new-search"
+                  className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  Look up a different email
+                </button>
+              </div>
               {orders.length === 0 && (
-                <div className="text-center py-16 text-sm text-slate-500" data-testid="lookup-empty">
-                  No paid orders found for that email
+                <div className="text-center py-16" data-testid="lookup-empty">
+                  <div className="text-sm text-slate-400">No purchases made with this email yet</div>
+                  <div className="text-xs text-slate-600 mt-2">If you just paid, give it a minute — your order appears here as soon as payment confirms.</div>
                 </div>
               )}
               {orders.map((o) => (

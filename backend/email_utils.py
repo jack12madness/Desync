@@ -233,6 +233,30 @@ def _deliverables_html(it: dict) -> str:
     return out
 
 
+def _instructions_box(it: dict) -> str:
+    txt = (it.get("instructions") or "").strip()
+    if not txt and not (it.get("discord_url") and not it.get("ticket_url")):
+        return ""
+    body = "<br>".join(escape(txt).splitlines())
+    inner = ""
+    if txt:
+        inner += (
+            '<div style="color:#F1F5F9;font-size:12px;font-weight:600;letter-spacing:1px;'
+            'text-transform:uppercase;margin-bottom:6px">Setup instructions</div>'
+            '<div style="color:#94A3B8;font-size:13px;line-height:1.6">' + body + '</div>'
+        )
+    if it.get("discord_url") and not it.get("ticket_url"):
+        inner += (
+            '<div style="margin-top:10px"><a href="' + escape(it["discord_url"]) + '" '
+            'style="display:inline-block;background:#5865F2;color:#ffffff;font-size:13px;font-weight:600;'
+            'padding:9px 16px;border-radius:8px;text-decoration:none">Join the Discord for this product</a></div>'
+        )
+    return (
+        '<div style="background:#050B18;border:1px solid #1E2D4A;border-radius:8px;'
+        'padding:12px 16px;margin:10px 0">' + inner + '</div>'
+    )
+
+
 async def send_order_email(order: dict) -> None:
     rows = ""
     for it in order["items"]:
@@ -243,6 +267,7 @@ async def send_order_email(order: dict) -> None:
             + escape(it["game"]) + ' &middot; ' + escape(it["duration_label"])
             + (' &middot; &times;' + str(it["qty"]) if (it.get("qty") or 1) > 1 else '') + '</div>'
             + _deliverables_html(it)
+            + _instructions_box(it)
             + ('<div style="margin-top:10px"><a href="' + STORE_URL + it["download_url"] + '" '
                'style="display:inline-block;background:#2E6BFF;color:#ffffff;font-size:13px;font-weight:600;'
                'padding:9px 16px;border-radius:8px;text-decoration:none">Download loader</a>'
@@ -398,3 +423,19 @@ async def send_bank_expired_email(order: dict, reason: str = "no payment arrived
         html=_shell("Order Expired", inner),
     )
 
+
+
+async def send_lookup_code_email(email: str, code: str) -> None:
+    inner = (
+        '<p style="color:#F1F5F9;font-size:15px;margin:0 0 10px">Here is your one-time code.</p>'
+        '<div style="font-family:Courier,monospace;font-size:28px;letter-spacing:6px;color:#7FB0FF;'
+        'background:#050B18;border:1px solid #1E2D4A;border-radius:8px;padding:16px;text-align:center;margin:12px 0">'
+        + escape(code) + '</div>'
+        '<p style="color:#94A3B8;font-size:13px;margin:0">Enter it on the My Orders page to view your '
+        'purchases. It expires in 10 minutes. If you did not request this code, you can ignore this email.</p>'
+    )
+    await send_email(
+        to=email,
+        subject="Your " + EMAIL_FROM_NAME + " My Orders code",
+        html=_shell("My Orders Access", inner),
+    )

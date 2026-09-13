@@ -23,7 +23,7 @@ export default function SalesStats() {
   ];
 
   const byProduct = Object.entries(stats.by_product || {})
-    .map(([pid, v]) => ({ name: products.find((p) => p.id === pid)?.name || "Deleted product", ...v }))
+    .map(([pid, v]) => ({ id: pid, name: products.find((p) => p.id === pid)?.name || "Deleted product", ...v }))
     .sort((a, b) => b.revenue - a.revenue);
   const maxRevenue = Math.max(...byProduct.map((p) => p.revenue), 1);
 
@@ -46,7 +46,7 @@ export default function SalesStats() {
           <div className="text-sm font-semibold text-white mb-4">Sales by product</div>
           <div className="space-y-3">
             {byProduct.map((p) => (
-              <div key={p.name} className="flex items-center gap-4">
+              <div key={p.id} className="flex items-center gap-4">
                 <div className="w-48 sm:w-64 truncate text-sm text-slate-300">{p.name}</div>
                 <div className="flex-1 h-2 rounded-full bg-[#050B18] overflow-hidden">
                   <div

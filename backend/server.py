@@ -11,7 +11,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict
-import time, uuid, logging, secrets, string, asyncio
+import time, uuid, logging, secrets, string, asyncio, hashlib
 import html, json, re
 from datetime import datetime, timezone, timedelta
 import httpx
@@ -22,7 +22,7 @@ import jwt
 import stripe
 
 from email_utils import (send_order_email, send_waitlist_email, send_low_stock_email, send_announce_email,
-                         send_bank_transfer_email, send_bank_expired_email)
+                         send_bank_transfer_email, send_bank_expired_email, send_lookup_code_email)
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -171,6 +171,8 @@ class ProductIn(BaseModel):
     delivery: str = "stock"  # "stock" (limited keys) or "ticket" (infinite, claim via Discord ticket)
     ticket_url: Optional[str] = None
     loader_link: Optional[str] = None  # external download URL instead of an uploaded file
+    discord_url: Optional[str] = None  # per-product Discord link, delivered to buyers after purchase
+    instructions: Optional[str] = None  # install/setup notes shown after payment (email, success, My Orders)
     active: bool = True
     sort_order: int = 0
 
@@ -202,6 +204,87 @@ class CheckoutIn(BaseModel):
 
 class LookupIn(BaseModel):
     email: EmailStr
+    token: str
+
+
+class RequestCodeIn(BaseModel):
+    email: EmailStr
+
+
+class VerifyCodeIn(BaseModel):
+    email: EmailStr
+    code: str
+
+
+# ---------- buyer OTP (My Orders access) ----------
+
+OTP_TTL_MINUTES = 10
+OTP_RESEND_SECONDS = 60
+OTP_MAX_ATTEMPTS = 5
+LOOKUP_TOKEN_HOURS = 2  # browser-session access window
+
+
+def _create_lookup_token(email: str) -> str:
+    payload = {
+        "sub": email, "type": "buyer_lookup",
+        "exp": datetime.now(timezone.utc) + timedelta(hours=LOOKUP_TOKEN_HOURS),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+@api_router.post("/orders/lookup/request-code")
+async def lookup_request_code(body: RequestCodeIn):
+    email = body.email.lower()
+    now = datetime.now(timezone.utc)
+    recent = await db.lookup_codes.find_one(
+        {"email": email, "created_dt": {"$gt": now - timedelta(seconds=OTP_RESEND_SECONDS)}}
+    )
+    if recent:
+        raise HTTPException(429, "A code was just sent — wait a minute before requesting another")
+    code = f"{secrets.randbelow(1000000):06d}"
+    await db.lookup_codes.insert_one({
+        "id": str(uuid.uuid4()), "email": email,
+        "code_hash": hashlib.sha256(code.encode()).hexdigest(),
+        "attempts": 0, "used": False,
+        "created_dt": now, "expires_dt": now + timedelta(minutes=OTP_TTL_MINUTES),
+    })
+    try:
+        await send_lookup_code_email(email, code)
+    except Exception as e:
+        logger.error("Lookup code email failed for %s: %s", email, e)
+        raise HTTPException(500, "Could not send the code email — please try again in a moment")
+    return {"sent": True}
+
+
+@api_router.post("/orders/lookup/verify")
+async def lookup_verify_code(body: VerifyCodeIn):
+    email = body.email.lower()
+    now = datetime.now(timezone.utc)
+    doc = await db.lookup_codes.find_one(
+        {"email": email, "used": False, "expires_dt": {"$gt": now}},
+        sort=[("created_dt", -1)],
+    )
+    if not doc:
+        raise HTTPException(400, "Code expired or never requested — request a new one")
+    if doc.get("attempts", 0) >= OTP_MAX_ATTEMPTS:
+        raise HTTPException(429, "Too many wrong attempts — request a new code")
+    digest = hashlib.sha256(body.code.strip().encode()).hexdigest()
+    if not secrets.compare_digest(doc["code_hash"], digest):
+        await db.lookup_codes.update_one({"id": doc["id"]}, {"$inc": {"attempts": 1}})
+        raise HTTPException(400, "Incorrect code")
+    await db.lookup_codes.update_one({"id": doc["id"]}, {"$set": {"used": True}})
+    return {"token": _create_lookup_token(email)}
+
+
+def _check_lookup_token(email: str, token: str):
+    try:
+        payload = jwt.decode(token or "", JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Session expired — verify your email again")
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "Verification required")
+    if payload.get("type") != "buyer_lookup" or payload.get("sub") != email:
+        raise HTTPException(401, "Verification required")
 
 
 # ---------- seeding ----------
@@ -268,6 +351,8 @@ async def startup():
     await db.categories.create_index("id", unique=True)
     await db.customers.create_index("email", unique=True)
     await db.expenses.create_index("id", unique=True)
+    await db.lookup_codes.create_index("expires_dt", expireAfterSeconds=0)
+    await db.lookup_codes.create_index("email")
     asyncio.create_task(_bank_expiry_loop())
     try:
         init_storage()
@@ -386,6 +471,7 @@ async def status_matrix():
 @api_router.post("/orders/lookup")
 async def order_lookup(body: LookupIn):
     email = body.email.lower()
+    _check_lookup_token(email, body.token)
     docs = await db.orders.find(
         {"email": email, "payment_status": "paid"}, {"_id": 0}
     ).sort("created_at", -1).to_list(50)
@@ -456,6 +542,8 @@ async def admin_create_product(body: ProductIn, admin: dict = Depends(get_admin)
         raise HTTPException(400, "Invalid status")
     now = datetime.now(timezone.utc).isoformat()
     doc = body.model_dump()
+    if doc.get("discord_url") and not doc["discord_url"].startswith("https://"):
+        raise HTTPException(400, "Discord URL must start with https://")
     loader_link = doc.pop("loader_link", None)
     if loader_link:
         if not loader_link.startswith("https://"):
@@ -471,6 +559,8 @@ async def admin_update_product(product_id: str, body: ProductIn, admin: dict = D
     if body.status not in STATUSES:
         raise HTTPException(400, "Invalid status")
     doc = body.model_dump()
+    if doc.get("discord_url") and not doc["discord_url"].startswith("https://"):
+        raise HTTPException(400, "Discord URL must start with https://")
     loader_link = doc.pop("loader_link", None)
     now = datetime.now(timezone.utc).isoformat()
     if loader_link:
@@ -491,6 +581,22 @@ async def admin_delete_product(product_id: str, admin: dict = Depends(get_admin)
     if res.deleted_count == 0:
         raise HTTPException(404, "Product not found")
     return {"deleted": True}
+
+
+class ReorderIn(BaseModel):
+    game: str
+    product_ids: List[str]
+
+
+@api_router.post("/admin/products/reorder")
+async def admin_reorder_products(body: ReorderIn, admin: dict = Depends(get_admin)):
+    prods = await db.products.find({"game": body.game}, {"_id": 0, "id": 1}).to_list(500)
+    existing = {p["id"] for p in prods}
+    if len(body.product_ids) != len(existing) or set(body.product_ids) != existing:
+        raise HTTPException(400, "List must include every product in this category exactly once")
+    for i, pid in enumerate(body.product_ids):
+        await db.products.update_one({"id": pid}, {"$set": {"sort_order": i + 1}})
+    return {"reordered": len(body.product_ids)}
 
 
 # ---------- admin: product/category images ----------
@@ -600,10 +706,19 @@ async def _attach_loader_links(order: dict) -> dict:
         await db.orders.update_one({"id": order["id"]}, {"$set": {"download_token": token}})
         order["download_token"] = token
     for it in order.get("items", []):
-        prod = await db.products.find_one({"id": it.get("product_id")}, {"_id": 0, "loader": 1})
-        if prod and prod.get("loader"):
+        prod = await db.products.find_one(
+            {"id": it.get("product_id")},
+            {"_id": 0, "loader": 1, "instructions": 1, "discord_url": 1},
+        )
+        if not prod:
+            continue
+        if prod.get("loader"):
             it["loader_filename"] = prod["loader"]["filename"]
             it["download_url"] = f"/api/orders/{order['id']}/loader/{it['product_id']}?token={token}"
+        if prod.get("instructions"):
+            it["instructions"] = prod["instructions"]
+        if prod.get("discord_url"):
+            it["discord_url"] = prod["discord_url"]
     return order
 
 
@@ -967,10 +1082,10 @@ async def admin_assign_keys(order_id: str, admin: dict = Depends(get_admin)):
         qty = max(1, int(item.get("qty") or 1))
         deliverables = item.get("deliverables") or []
         prod = await db.products.find_one(
-            {"id": item["product_id"]}, {"_id": 0, "delivery": 1, "ticket_url": 1}
+            {"id": item["product_id"]}, {"_id": 0, "delivery": 1, "ticket_url": 1, "discord_url": 1}
         )
         if prod and prod.get("delivery") == "ticket":
-            item["ticket_url"] = prod.get("ticket_url") or "https://discord.gg/de-sync"
+            item["ticket_url"] = prod.get("discord_url") or prod.get("ticket_url") or "https://discord.gg/de-sync"
             item["key_pending"] = False
             continue
         if item.get("license_key") and not deliverables:
@@ -1515,10 +1630,10 @@ async def _fulfill_order(where: dict) -> Optional[dict]:
         qty = max(1, int(item.get("qty") or 1))
         deliverables = item.get("deliverables") or []
         prod = await db.products.find_one(
-            {"id": item["product_id"]}, {"_id": 0, "delivery": 1, "ticket_url": 1}
+            {"id": item["product_id"]}, {"_id": 0, "delivery": 1, "ticket_url": 1, "discord_url": 1}
         )
         if prod and prod.get("delivery") == "ticket":
-            item["ticket_url"] = prod.get("ticket_url") or "https://discord.gg/de-sync"
+            item["ticket_url"] = prod.get("discord_url") or prod.get("ticket_url") or "https://discord.gg/de-sync"
             item["key_pending"] = False
             continue
         if item.get("license_key") and not deliverables:

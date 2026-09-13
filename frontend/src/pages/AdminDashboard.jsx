@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Pencil, Trash2, LogOut, Terminal, Mail } from "lucide-react";
+import { Trash2, LogOut, Mail } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import StatusPill from "@/components/StatusPill";
 import { api, apiError, eur } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 import { DURATION_LABELS } from "@/context/CartContext";
@@ -13,6 +13,7 @@ import KeyManager from "@/components/KeyManager";
 import SalesStats from "@/components/SalesStats";
 import CouponsTab from "@/components/CouponsTab";
 import CategoriesTab from "@/components/CategoriesTab";
+import ProductsTab from "@/components/ProductsTab";
 import CustomersTab from "@/components/CustomersTab";
 import ExpensesTab from "@/components/ExpensesTab";
 import AlertsTab from "@/components/AlertsTab";
@@ -20,7 +21,8 @@ import AlertsTab from "@/components/AlertsTab";
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
   features: [], anticheat: "", prices: { day: "", week: "", month: "", lifetime: "" },
-  min_buy: 1, kind: "cheat", account_type: "discord", delivery: "stock", ticket_url: "", loader_link: "", active: true, sort_order: 0,
+  min_buy: 1, kind: "cheat", account_type: "discord", delivery: "stock", ticket_url: "", loader_link: "",
+  discord_url: "", instructions: "", active: true, sort_order: 0,
 };
 
 function ProductForm({ initial, categories, onSave, onClose }) {
@@ -51,10 +53,12 @@ function ProductForm({ initial, categories, onSave, onClose }) {
       game: form.game, name: form.name, description: form.description,
       image_url: form.image_url, status: form.status, anticheat: form.anticheat, kind: form.kind || "cheat",
       loader_link: form.loader_link?.trim() || null,
+      discord_url: form.discord_url?.trim() || null,
+      instructions: form.instructions?.trim() || null,
       features: typeof form.features === "string"
         ? form.features.split(",").map((s) => s.trim()).filter(Boolean)
         : form.features,
-      prices, min_buy: Math.max(1, parseInt(form.min_buy) || 1), account_type: form.kind === "account" ? (form.account_type || "discord") : null, delivery: form.delivery || "stock", ticket_url: form.delivery === "ticket" ? (form.ticket_url?.trim() || "https://discord.gg/de-sync") : null, active: form.active, sort_order: Number(form.sort_order) || 0,
+      prices, min_buy: Math.max(1, parseInt(form.min_buy) || 1), account_type: form.kind === "account" ? (form.account_type || "discord") : null, delivery: form.delivery || "stock", ticket_url: form.delivery === "ticket" ? (form.ticket_url?.trim() || null) : null, active: form.active, sort_order: Number(form.sort_order) || 0,
     }, loaderFile, removeLoader, imageFile);
   };
 
@@ -93,8 +97,18 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             <Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="SPECTRE // Executor" data-testid="product-form-name" className={fieldCls} />
           </div>
           <div className="sm:col-span-2">
-            <label className={labelCls}>Description</label>
-            <Input value={form.description} onChange={(e) => set("description", e.target.value)} data-testid="product-form-description" className={fieldCls} />
+            <label className={labelCls}>Description — supports formatting</label>
+            <Textarea
+              value={form.description}
+              onChange={(e) => set("description", e.target.value)}
+              rows={6}
+              placeholder={"Short intro paragraph.\n\n## Key Features\n- **Email : Password Format** — easy to use, ready for login\n- **Instant Delivery** — automated system for immediate access"}
+              data-testid="product-form-description"
+              className={`${fieldCls} resize-y`}
+            />
+            <div className="text-[10px] font-mono text-slate-600 mt-1.5">
+              Line breaks are kept. Start a line with ## for a heading, - for a bullet, wrap words in ** ** to bold them
+            </div>
           </div>
           <div className="sm:col-span-2">
             <label className={labelCls}>Product photo — upload a PNG/JPG (never expires)</label>
@@ -236,15 +250,27 @@ function ProductForm({ initial, categories, onSave, onClose }) {
               </SelectContent>
             </Select>
           </div>
-          {form.delivery === "ticket" && (
-            <div className="sm:col-span-2">
-              <label className={labelCls}>Discord ticket link</label>
-              <Input value={form.ticket_url} onChange={(e) => set("ticket_url", e.target.value)} placeholder="https://discord.gg/de-sync" data-testid="product-form-ticket-url" className={fieldCls} />
-              <div className="text-[10px] font-mono text-slate-500 mt-1.5">
-                Buyers are sent here to open a ticket after payment — no keys needed, never sold out
-              </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Discord link for this product (optional)</label>
+            <Input value={form.discord_url || ""} onChange={(e) => set("discord_url", e.target.value)} placeholder="https://discord.gg/your-server" data-testid="product-form-discord-url" className={fieldCls} />
+            <div className="text-[10px] font-mono text-slate-500 mt-1.5">
+              Shown to buyers after payment. {form.delivery === "ticket" ? "Ticket products send buyers here to claim — leave blank to use the store-wide link." : "Overrides the store-wide Discord link for this product."}
             </div>
-          )}
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Installation instructions (optional)</label>
+            <Textarea
+              value={form.instructions || ""}
+              onChange={(e) => set("instructions", e.target.value)}
+              placeholder={"1. Download the loader\n2. Run as Administrator\n3. Paste your key and launch the game"}
+              rows={4}
+              data-testid="product-form-instructions"
+              className={`${fieldCls} resize-y`}
+            />
+            <div className="text-[10px] font-mono text-slate-500 mt-1.5">
+              Delivered after payment — in the delivery email, on the success page and in My Orders
+            </div>
+          </div>
           <div className="flex items-end pb-1">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -489,65 +515,16 @@ export default function AdminDashboard() {
           </TabsList>
 
           <TabsContent value="products">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="font-display text-xl font-bold uppercase tracking-tight">{products.length} Products</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setNewKind("cheat"); setEditing({}); }}
-                  data-testid="admin-add-product-button"
-                  className="rounded-lg inline-flex items-center gap-2 px-4 py-2 bg-blue-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-blue-300 transition-all"
-                >
-                  <Plus className="w-4 h-4" /> Add Cheat
-                </button>
-                <button
-                  onClick={() => { setNewKind("account"); setEditing({}); }}
-                  data-testid="admin-add-account-button"
-                  className="rounded-lg inline-flex items-center gap-2 px-4 py-2 bg-violet-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-violet-300 transition-all"
-                >
-                  <Plus className="w-4 h-4" /> Add Account
-                </button>
-              </div>
-            </div>
-            <div className="space-y-3" data-testid="admin-products-list">
-              {products.map((p) => (
-                <div key={p.id} className="flex flex-col lg:flex-row lg:items-center gap-4 p-4 bg-[#0F1F38] border border-blue-900/40 rounded-lg" data-testid={`admin-product-row-${p.id}`}>
-                  <img src={p.image_url} alt="" className="w-16 h-16 object-cover rounded-md saturate-[0.7]" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-100">{p.name}</div>
-                    <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
-                      {p.game} // {Object.entries(p.prices || {}).map(([k, v]) => `${DURATION_LABELS[k]} ${eur(v)}`).join(" · ")}
-                      {!p.active && <span className="text-rose-400 ml-2">HIDDEN</span>}
-                    </div>
-                  </div>
-                  {p.kind === "account" ? (
-                    <span className="text-[10px] px-2 py-1 rounded-full bg-violet-400/10 border border-violet-400/40 text-violet-300 font-mono uppercase tracking-widest" data-testid={`admin-product-kind-${p.id}`}>
-                      Account
-                    </span>
-                  ) : (
-                    <StatusPill status={p.status} testid={`admin-product-status-${p.id}`} />
-                  )}
-                  <button
-                    onClick={() => setKeysFor(p)}
-                    data-testid={`admin-keys-button-${p.id}`}
-                    className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                      (stockCounts[p.id]?.total || 0) > 0
-                        ? "border-[#1E2D4A] text-slate-300 hover:border-[#2E6BFF]/50 hover:text-white"
-                        : "border-amber-400/40 text-amber-300 hover:border-amber-400"
-                    }`}
-                  >
-                    {stockCounts[p.id]?.total || 0} keys · Manage
-                  </button>
-                  <div className="flex gap-2">
-                    <button onClick={() => setEditing(p)} data-testid={`admin-edit-product-${p.id}`} className="p-2 border border-blue-500/30 text-blue-300 hover:bg-blue-400/10 rounded transition-colors">
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => deleteProduct(p)} data-testid={`admin-delete-product-${p.id}`} className="p-2 border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 rounded transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ProductsTab
+              products={products}
+              categories={categories}
+              stockCounts={stockCounts}
+              onAdd={(kind, game) => { setNewKind(kind); setEditing({ game }); }}
+              onEdit={(p) => setEditing(p)}
+              onDelete={deleteProduct}
+              onKeys={(p) => setKeysFor(p)}
+              onReordered={loadProducts}
+            />
           </TabsContent>
 
           <TabsContent value="categories">
@@ -741,7 +718,7 @@ export default function AdminDashboard() {
 
       {editing !== null && (
         <ProductForm
-          initial={editing.id ? editing : { ...EMPTY_PRODUCT, kind: newKind }}
+          initial={editing.id ? editing : { ...EMPTY_PRODUCT, kind: newKind, game: editing.game || "" }}
           categories={categories}
           onSave={saveProduct}
           onClose={() => setEditing(null)}

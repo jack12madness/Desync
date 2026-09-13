@@ -8,6 +8,51 @@ import { toast } from "@/components/ui/sonner";
 
 const DURATION_ORDER = ["day", "week", "month", "lifetime"];
 
+function renderInline(text) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") ? (
+      <strong key={i} className="text-slate-100 font-semibold">{part.slice(2, -2)}</strong>
+    ) : (
+      part
+    )
+  );
+}
+
+export function RichDescription({ text }) {
+  const lines = (text || "").split("\n");
+  return (
+    <div data-testid="rich-description">
+      {lines.map((line, i) => {
+        const t = line.trim();
+        if (!t) return <div key={i} className="h-2.5" />;
+        if (t.startsWith("## ")) {
+          return (
+            <h4 key={i} className="font-display text-base font-bold tracking-tight text-white mt-4 mb-1.5 first:mt-0">
+              {renderInline(t.slice(3))}
+            </h4>
+          );
+        }
+        if (t.startsWith("- ") || t.startsWith("• ")) {
+          return (
+            <div key={i} className="flex items-start gap-2 text-sm text-slate-300 leading-relaxed">
+              <Check className="w-3.5 h-3.5 text-[#5B8CFF] shrink-0 mt-1" />
+              <span>{renderInline(t.slice(2))}</span>
+            </div>
+          );
+        }
+        if (t.endsWith(":") && t.length < 60) {
+          return (
+            <div key={i} className="text-xs font-mono uppercase tracking-[0.2em] text-[#5B8CFF] mt-4 mb-1 first:mt-0">
+              {renderInline(t.slice(0, -1))}
+            </div>
+          );
+        }
+        return <p key={i} className="text-sm text-slate-400 leading-relaxed">{renderInline(t)}</p>;
+      })}
+    </div>
+  );
+}
+
 export default function ProductModal({ product, onClose }) {
   const { addItem, openCart } = useCart();
   const durations = product
@@ -28,21 +73,28 @@ export default function ProductModal({ product, onClose }) {
         data-testid="product-detail-modal"
       >
         <div className="grid md:grid-cols-2">
-          <div className="relative h-56 md:h-full min-h-[220px]">
-            <img src={product.image_url} alt={product.name} className="absolute inset-0 w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-[#0A1628] via-transparent to-transparent" />
-            <div className="absolute top-4 left-4">
-              {product.kind === "account" ? (
-                <span
-                  data-testid="modal-status-badge"
-                  className="px-2.5 py-1 rounded-md bg-violet-400/15 border border-violet-400/40 text-violet-300 text-[10px] font-mono font-bold uppercase tracking-[0.2em]"
-                >
-                  Discord Account
-                </span>
-              ) : (
-                <StatusPill status={product.status} testid="modal-status-badge" />
-              )}
+          <div>
+            <div className="relative h-56 md:h-72">
+              <img src={product.image_url} alt={product.name} className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0A1628] via-transparent to-transparent" />
+              <div className="absolute top-4 left-4">
+                {product.kind === "account" ? (
+                  <span
+                    data-testid="modal-status-badge"
+                    className="px-2.5 py-1 rounded-md bg-violet-400/15 border border-violet-400/40 text-violet-300 text-[10px] font-mono font-bold uppercase tracking-[0.2em]"
+                  >
+                    Discord Account
+                  </span>
+                ) : (
+                  <StatusPill status={product.status} testid="modal-status-badge" />
+                )}
+              </div>
             </div>
+            {product.description && (
+              <div className="p-6 sm:p-8 md:pr-4" data-testid="modal-description">
+                <RichDescription text={product.description} />
+              </div>
+            )}
           </div>
 
           <div className="p-6 sm:p-8">
@@ -67,8 +119,6 @@ export default function ProductModal({ product, onClose }) {
                 </button>
               </div>
             </DialogHeader>
-
-            <p className="mt-3 text-sm text-slate-400 leading-relaxed">{product.description}</p>
 
             <div className="mt-4 flex items-center gap-2 text-sm text-slate-400">
               <ShieldCheck className="w-4 h-4 text-[#5B8CFF]" />

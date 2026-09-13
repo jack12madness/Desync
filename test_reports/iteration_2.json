@@ -1,0 +1,35 @@
+{
+  "summary": "Verified all UI features in the latest Desync batch: admin Products category-nav, drag handles, per-product Discord URL + Instructions fields with https:// validation, KeyManager scrollable filtered list, storefront rich RichDescription (headings/bold/checkmark bullets), and /orders OTP two-step flow (send code, wrong-code error, resend + use-different-email links). Backend pytest suite (16 tests across test_otp_reorder.py + test_desync_features.py) re-run and passes.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Dashboard header — Sales by product widget", "issues": ["React 'Encountered two children with the same key' warnings spam the console: multiple orders reference deleted products which all render as 'Deleted product' and appear to be keyed by name/label instead of a stable id. Cosmetic (no visual dupes seen) but pollutes console and is a latent duplicate-key hazard."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_otp_reorder.py",
+    "/app/backend/tests/test_desync_features.py",
+    "/app/backend/tests/test_bank_customers_expenses.py"
+  ],
+  "action_items": [
+    "In the admin 'Sales by product' list, key each row by order/product id (or index) rather than product name to eliminate the duplicate-key React warnings for 'Deleted product' rows."
+  ],
+  "critical_code_review_comments": [
+    "Admin Products category-nav (ProductsTab.jsx) correctly wires data-testid admin-cat-card-<slug>, admin-cat-back, admin-add-product-button, admin-add-account-button, drag-handle-<id>, admin-product-row-<id>, admin-edit/delete/keys-button-<id> — good testability.",
+    "ProductForm Discord URL client validation returns clear toast 'Discord URL must start with https://' AND backend enforces it (400 seen for the same submit) — defense in depth is good.",
+    "KeyManager 'keys-list' uses overflow-y:auto with max-height ≈ 410px (38vh @ 1080p) and shows correct '<n> total' counter (40 for PHANTOM). Filter narrows rows visibly.",
+    "ProductModal 'modal-description' renders rich content (h4 headings, <strong> bold lead-ins, checkmark bullet lines) directly under the product image on the left column — matches spec.",
+    "OrderLookup two-step flow works: lookup-email-input + lookup-submit-button → otp-code-input + otp-verify-button; toasts 'Code sent — check your inbox' and 'Incorrect code' render; Resend code + Use a different email links present.",
+    "server.py already flagged in iteration_1 as ~1000+ lines — still worth splitting into routers; not a blocker."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (16/16 relevant pytest cases)", "frontend": "100% of listed features verified"},
+  "test_credentials": "admin voidowner / VoidGhost!26; OTP email delivered@resend.dev",
+  "seed_data_creation": "None (a temporary edit set PHANTOM discord_url='http://bad.example.com' was rejected by validation and immediately restored to blank; PHANTOM discord_url ends at empty string, its original value).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All new-batch UI features (category-nav admin products, drag handles, discord_url/instructions fields+validation, KeyManager scroll/filter, ProductModal RichDescription, /orders OTP two-step) are functional on preview URL. Only lingering issue is a benign React duplicate-key warning in the admin 'Sales by product' widget when multiple 'Deleted product' rows are rendered — key each row by id. Backend pytest already covers OTP verify-success (which UI cannot verify since the email inbox is unreachable in-test).",
+  "rca of the issue": "N/A — no functional bugs. The duplicate-key React warning stems from the admin dashboard rendering the sales-by-product breakdown keyed by the product's display name; when several orders reference now-deleted products they all resolve to the string 'Deleted product', producing collisions."
+}

@@ -59,6 +59,12 @@ export default function KeyManager({ product, onClose, onChanged }) {
   const productDurations = DURATIONS.filter((d) => product.prices && product.prices[d] != null);
   const sorted = [...(keys || [])].sort((a, b) => (a.duration || "").localeCompare(b.duration || ""));
   const isTicket = product.delivery === "ticket";
+  const [filter, setFilter] = useState("");
+  const [showAll, setShowAll] = useState(false);
+  const filteredKeys = filter
+    ? sorted.filter((k) => (k.key || "").toLowerCase().includes(filter.toLowerCase()))
+    : sorted;
+  const visibleKeys = showAll ? filteredKeys : filteredKeys.slice(0, 100);
 
   if (isTicket) {
     return (
@@ -175,14 +181,32 @@ export default function KeyManager({ product, onClose, onChanged }) {
           </button>
         </div>
 
-        <div className="mt-6 space-y-2">
+        <div className="mt-6">
+          <div className="flex items-center gap-3 mb-2">
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter keys..."
+              data-testid="keys-filter-input"
+              className="flex-1 h-9 rounded-lg bg-[#050B18] border border-[#1E2D4A] focus:border-[#2E6BFF] focus:outline-none font-mono text-xs px-3 text-slate-100 placeholder:text-slate-600"
+            />
+            <span className="text-[10px] font-mono text-slate-500 shrink-0" data-testid="keys-list-count">
+              {filteredKeys.length} total
+            </span>
+          </div>
+          <div className="space-y-2 max-h-[38vh] overflow-y-auto pr-1" data-testid="keys-list">
           {keys === null && <div className="text-sm text-slate-500 py-8 text-center">Loading...</div>}
           {keys !== null && keys.length === 0 && (
             <div className="text-sm text-slate-500 py-8 text-center" data-testid="keys-empty">
               No keys yet — paste your supplier keys above
             </div>
           )}
-          {sorted.map((k) => (
+          {keys !== null && keys.length > 0 && filteredKeys.length === 0 && (
+            <div className="text-sm text-slate-500 py-8 text-center" data-testid="keys-filter-empty">
+              No keys match that filter
+            </div>
+          )}
+          {visibleKeys.map((k) => (
             <div
               key={k.id}
               data-testid={`key-row-${k.id}`}
@@ -196,7 +220,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
                   Account
                 </span>
               )}
-              <code className="font-mono text-sm text-slate-100 flex-1 truncate">{k.key}</code>
+              <code className="font-mono text-sm text-slate-100 flex-1 truncate" title={k.key}>{k.key}</code>
               {k.status === "available" ? (
                 <>
                   <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/30 text-emerald-300">Available</span>
@@ -219,6 +243,16 @@ export default function KeyManager({ product, onClose, onChanged }) {
               )}
             </div>
           ))}
+          </div>
+          {!showAll && filteredKeys.length > 100 && (
+            <button
+              onClick={() => setShowAll(true)}
+              data-testid="keys-show-all"
+              className="mt-2 text-xs font-mono text-[#8FB8E8] hover:text-white transition-colors"
+            >
+              Showing 100 of {filteredKeys.length} — show all
+            </button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
