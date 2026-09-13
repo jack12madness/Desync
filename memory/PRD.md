@@ -11,6 +11,15 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-13 — Crypto checkout (NOWPayments)
+- POST /api/payments/crypto: prices cart server-side (EUR), creates NOWPayments hosted invoice (ipn_callback_url = SITE_URL + /api/payments/crypto/webhook, success_url = /payment/success?order=<id>), order provider "crypto" pending; returns invoice_url. 503 if unconfigured, 502 on provider error
+- POST /api/payments/crypto/webhook: HMAC-SHA512 over recursively-sorted compact JSON (x-nowpayments-sig, constant-time compare). confirmed/finished → background _fulfill_order (idempotent); failed/expired/refunded → marked; waiting/confirming → recorded only. 401 bad sig, 404 unknown order
+- Cart: "Pay with Crypto (BTC, USDT & more)" button (cart-crypto-button) with network-confirmation note; keys in backend/.env NOWPAYMENTS_API_KEY + NOWPAYMENTS_IPN_SECRET (never in frontend)
+- Verified: real invoice created (nowpayments.io/payment/?iid=...), signed webhook fulfilled order with key + email, bad sig 401, waiting no-fulfill; 36/36 pytest
+- Payouts land in user's Trust Wallet (configured in NOWPayments Store Settings by user)
+- TODO user-side: claim Stripe account → enable Apple Pay + Google Pay in Stripe Dashboard → Payment methods (no code needed; hosted checkout shows them automatically)
+
+
 ### 2026-09-13 — Restock announcements to Discord
 - New "restock" Discord webhook kind (5th card in Alerts tab: Restock announcements). User's webhook saved in PREVIEW settings — must be re-saved on LIVE admin after deploy (separate DBs)
 - KeyManager: after Add keys → confirm screen (added/skipped/raw summary + pool) with "Announce this restock in Discord" checkbox (default on) → Announce & Done / Done / Add more; announce failure keeps the screen open for retry

@@ -11,7 +11,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict
-import time, uuid, logging, secrets, string, asyncio, hashlib
+import time, uuid, logging, secrets, string, asyncio, hashlib, hmac
 import html, json, re
 from datetime import datetime, timezone, timedelta
 import httpx
@@ -2025,6 +2025,116 @@ async def paypal_capture(body: PayPalCaptureIn):
     if not order:
         raise HTTPException(404, "Order not found")
     return {"status": "paid", "order_id": order["id"]}
+
+
+# ---------- payments: crypto (NOWPayments) ----------
+
+NOWPAYMENTS_API_KEY = os.environ.get("NOWPAYMENTS_API_KEY")
+NOWPAYMENTS_IPN_SECRET = (os.environ.get("NOWPAYMENTS_IPN_SECRET") or "").strip()
+NP_BASE = "https://api.nowpayments.io/v1"
+
+
+@api_router.post("/payments/crypto")
+async def crypto_checkout(body: CheckoutIn):
+    if not NOWPAYMENTS_API_KEY:
+        raise HTTPException(503, "Crypto payments are not configured")
+    if not body.items:
+        raise HTTPException(400, "Cart is empty")
+    email = body.email.lower()
+    order_items, subtotal_cents, total_cents, discount_pct, coupon_code = await _price_cart(
+        body.items, body.coupon
+    )
+    if total_cents <= 0:
+        raise HTTPException(400, "Total must be above zero")
+    order_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    order = {
+        "id": order_id, "session_id": None, "email": email,
+        "discord_username": (body.discord_username or "").strip() or None,
+        "items": order_items, "total": total_cents / 100.0, "currency": "eur",
+        "subtotal": subtotal_cents / 100.0, "discount_percent": discount_pct,
+        "coupon_code": coupon_code,
+        "provider": "crypto", "status": "initiated", "payment_status": "pending",
+        "download_token": secrets.token_urlsafe(24),
+        "created_at": now, "updated_at": now,
+    }
+    payload = {
+        "price_amount": round(total_cents / 100.0, 2),
+        "price_currency": "eur",
+        "order_id": order_id,
+        "order_description": f"Desync order {order_id[:8].upper()}",
+        "ipn_callback_url": f"{SITE_URL}/api/payments/crypto/webhook",
+        "success_url": f"{body.origin_url}/payment/success?order={order_id}",
+        "cancel_url": f"{body.origin_url}/",
+    }
+    async with httpx.AsyncClient(timeout=20) as h:
+        resp = await h.post(
+            f"{NP_BASE}/invoice",
+            headers={"x-api-key": NOWPAYMENTS_API_KEY, "Content-Type": "application/json"},
+            json=payload,
+        )
+    if resp.status_code >= 400:
+        logger.error("NOWPayments invoice failed: %s %s", resp.status_code, resp.text)
+        raise HTTPException(502, "Crypto checkout is unavailable right now — try card or bank transfer")
+    invoice = resp.json()
+    if not invoice.get("invoice_url") or not invoice.get("id"):
+        raise HTTPException(502, "Invalid response from crypto provider")
+    order["np_invoice_id"] = str(invoice["id"])
+    await db.orders.insert_one(order)
+    await _discord_alert(
+        "orders", "New order (crypto checkout)", "NOWPayments invoice created — awaiting payment.",
+        fields=_order_fields(order), color=0xF7931A,
+    )
+    return {"invoice_url": invoice["invoice_url"], "order_id": order_id}
+
+
+def _np_sort(value):
+    if isinstance(value, dict):
+        return {k: _np_sort(value[k]) for k in sorted(value)}
+    if isinstance(value, list):
+        return [_np_sort(x) for x in value]
+    return value
+
+
+def _np_verify(payload: dict, signature: str) -> bool:
+    if not signature or not NOWPAYMENTS_IPN_SECRET:
+        return False
+    canonical = json.dumps(_np_sort(payload), separators=(",", ":"), ensure_ascii=False).encode()
+    expected = hmac.new(NOWPAYMENTS_IPN_SECRET.encode(), canonical, hashlib.sha512).hexdigest()
+    return hmac.compare_digest(expected, signature.strip())
+
+
+@api_router.post("/payments/crypto/webhook")
+async def crypto_webhook(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    if not isinstance(payload, dict) or not _np_verify(payload, request.headers.get("x-nowpayments-sig", "")):
+        raise HTTPException(401, "Invalid signature")
+    order_id = str(payload.get("order_id") or "")
+    pay_status = payload.get("payment_status")
+    if not order_id:
+        raise HTTPException(400, "Missing order id")
+    order = await db.orders.find_one({"id": order_id, "provider": "crypto"}, {"_id": 0, "id": 1, "payment_status": 1})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    now = datetime.now(timezone.utc).isoformat()
+    if pay_status in ("confirmed", "finished"):
+        asyncio.create_task(_fulfill_order({"id": order_id}))
+    elif pay_status in ("failed", "expired", "refunded"):
+        await db.orders.update_one(
+            {"id": order_id, "payment_status": {"$ne": "paid"}},
+            {"$set": {"payment_status": pay_status, "status": pay_status, "updated_at": now}},
+        )
+    else:
+        # waiting / confirming / partially_paid / sending — record progress only
+        await db.orders.update_one(
+            {"id": order_id},
+            {"$set": {"np_payment_id": str(payload.get("payment_id") or ""), "np_status": pay_status,
+                      "updated_at": now}},
+        )
+    return {"received": True}
 
 
 @api_router.get("/orders/by-id/{order_id}")

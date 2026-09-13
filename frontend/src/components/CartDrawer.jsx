@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, Lock, ArrowRight, Tag, Landmark, Minus, Plus } from "lucide-react";
+import { X, Lock, ArrowRight, Tag, Landmark, Minus, Plus, Bitcoin } from "lucide-react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
@@ -101,6 +101,34 @@ export default function CartDrawer() {
     } catch (e) {
       toast.error(apiError(e));
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const cryptoCheckout = async () => {
+    if (!validEmail) {
+      toast.error("Enter a valid email — your keys are delivered there");
+      return;
+    }
+    if (!discordUser.trim()) {
+      toast.error("Enter your Discord username");
+      return;
+    }
+    if (!agreed) {
+      toast.error("Please agree to the Terms of Service first");
+      return;
+    }
+    if (items.length === 0) return;
+    setLoading(true);
+    try {
+      localStorage.setItem("void_email", email);
+      const { data } = await api.post("/payments/crypto", {
+        ...cartPayload(),
+        origin_url: window.location.origin,
+      });
+      window.location.href = data.invoice_url;
+    } catch (e) {
+      toast.error(apiError(e));
       setLoading(false);
     }
   };
@@ -292,6 +320,19 @@ export default function CartDrawer() {
           </button>
           <p className="text-center text-[11px] text-slate-500 -mt-1" data-testid="bank-transfer-note">
             Bank transfer is manually confirmed — not instant delivery
+          </p>
+
+          <button
+            onClick={cryptoCheckout}
+            disabled={loading || items.length === 0 || !agreed || !discordUser.trim()}
+            data-testid="cart-crypto-button"
+            className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg border border-[#F7931A]/40 text-[#F5B45E] text-sm font-semibold hover:bg-[#F7931A]/10 disabled:opacity-40 disabled:pointer-events-none transition-all duration-200"
+          >
+            <Bitcoin className="w-4 h-4" />
+            {loading ? "Redirecting..." : "Pay with Crypto (BTC, USDT & more)"}
+          </button>
+          <p className="text-center text-[11px] text-slate-500 -mt-1" data-testid="crypto-note">
+            Crypto delivers automatically once the network confirms — usually a few minutes
           </p>
 
           {SHOW_PAYPAL && PAYPAL_CLIENT_ID && (
