@@ -11,6 +11,12 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-13 — Crypto polish: alerts detail, storefront badge, auto-expiry
+- Crypto webhook now records payment_id/pay_currency/actually_paid before fulfillment; Discord "payments" embed shows "Crypto paid: <amt> <COIN>" (paid alerts already fired via shared _fulfill_order path)
+- Home shop header: "Crypto accepted — BTC, USDT & more" pill (crypto-accepted-badge, Bitcoin icon, orange)
+- Auto-expiry: _sweep_expired_orders() (bank 48h + crypto pending >24h → expired) runs every 15min; new admin POST /api/admin/orders/sweep-expired for manual runs (401 unauth). 38/38 pytest
+
+
 ### 2026-09-13 — Crypto checkout (NOWPayments)
 - POST /api/payments/crypto: prices cart server-side (EUR), creates NOWPayments hosted invoice (ipn_callback_url = SITE_URL + /api/payments/crypto/webhook, success_url = /payment/success?order=<id>), order provider "crypto" pending; returns invoice_url. 503 if unconfigured, 502 on provider error
 - POST /api/payments/crypto/webhook: HMAC-SHA512 over recursively-sorted compact JSON (x-nowpayments-sig, constant-time compare). confirmed/finished → background _fulfill_order (idempotent); failed/expired/refunded → marked; waiting/confirming → recorded only. 401 bad sig, 404 unknown order

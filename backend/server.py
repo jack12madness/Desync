@@ -1209,6 +1209,10 @@ def _order_fields(order: dict) -> list:
         fields.append({"name": "Discord", "value": order["discord_username"], "inline": True})
     if order.get("reference"):
         fields.append({"name": "Reference", "value": f"`{order['reference']}`", "inline": True})
+    if order.get("pay_currency"):
+        coin = str(order["pay_currency"]).upper()
+        amt = order.get("actually_paid")
+        fields.append({"name": "Crypto paid", "value": f"{amt} {coin}" if amt else coin, "inline": True})
     return fields
 
 
@@ -1377,31 +1381,62 @@ async def admin_mark_paid(order_id: str, admin: dict = Depends(get_admin)):
     return {"fulfilled": bool(updated and updated.get("payment_status") == "paid"), "order_id": order_id}
 
 
+CRYPTO_ORDER_TTL_HOURS = 24
+
+
+async def _sweep_expired_orders() -> dict:
+    """Expire stale orders: bank transfers past their 48h window (release reserved stock)
+    and unpaid crypto orders older than 24h. Returns counts."""
+    now_dt = datetime.now(timezone.utc)
+    now = now_dt.isoformat()
+    result = {"bank_expired": 0, "crypto_expired": 0}
+    expired = await db.orders.find(
+        {"provider": "bank_transfer", "payment_status": "awaiting_payment", "expires_at": {"$lt": now}},
+        {"_id": 0},
+    ).to_list(100)
+    for o in expired:
+        rel = await db.keystock.update_many(
+            {"reserved_order_id": o["id"], "status": "reserved"},
+            {"$set": {"status": "available"}, "$unset": {"reserved_order_id": "", "reserved_at": ""}},
+        )
+        res = await db.orders.update_one(
+            {"id": o["id"], "payment_status": "awaiting_payment"},
+            {"$set": {"payment_status": "cancelled", "status": "cancelled", "updated_at": now}},
+        )
+        if res.modified_count:
+            result["bank_expired"] += 1
+            logger.info("Bank order %s expired, released %d reserved keys", o["id"], rel.modified_count)
+            try:
+                await send_bank_expired_email(o)
+            except Exception as e:
+                logger.error("Bank expiry email failed for %s: %s", o["id"], e)
+    crypto_cutoff = (now_dt - timedelta(hours=CRYPTO_ORDER_TTL_HOURS)).isoformat()
+    stale = await db.orders.find(
+        {"provider": "crypto", "payment_status": "pending", "created_at": {"$lt": crypto_cutoff}},
+        {"_id": 0, "id": 1},
+    ).to_list(200)
+    for o in stale:
+        res = await db.orders.update_one(
+            {"id": o["id"], "payment_status": "pending"},
+            {"$set": {"payment_status": "expired", "status": "expired", "updated_at": now}},
+        )
+        if res.modified_count:
+            result["crypto_expired"] += 1
+            logger.info("Crypto order %s auto-expired (unpaid >%dh)", o["id"], CRYPTO_ORDER_TTL_HOURS)
+    return result
+
+
+@api_router.post("/admin/orders/sweep-expired")
+async def admin_sweep_expired(admin: dict = Depends(get_admin)):
+    return await _sweep_expired_orders()
+
+
 async def _bank_expiry_loop():
     while True:
         try:
-            now = datetime.now(timezone.utc).isoformat()
-            expired = await db.orders.find(
-                {"provider": "bank_transfer", "payment_status": "awaiting_payment", "expires_at": {"$lt": now}},
-                {"_id": 0},
-            ).to_list(100)
-            for o in expired:
-                rel = await db.keystock.update_many(
-                    {"reserved_order_id": o["id"], "status": "reserved"},
-                    {"$set": {"status": "available"}, "$unset": {"reserved_order_id": "", "reserved_at": ""}},
-                )
-                res = await db.orders.update_one(
-                    {"id": o["id"], "payment_status": "awaiting_payment"},
-                    {"$set": {"payment_status": "cancelled", "status": "cancelled", "updated_at": now}},
-                )
-                if res.modified_count:
-                    logger.info("Bank order %s expired, released %d reserved keys", o["id"], rel.modified_count)
-                    try:
-                        await send_bank_expired_email(o)
-                    except Exception as e:
-                        logger.error("Bank expiry email failed for %s: %s", o["id"], e)
+            await _sweep_expired_orders()
         except Exception as e:
-            logger.error("Bank expiry loop error: %s", e)
+            logger.error("Expiry sweep error: %s", e)
         await asyncio.sleep(900)
 
 
@@ -2121,6 +2156,13 @@ async def crypto_webhook(request: Request):
         raise HTTPException(404, "Order not found")
     now = datetime.now(timezone.utc).isoformat()
     if pay_status in ("confirmed", "finished"):
+        await db.orders.update_one(
+            {"id": order_id},
+            {"$set": {"np_payment_id": str(payload.get("payment_id") or ""),
+                      "pay_currency": payload.get("pay_currency"),
+                      "actually_paid": payload.get("actually_paid"),
+                      "updated_at": now}},
+        )
         asyncio.create_task(_fulfill_order({"id": order_id}))
     elif pay_status in ("failed", "expired", "refunded"):
         await db.orders.update_one(

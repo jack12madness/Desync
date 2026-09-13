@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, ArrowLeft } from "lucide-react";
+import { ArrowRight, ArrowLeft, Bitcoin } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import StatusBanner from "@/components/StatusBanner";
@@ -101,6 +101,12 @@ export default function Home() {
               <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-white" data-testid="shop-title">
                 {activeCat ? activeCat : "Browse collections"}
               </h2>
+              <div
+                className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#F7931A]/40 bg-[#F7931A]/10 text-[#F5B45E] text-[10px] font-mono font-bold uppercase tracking-[0.2em]"
+                data-testid="crypto-accepted-badge"
+              >
+                <Bitcoin className="w-3.5 h-3.5" /> Crypto accepted — BTC, USDT & more
+              </div>
             </div>
             {activeCat && (
               <button

@@ -118,3 +118,58 @@ def test_crypto_webhook_waiting_status_does_not_fulfill():
     # still unpaid -> by-id is 404
     g = requests.get(f"{API}/orders/by-id/{order_id}", timeout=15)
     assert g.status_code == 404
+
+
+def test_crypto_webhook_records_coin_details():
+    prod, dur = _in_stock()
+    assert prod is not None
+    r = requests.post(f"{API}/payments/crypto", json={
+        "email": "delivered@resend.dev",
+        "items": [{"product_id": prod["id"], "duration": dur, "qty": 1}],
+        "origin_url": BASE,
+    }, timeout=30)
+    order_id = r.json()["order_id"]
+    payload = {"payment_id": f"pytest-{uuid.uuid4().hex[:8]}", "payment_status": "finished",
+               "order_id": order_id, "pay_currency": "usdttrc20", "actually_paid": 5.42}
+    ok = requests.post(f"{API}/payments/crypto/webhook", json=payload,
+                       headers={"x-nowpayments-sig": _sig(payload)}, timeout=15)
+    assert ok.status_code == 200
+    from pymongo import MongoClient
+    db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
+    doc = db.orders.find_one({"id": order_id}, {"pay_currency": 1, "actually_paid": 1, "np_payment_id": 1})
+    assert doc["pay_currency"] == "usdttrc20"
+    assert doc["actually_paid"] == 5.42
+    assert doc["np_payment_id"] == payload["payment_id"]
+
+
+def test_crypto_auto_expiry_sweep():
+    admin = requests.post(f"{API}/auth/login", json={"username": "voidowner", "password": "VoidGhost!26"}, timeout=15)
+    headers = {"Authorization": f"Bearer {admin.json()['token']}"}
+    prod, dur = _in_stock()
+    assert prod is not None
+    # old unpaid crypto order -> expired
+    r = requests.post(f"{API}/payments/crypto", json={
+        "email": "delivered@resend.dev",
+        "items": [{"product_id": prod["id"], "duration": dur, "qty": 1}],
+        "origin_url": BASE,
+    }, timeout=30)
+    old_id = r.json()["order_id"]
+    from datetime import datetime, timedelta, timezone
+    from pymongo import MongoClient
+    db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
+    db.orders.update_one({"id": old_id}, {"$set": {"created_at": (datetime.now(timezone.utc) - timedelta(hours=25)).isoformat()}})
+    # fresh unpaid crypto order -> untouched
+    r2 = requests.post(f"{API}/payments/crypto", json={
+        "email": "delivered@resend.dev",
+        "items": [{"product_id": prod["id"], "duration": dur, "qty": 1}],
+        "origin_url": BASE,
+    }, timeout=30)
+    fresh_id = r2.json()["order_id"]
+    s = requests.post(f"{API}/admin/orders/sweep-expired", headers=headers, timeout=20)
+    assert s.status_code == 200, s.text
+    assert s.json()["crypto_expired"] >= 1
+    assert db.orders.find_one({"id": old_id})["payment_status"] == "expired"
+    assert db.orders.find_one({"id": fresh_id})["payment_status"] == "pending"
+    # unauth blocked
+    no = requests.post(f"{API}/admin/orders/sweep-expired", timeout=15)
+    assert no.status_code == 401
