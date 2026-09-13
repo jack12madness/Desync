@@ -18,6 +18,9 @@ export default function KeyManager({ product, onClose, onChanged }) {
   });
   const [mode, setMode] = useState(isAccountProduct ? "accounts" : "keys");
   const [adding, setAdding] = useState(false);
+  const [confirm, setConfirm] = useState(null); // {added, skipped, raw, duration}
+  const [announce, setAnnounce] = useState(true);
+  const [announcing, setAnnouncing] = useState(false);
 
   const load = () =>
     api.get(`/admin/keystock/${product.id}`).then(({ data }) => setKeys(data)).catch(() => setKeys([]));
@@ -32,8 +35,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
     setAdding(true);
     try {
       const { data } = await api.post("/admin/keystock", { product_id: product.id, duration, keys: input, mode });
-      const noun = mode === "accounts" ? "account" : "key";
-      toast.success(`${data.added} ${noun}${data.added === 1 ? "" : "s"} added to ${DURATION_LABELS[duration]}${data.skipped ? `, ${data.skipped} duplicates skipped` : ""}${data.raw ? `, ${data.raw} stored as pasted` : ""}`);
+      setConfirm({ added: data.added, skipped: data.skipped, raw: data.raw, duration, mode });
       setInput("");
       load();
       onChanged && onChanged();
@@ -66,6 +68,24 @@ export default function KeyManager({ product, onClose, onChanged }) {
     : sorted;
   const visibleKeys = showAll ? filteredKeys : filteredKeys.slice(0, 100);
 
+  const finishRestock = async () => {
+    if (announce && confirm?.added > 0) {
+      setAnnouncing(true);
+      try {
+        await api.post(`/admin/products/${product.id}/restock-announce`, {
+          duration: confirm.duration, added: confirm.added,
+        });
+        toast.success("Restock announced in Discord");
+      } catch (e) {
+        toast.error(apiError(e));
+        setAnnouncing(false);
+        return; // keep the confirm screen open so they can retry or untick
+      }
+      setAnnouncing(false);
+    }
+    setConfirm(null);
+  };
+
   if (isTicket) {
     return (
       <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -80,6 +100,65 @@ export default function KeyManager({ product, onClose, onChanged }) {
             stock, never sold out. After paying, buyers are sent to{" "}
             <span className="font-mono text-[#8FB8E8]">{product.ticket_url || "https://discord.gg/de-sync"}</span>{" "}
             to open a ticket. Nothing to manage here.
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (confirm) {
+    const noun = confirm.mode === "accounts" ? "account" : "key";
+    return (
+      <Dialog open onOpenChange={(o) => !o && setConfirm(null)}>
+        <DialogContent className="max-w-md bg-[#0A1628] border-[#1E2D4A] text-slate-100 rounded-xl" data-testid="restock-confirm-modal">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-bold tracking-tight text-white flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-emerald-400" /> Restock complete
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-4 rounded-lg bg-[#050B18] border border-[#1E2D4A] space-y-2" data-testid="restock-confirm-summary">
+            <div className="text-sm text-slate-300">
+              <span className="text-emerald-300 font-mono font-bold">{confirm.added}</span>{" "}
+              {noun}{confirm.added === 1 ? "" : "s"} added to{" "}
+              <span className="text-white font-semibold">{product.name}</span>{" "}
+              <span className="text-slate-500">({DURATION_LABELS[confirm.duration]} pool)</span>
+            </div>
+            {confirm.skipped > 0 && (
+              <div className="text-xs text-amber-300">{confirm.skipped} duplicate{confirm.skipped === 1 ? "" : "s"} skipped</div>
+            )}
+            {confirm.raw > 0 && (
+              <div className="text-xs text-slate-500">{confirm.raw} stored exactly as pasted</div>
+            )}
+          </div>
+          <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg bg-[#5865F2]/10 border border-[#5865F2]/30">
+            <input
+              type="checkbox"
+              checked={announce}
+              onChange={(e) => setAnnounce(e.target.checked)}
+              data-testid="restock-announce-toggle"
+              className="w-4 h-4 accent-[#5865F2]"
+            />
+            <span className="text-xs text-slate-300 leading-relaxed">
+              <span className="text-white font-semibold">Announce this restock in Discord</span>{" "}
+              — posts a restocked embed with variants, prices and live stock
+            </span>
+          </label>
+          <div className="flex gap-3 mt-1">
+            <button
+              onClick={finishRestock}
+              disabled={announcing}
+              data-testid="restock-confirm-done"
+              className="flex-1 px-5 py-2.5 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold disabled:opacity-40 transition-all duration-200 active:scale-95"
+            >
+              {announcing ? "Announcing..." : announce ? "Announce & Done" : "Done"}
+            </button>
+            <button
+              onClick={() => setConfirm(null)}
+              data-testid="restock-add-more"
+              className="px-5 py-2.5 rounded-lg border border-[#1E2D4A] text-sm text-slate-300 hover:border-[#2E6BFF]/50 hover:text-white transition-all"
+            >
+              Add more
+            </button>
           </div>
         </DialogContent>
       </Dialog>

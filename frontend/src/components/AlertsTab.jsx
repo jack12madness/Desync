@@ -29,10 +29,16 @@ const CHANNELS = [
     desc: "Pool drops to 4 left, and when it hits 0",
     color: "text-amber-300 border-amber-400/40 bg-amber-400/10",
   },
+  {
+    kind: "restock",
+    title: "Restock announcements",
+    desc: "Posted to your community when you add keys and choose 'Announce this restock'",
+    color: "text-violet-300 border-violet-400/40 bg-violet-400/10",
+  },
 ];
 
 export default function AlertsTab() {
-  const [hooks, setHooks] = useState({ orders: "", payments: "", bank: "", low_stock: "" });
+  const [hooks, setHooks] = useState({ orders: "", payments: "", bank: "", low_stock: "", restock: "" });
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(null);
 
@@ -42,6 +48,7 @@ export default function AlertsTab() {
       setHooks({
         orders: existing.orders || "", payments: existing.payments || "",
         bank: existing.bank || "", low_stock: existing.low_stock || "",
+        restock: existing.restock || "",
       });
     }).catch(() => {});
   }, []);

@@ -1006,6 +1006,53 @@ async def admin_discord_test(body: DiscordTestIn, admin: dict = Depends(get_admi
     return {"sent": True, "kind": body.kind}
 
 
+class RestockAnnounceIn(BaseModel):
+    duration: Optional[str] = None
+    added: int = 0
+
+
+@api_router.post("/admin/products/{product_id}/restock-announce")
+async def admin_restock_announce(product_id: str, body: RestockAnnounceIn, admin: dict = Depends(get_admin)):
+    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(404, "Product not found")
+    settings = await db.settings.find_one({"id": "main"}, {"_id": 0, "discord_webhooks": 1})
+    url = ((settings or {}).get("discord_webhooks") or {}).get("restock")
+    if not url:
+        raise HTTPException(400, "No restock webhook saved — add one in the Alerts tab first")
+    stock = await _available_stock_map()
+    pstock = stock.get(product_id, {})
+    fields = []
+    for d in ("day", "week", "month", "lifetime"):
+        price = (product.get("prices") or {}).get(d)
+        if price is None:
+            continue
+        label = DURATIONS[d] + (f" · +{body.added} new" if d == body.duration and body.added else "")
+        fields.append({"name": "Variant", "value": label, "inline": True})
+        fields.append({"name": "Price", "value": f"€{float(price):.2f}", "inline": True})
+        fields.append({"name": "Stock", "value": str(pstock.get(d, 0)), "inline": True})
+    buy_link = f"{SITE_URL}/product/{product_id}" if SITE_URL else ""
+    desc = f"Our product **{product['name']}** has just been restocked!"
+    if buy_link:
+        desc += f"\n[Buy Now]({buy_link})"
+    embed = {
+        "title": f"{product['name']} Restocked",
+        "description": desc,
+        "color": 0x22C55E,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "footer": {"text": "Desync"},
+        "fields": fields,
+    }
+    img = product.get("image_url") or ""
+    if img:
+        embed["image"] = {"url": img if img.startswith("http") else f"{SITE_URL}{img}"}
+    async with httpx.AsyncClient(timeout=10) as h:
+        r = await h.post(url, json={"embeds": [embed]})
+    if r.status_code not in (200, 204):
+        raise HTTPException(400, f"Discord rejected the webhook (HTTP {r.status_code}) — check the URL in the Alerts tab")
+    return {"announced": True, "product": product["name"]}
+
+
 # ---------- public: drop config ----------
 
 @api_router.get("/drop-config")
@@ -1144,7 +1191,7 @@ async def admin_resend_order_email(order_id: str, admin: dict = Depends(get_admi
 
 # ---------- discord webhook alerts ----------
 
-DISCORD_ALERT_KINDS = ("orders", "payments", "low_stock", "bank")
+DISCORD_ALERT_KINDS = ("orders", "payments", "low_stock", "bank", "restock")
 
 
 def _order_fields(order: dict) -> list:

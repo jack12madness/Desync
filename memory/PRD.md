@@ -11,6 +11,12 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-13 — Restock announcements to Discord
+- New "restock" Discord webhook kind (5th card in Alerts tab: Restock announcements). User's webhook saved in PREVIEW settings — must be re-saved on LIVE admin after deploy (separate DBs)
+- KeyManager: after Add keys → confirm screen (added/skipped/raw summary + pool) with "Announce this restock in Discord" checkbox (default on) → Announce & Done / Done / Add more; announce failure keeps the screen open for retry
+- POST /api/admin/products/{id}/restock-announce {duration, added}: Kovex-style embed — "{Product} Restocked", "Our product X has just been restocked! [Buy Now]" (links to /product/{id}), Variant/Price/Stock inline fields per priced duration (live counts), product image, green. 400 if no webhook saved or Discord rejects; 401/404 guards verified. Real test post delivered 200
+
+
 ### 2026-09-13 — Full-bleed product photos in buy modal
 - ProductModal image no longer crops: object-contain over a blurred cover backdrop (object-cover blur-2xl opacity-40), frame h-64/md:h-80, dark base. testid modal-product-image. Shop cards unchanged (still cover-cropped for grid uniformity)
 
