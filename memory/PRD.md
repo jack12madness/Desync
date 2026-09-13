@@ -11,6 +11,10 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-13 — Full-bleed product photos in buy modal
+- ProductModal image no longer crops: object-contain over a blurred cover backdrop (object-cover blur-2xl opacity-40), frame h-64/md:h-80, dark base. testid modal-product-image. Shop cards unchanged (still cover-cropped for grid uniformity)
+
+
 ### 2026-09-13 — Category admin, drag ordering, per-product Discord/instructions, My Orders OTP
 - Admin Products tab: category cards first (ProductsTab.jsx), click a category to manage its products; Add Cheat/Add Account pre-fill that category
 - Drag-and-drop product ordering per category (HTML5 DnD, grip handles) → POST /api/admin/products/reorder {game, product_ids} validates exact membership, sets sort_order (storefront follows)

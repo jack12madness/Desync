@@ -74,8 +74,9 @@ export default function ProductModal({ product, onClose }) {
       >
         <div className="grid md:grid-cols-2">
           <div>
-            <div className="relative h-56 md:h-72">
-              <img src={product.image_url} alt={product.name} className="absolute inset-0 w-full h-full object-cover" />
+            <div className="relative h-64 md:h-80 overflow-hidden bg-[#050B18]">
+              <img src={product.image_url} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover blur-2xl scale-125 opacity-40 saturate-[0.6]" />
+              <img src={product.image_url} alt={product.name} className="absolute inset-0 w-full h-full object-contain" data-testid="modal-product-image" />
               <div className="absolute inset-0 bg-gradient-to-t from-[#0A1628] via-transparent to-transparent" />
               <div className="absolute top-4 left-4">
                 {product.kind === "account" ? (
