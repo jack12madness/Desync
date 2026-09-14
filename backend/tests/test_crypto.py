@@ -240,3 +240,43 @@ def test_keystock_export_move_removes_stock():
 
     # unauth blocked
     assert requests.post(f"{API}/admin/keystock/{prod['id']}/export-move", timeout=15).status_code == 401
+
+
+def test_send_stock_emails_n_items_and_removes_them():
+    """send-stock emails the FIRST N available lines (oldest first, matching the export
+    panel order) in original format, then removes exactly those from stock."""
+    admin = requests.post(f"{API}/auth/login", json={"username": "voidowner", "password": "VoidGhost!26"}, timeout=15)
+    headers = {"Authorization": f"Bearer {admin.json()['token']}"}
+    prods = requests.get(f"{API}/admin/products", headers=headers, timeout=15).json()
+    prod = next(p for p in prods if "PHANTOM" in p["name"].upper())
+    u = uuid.uuid4().hex[:6]
+    mine = [f"SND2-{u}-1", f"SND2-{u}-2", f"SND2-{u}-3"]
+    r = requests.post(f"{API}/admin/keystock",
+                      json={"product_id": prod["id"], "duration": "month", "keys": "\n".join(mine), "mode": "keys"},
+                      headers=headers, timeout=15)
+    assert r.status_code == 200 and r.json()["added"] == 3, r.text
+
+    before = requests.get(f"{API}/admin/keystock/{prod['id']}/export", headers=headers, timeout=15).json()
+    first_line = before["lines"][0]
+    s = requests.post(f"{API}/admin/keystock/{prod['id']}/send-stock",
+                      json={"count": 1, "email": "delivered@resend.dev"}, headers=headers, timeout=30)
+    assert s.status_code == 200, s.text
+    assert s.json()["sent"] == 1 and s.json()["removed"] == 1
+
+    after = requests.get(f"{API}/admin/keystock/{prod['id']}/export", headers=headers, timeout=15).json()
+    assert after["count"] == before["count"] - 1
+    assert first_line not in after["lines"], "the emailed (oldest) line must be the one removed"
+    # my 3 month-pool lines untouched
+    assert all(any(m == l for l in after["lines"]) for m in mine)
+
+    # guards
+    assert requests.post(f"{API}/admin/keystock/{prod['id']}/send-stock",
+                         json={"count": 1, "email": "delivered@resend.dev"}, timeout=15).status_code == 401
+    assert requests.post(f"{API}/admin/keystock/{prod['id']}/send-stock",
+                         json={"count": 0, "email": "delivered@resend.dev"}, headers=headers, timeout=15).status_code == 400
+
+    # cleanup my month lines
+    rows = requests.get(f"{API}/admin/keystock/{prod['id']}", headers=headers, timeout=15).json()
+    for k in rows:
+        if f"SND2-{u}" in (k.get("key") or ""):
+            requests.delete(f"{API}/admin/keystock/{k['id']}", headers=headers, timeout=10)

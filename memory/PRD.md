@@ -11,6 +11,12 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-14 — Send N stock items to an email (original format, removed from stock)
+- POST /api/admin/keystock/{id}/send-stock {count, email}: emails the FIRST N available lines (oldest-first, matches export panel order) via send_stock_transfer_email (mono pre block, no customer formatting), then deletes exactly those docs. Email failure → 500 and stock NOT removed. Guards: count<1 → 400, no stock → 400, unauth → 401
+- KeyManager export panel: "Send some to an email" row — number input (keys-send-count), email input (keys-send-email), Send (keys-send-button); confirm dialog, panel + counts refresh after
+- Verified: sent 2 of 5, correct FIFO lines removed, originals intact; pytest test_send_stock_emails_n_items_and_removes_them; 41/41 suite
+
+
 ### 2026-09-14 — Export & remove (one-way move to gen)
 - POST /api/admin/keystock/{id}/export-move: returns available stock in original paste format AND deletes those docs (id-scoped delete_many). 401 unauth. Logged with admin username
 - KeyManager export panel: red "Copy & remove from store (move to gen)" button (keys-export-move) — confirm dialog → copies lines to clipboard → moves → reloads counts

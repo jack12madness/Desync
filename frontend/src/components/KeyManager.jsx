@@ -68,6 +68,30 @@ export default function KeyManager({ product, onClose, onChanged }) {
     }
   };
 
+  const [sendCount, setSendCount] = useState(12);
+  const [sendEmail, setSendEmail] = useState("");
+  const [sendingStock, setSendingStock] = useState(false);
+  const sendStock = async () => {
+    const n = Math.max(1, Math.min(parseInt(sendCount) || 0, exportData.length));
+    if (!sendEmail.trim()) {
+      toast.error("Enter an email to send the stock to");
+      return;
+    }
+    if (!window.confirm(`Email ${n} item(s) to ${sendEmail.trim()} in original paste format and REMOVE them from store stock?`)) return;
+    setSendingStock(true);
+    try {
+      const { data } = await api.post(`/admin/keystock/${product.id}/send-stock`, { count: n, email: sendEmail.trim() });
+      toast.success(`${data.sent} item${data.sent === 1 ? "" : "s"} emailed to ${data.email} and removed from stock`);
+      await doExport();
+      load();
+      onChanged && onChanged();
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setSendingStock(false);
+    }
+  };
+
   const load = () =>
     api.get(`/admin/keystock/${product.id}`).then(({ data }) => setKeys(data)).catch(() => setKeys([]));
 
@@ -370,6 +394,38 @@ export default function KeyManager({ product, onClose, onChanged }) {
               >
                 <Trash2 className="w-3.5 h-3.5" /> {moving ? "Moving..." : "Copy & remove from store (move to gen)"}
               </button>
+              <div className="mt-3 pt-3 border-t border-[#1E2D4A]">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500 mb-2">
+                  Send some to an email — original paste format, removed from stock
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={exportData.length}
+                    value={sendCount}
+                    onChange={(e) => setSendCount(e.target.value)}
+                    data-testid="keys-send-count"
+                    className="w-20 h-9 rounded-lg bg-[#0A1628] border border-[#1E2D4A] focus:border-[#2E6BFF] focus:outline-none font-mono text-xs px-3 text-slate-100"
+                  />
+                  <input
+                    type="email"
+                    value={sendEmail}
+                    onChange={(e) => setSendEmail(e.target.value)}
+                    placeholder="send-to@example.com"
+                    data-testid="keys-send-email"
+                    className="flex-1 h-9 rounded-lg bg-[#0A1628] border border-[#1E2D4A] focus:border-[#2E6BFF] focus:outline-none font-mono text-xs px-3 text-slate-100 placeholder:text-slate-600"
+                  />
+                  <button
+                    onClick={sendStock}
+                    disabled={sendingStock || exportData.length === 0}
+                    data-testid="keys-send-button"
+                    className="shrink-0 inline-flex items-center gap-1.5 px-4 h-9 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-xs font-semibold disabled:opacity-40 transition-colors"
+                  >
+                    {sendingStock ? "Sending..." : "Send"}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
           <div className="space-y-2 max-h-[38vh] overflow-y-auto pr-1" data-testid="keys-list">

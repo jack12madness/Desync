@@ -439,3 +439,20 @@ async def send_lookup_code_email(email: str, code: str) -> None:
         subject="Your " + EMAIL_FROM_NAME + " My Orders code",
         html=_shell("My Orders Access", inner),
     )
+
+
+async def send_stock_transfer_email(email: str, product_name: str, lines: list) -> None:
+    block = escape("\n".join(lines))
+    inner = (
+        '<p style="color:#F1F5F9;font-size:15px;margin:0 0 10px">'
+        + str(len(lines)) + ' item(s) for <strong>' + escape(product_name) + '</strong>, in the original paste format.</p>'
+        '<pre style="font-family:Courier,monospace;font-size:12px;color:#8FB8E8;background:#050B18;'
+        'border:1px solid #1E2D4A;border-radius:8px;padding:14px;white-space:pre-wrap;word-break:break-all;margin:12px 0">'
+        + block + '</pre>'
+        '<p style="color:#94A3B8;font-size:12px;margin:0">Sent from the ' + escape(EMAIL_FROM_NAME) + ' admin console.</p>'
+    )
+    await send_email(
+        to=email,
+        subject="Stock transfer — " + product_name + " (" + str(len(lines)) + " items)",
+        html=_shell("Stock Transfer", inner),
+    )

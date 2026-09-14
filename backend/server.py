@@ -22,7 +22,8 @@ import jwt
 import stripe
 
 from email_utils import (send_order_email, send_waitlist_email, send_low_stock_email, send_announce_email,
-                         send_bank_transfer_email, send_bank_expired_email, send_lookup_code_email)
+                         send_bank_transfer_email, send_bank_expired_email, send_lookup_code_email,
+                         send_stock_transfer_email)
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
@@ -1007,6 +1008,39 @@ async def keystock_export_move(product_id: str, admin: dict = Depends(get_admin)
     )
     logger.info("Export-move: %d items removed from product %s by %s", res.deleted_count, product_id, admin.get("username"))
     return {"count": len(lines), "lines": lines, "removed": res.deleted_count}
+
+
+class SendStockIn(BaseModel):
+    count: int
+    email: EmailStr
+
+
+@api_router.post("/admin/keystock/{product_id}/send-stock")
+async def keystock_send_stock(product_id: str, body: SendStockIn, admin: dict = Depends(get_admin)):
+    """Email N available items to an address in original paste format, then remove them from stock."""
+    if body.count < 1:
+        raise HTTPException(400, "Count must be at least 1")
+    docs = await db.keystock.find(
+        {"product_id": product_id, "status": "available"}, {"_id": 0}
+    ).sort("created_at", 1).limit(body.count).to_list(body.count)
+    if not docs:
+        raise HTTPException(400, "No available stock for this product")
+    lines = [(d["id"], l) for d in docs for l in [_export_line(d)] if l]
+    if not lines:
+        raise HTTPException(400, "Nothing exportable in stock")
+    product = await db.products.find_one({"id": product_id}, {"_id": 0, "name": 1})
+    recipient = body.email.lower()
+    try:
+        await send_stock_transfer_email(recipient, (product or {}).get("name", "product"), [l for _, l in lines])
+    except Exception as e:
+        logger.error("Stock transfer email failed for %s: %s", recipient, e)
+        raise HTTPException(500, "Could not send the email — stock was NOT removed, try again in a moment")
+    res = await db.keystock.delete_many(
+        {"product_id": product_id, "status": "available", "id": {"$in": [i for i, _ in lines]}}
+    )
+    logger.info("Send-stock: %d items emailed to %s from product %s by %s",
+                res.deleted_count, recipient, product_id, admin.get("username"))
+    return {"sent": len(lines), "removed": res.deleted_count, "email": recipient}
 
 
 # ---------- admin: settings ----------
