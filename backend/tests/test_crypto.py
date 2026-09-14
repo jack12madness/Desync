@@ -173,3 +173,36 @@ def test_crypto_auto_expiry_sweep():
     # unauth blocked
     no = requests.post(f"{API}/admin/orders/sweep-expired", timeout=15)
     assert no.status_code == 401
+
+
+
+def test_keystock_export_roundtrip():
+    """Export returns stock in the exact original paste format (for the Discord gen)."""
+    admin = requests.post(f"{API}/auth/login", json={"username": "voidowner", "password": "VoidGhost!26"}, timeout=15)
+    headers = {"Authorization": f"Bearer {admin.json()['token']}"}
+    prods = requests.get(f"{API}/admin/products", headers=headers, timeout=15).json()
+    prod = next(p for p in prods if "PHANTOM" in p["name"].upper())
+    u = uuid.uuid4().hex[:6]
+    lines = [
+        f"EX_{u}_a@mail.com:emailpw:dcpass:token{u}",
+        f"E-Mail: EX_{u}_b@mail.com | Steam Password: spw | Steam Username: su{u}",
+        f"totally custom format EX_{u}_c anything",
+    ]
+    r = requests.post(f"{API}/admin/keystock",
+                      json={"product_id": prod["id"], "duration": "week", "keys": "\n".join(lines), "mode": "accounts"},
+                      headers=headers, timeout=20)
+    assert r.status_code == 200 and r.json()["added"] == 3, r.text
+
+    ex = requests.get(f"{API}/admin/keystock/{prod['id']}/export", headers=headers, timeout=15)
+    assert ex.status_code == 200
+    exported = [l for l in ex.json()["lines"] if f"EX_{u}" in l]
+    assert exported == lines, f"round-trip mismatch: {exported}"
+
+    # unauth blocked
+    assert requests.get(f"{API}/admin/keystock/{prod['id']}/export", timeout=15).status_code == 401
+
+    # cleanup
+    rows = requests.get(f"{API}/admin/keystock/{prod['id']}", headers=headers, timeout=15).json()
+    for k in rows:
+        if f"EX_{u}" in (k.get("key") or "") or f"EX_{u}" in str((k.get("account") or {}).get("raw", "")):
+            requests.delete(f"{API}/admin/keystock/{k['id']}", headers=headers, timeout=10)

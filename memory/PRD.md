@@ -11,6 +11,12 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-14 — Stock export in original paste format (for Discord gen)
+- keystock docs now store raw_line (the exact pasted line); GET /api/admin/keystock/{id}/export?status=available returns {count, lines} — byte-identical to what was pasted; older stock without raw_line is reconstructed (discord colon format, steam/rockstar labeled pipes, raw verbatim, plain keys)
+- KeyManager: Export button (keys-export-button) next to filter → review panel (keys-export-panel) with "N available items — original paste format", readonly textarea, Copy all (keys-export-copy) + Download .txt (keys-export-download)
+- Verified: 3 formats (discord colon, labeled pipe, raw weird) round-trip exactly; unauth 401; pytest test_keystock_export_roundtrip; 39/39 suite pass
+
+
 ### 2026-09-13 — Crypto polish: alerts detail, storefront badge, auto-expiry
 - Crypto webhook now records payment_id/pay_currency/actually_paid before fulfillment; Discord "payments" embed shows "Crypto paid: <amt> <COIN>" (paid alerts already fired via shared _fulfill_order path)
 - Home shop header: "Crypto accepted — BTC, USDT & more" pill (crypto-accepted-badge, Bitcoin icon, orange)

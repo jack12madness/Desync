@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Trash2, Plus, KeyRound } from "lucide-react";
+import { Trash2, Plus, KeyRound, Download, Copy, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api, apiError } from "@/lib/api";
@@ -21,6 +21,34 @@ export default function KeyManager({ product, onClose, onChanged }) {
   const [confirm, setConfirm] = useState(null); // {added, skipped, raw, duration}
   const [announce, setAnnounce] = useState(true);
   const [announcing, setAnnouncing] = useState(false);
+  const [exportData, setExportData] = useState(null); // string[] | null
+  const [exporting, setExporting] = useState(false);
+
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      const { data } = await api.get(`/admin/keystock/${product.id}/export`);
+      setExportData(data.lines);
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const copyExport = async () => {
+    await navigator.clipboard.writeText((exportData || []).join("\n"));
+    toast.success(`${exportData.length} line${exportData.length === 1 ? "" : "s"} copied — paste into your gen`);
+  };
+
+  const downloadExport = () => {
+    const blob = new Blob([(exportData || []).join("\n")], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${product.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-stock.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
 
   const load = () =>
     api.get(`/admin/keystock/${product.id}`).then(({ data }) => setKeys(data)).catch(() => setKeys([]));
@@ -269,10 +297,55 @@ export default function KeyManager({ product, onClose, onChanged }) {
               data-testid="keys-filter-input"
               className="flex-1 h-9 rounded-lg bg-[#050B18] border border-[#1E2D4A] focus:border-[#2E6BFF] focus:outline-none font-mono text-xs px-3 text-slate-100 placeholder:text-slate-600"
             />
+            <button
+              onClick={doExport}
+              disabled={exporting}
+              data-testid="keys-export-button"
+              title="Pull available stock out in the original paste format — for your Discord gen"
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 h-9 rounded-lg border border-[#2E6BFF]/40 text-[#8FB8E8] text-xs font-mono font-bold uppercase tracking-widest hover:bg-[#2E6BFF]/10 disabled:opacity-40 transition-all"
+            >
+              <Download className="w-3.5 h-3.5" /> {exporting ? "..." : "Export"}
+            </button>
             <span className="text-[10px] font-mono text-slate-500 shrink-0" data-testid="keys-list-count">
               {filteredKeys.length} total
             </span>
           </div>
+          {exportData !== null && (
+            <div className="mb-3 p-3 rounded-lg bg-[#050B18] border border-[#2E6BFF]/30" data-testid="keys-export-panel">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">
+                  {exportData.length} available item{exportData.length === 1 ? "" : "s"} — original paste format
+                </span>
+                <button onClick={() => setExportData(null)} data-testid="keys-export-close" className="p-1 text-slate-500 hover:text-white transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <textarea
+                readOnly
+                value={exportData.join("\n")}
+                rows={Math.min(10, Math.max(3, exportData.length))}
+                data-testid="keys-export-text"
+                className="w-full rounded-lg bg-[#0A1628] border border-[#1E2D4A] font-mono text-xs p-3 text-[#8FB8E8] focus:outline-none"
+                onFocus={(e) => e.target.select()}
+              />
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={copyExport}
+                  data-testid="keys-export-copy"
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-xs font-semibold transition-colors"
+                >
+                  <Copy className="w-3.5 h-3.5" /> Copy all
+                </button>
+                <button
+                  onClick={downloadExport}
+                  data-testid="keys-export-download"
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-[#1E2D4A] text-xs text-slate-300 hover:border-[#2E6BFF]/50 hover:text-white transition-all"
+                >
+                  <Download className="w-3.5 h-3.5" /> Download .txt
+                </button>
+              </div>
+            </div>
+          )}
           <div className="space-y-2 max-h-[38vh] overflow-y-auto pr-1" data-testid="keys-list">
           {keys === null && <div className="text-sm text-slate-500 py-8 text-center">Loading...</div>}
           {keys !== null && keys.length === 0 && (

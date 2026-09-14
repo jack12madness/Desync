@@ -922,7 +922,7 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
         doc = {
             "id": str(uuid.uuid4()), "product_id": body.product_id, "duration": body.duration,
             "key": key, "status": "available", "assigned_order_id": None, "assigned_at": None,
-            "created_at": now,
+            "raw_line": line, "created_at": now,
         }
         if account:
             doc["account"] = account
@@ -937,6 +937,57 @@ async def keystock_delete(key_id: str, admin: dict = Depends(get_admin)):
     if res.deleted_count == 0:
         raise HTTPException(400, "Key not found or already assigned")
     return {"deleted": True}
+
+
+def _export_line(doc: dict) -> str:
+    """Rebuild the original paste line for a stock item (for the Discord gen)."""
+    if doc.get("raw_line"):
+        return doc["raw_line"]
+    acc = doc.get("account")
+    if not acc:
+        return doc.get("key", "")
+    if acc.get("raw"):
+        return acc["raw"]
+    if acc.get("discord_token"):
+        return ":".join(acc.get(f, "") for f in ("email", "email_password", "discord_password", "discord_token"))
+    if acc.get("steam_username") or acc.get("webmail"):
+        parts = []
+        if acc.get("steam_username"):
+            parts.append(f"Steam Username: {acc['steam_username']}")
+        if acc.get("steam_password"):
+            parts.append(f"Steam Password: {acc['steam_password']}")
+        if acc.get("email"):
+            parts.append(f"E-Mail: {acc['email']}")
+        if acc.get("password"):
+            parts.append(f"Password: {acc['password']}")
+        if acc.get("webmail"):
+            parts.append(f"Webmail: {acc['webmail']}")
+        return " | ".join(parts)
+    if acc.get("twofa_key") or acc.get("twofa_redeem"):
+        parts = []
+        if acc.get("email"):
+            parts.append(f"E-Mail: {acc['email']}")
+        if acc.get("password"):
+            parts.append(f"Rockstar Password: {acc['password']}")
+        if acc.get("twofa_key"):
+            parts.append(f"2FA Key: {acc['twofa_key']}")
+        if acc.get("twofa_redeem"):
+            parts.append(f"2FA Redeem: {acc['twofa_redeem']}")
+        return " | ".join(parts)
+    if acc.get("email"):
+        return f"{acc['email']}:{acc.get('password', '')}"
+    return doc.get("key", "")
+
+
+@api_router.get("/admin/keystock/{product_id}/export")
+async def keystock_export(product_id: str, status: str = "available", admin: dict = Depends(get_admin)):
+    if status not in ("available", "reserved", "assigned"):
+        raise HTTPException(400, "Invalid status")
+    docs = await db.keystock.find(
+        {"product_id": product_id, "status": status}, {"_id": 0}
+    ).sort("created_at", 1).to_list(10000)
+    lines = [l for l in (_export_line(d) for d in docs) if l]
+    return {"count": len(lines), "lines": lines}
 
 
 # ---------- admin: settings ----------
