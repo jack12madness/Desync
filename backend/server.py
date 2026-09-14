@@ -990,6 +990,25 @@ async def keystock_export(product_id: str, status: str = "available", admin: dic
     return {"count": len(lines), "lines": lines}
 
 
+@api_router.post("/admin/keystock/{product_id}/export-move")
+async def keystock_export_move(product_id: str, admin: dict = Depends(get_admin)):
+    """Export available stock in original format AND delete it (one-way transfer to the gen)."""
+    docs = await db.keystock.find(
+        {"product_id": product_id, "status": "available"}, {"_id": 0, "id": 1}
+    ).sort("created_at", 1).to_list(10000)
+    if not docs:
+        return {"count": 0, "lines": [], "removed": 0}
+    full = await db.keystock.find(
+        {"product_id": product_id, "status": "available"}, {"_id": 0}
+    ).sort("created_at", 1).to_list(10000)
+    lines = [l for l in (_export_line(d) for d in full) if l]
+    res = await db.keystock.delete_many(
+        {"product_id": product_id, "status": "available", "id": {"$in": [d["id"] for d in docs]}}
+    )
+    logger.info("Export-move: %d items removed from product %s by %s", res.deleted_count, product_id, admin.get("username"))
+    return {"count": len(lines), "lines": lines, "removed": res.deleted_count}
+
+
 # ---------- admin: settings ----------
 
 class SettingsIn(BaseModel):

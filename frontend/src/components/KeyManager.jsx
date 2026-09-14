@@ -50,6 +50,24 @@ export default function KeyManager({ product, onClose, onChanged }) {
     URL.revokeObjectURL(a.href);
   };
 
+  const [moving, setMoving] = useState(false);
+  const moveToGen = async () => {
+    if (!window.confirm(`Copy ${exportData.length} line(s) and REMOVE them from store stock? This is a one-way move to your gen.`)) return;
+    setMoving(true);
+    try {
+      await navigator.clipboard.writeText((exportData || []).join("\n")).catch(() => {});
+      const { data } = await api.post(`/admin/keystock/${product.id}/export-move`);
+      toast.success(`${data.removed} item${data.removed === 1 ? "" : "s"} copied and removed from store stock`);
+      setExportData(null);
+      load();
+      onChanged && onChanged();
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setMoving(false);
+    }
+  };
+
   const load = () =>
     api.get(`/admin/keystock/${product.id}`).then(({ data }) => setKeys(data)).catch(() => setKeys([]));
 
@@ -344,6 +362,14 @@ export default function KeyManager({ product, onClose, onChanged }) {
                   <Download className="w-3.5 h-3.5" /> Download .txt
                 </button>
               </div>
+              <button
+                onClick={moveToGen}
+                disabled={moving || exportData.length === 0}
+                data-testid="keys-export-move"
+                className="mt-2 w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-rose-500/10 border border-rose-500/40 text-rose-300 text-xs font-semibold hover:bg-rose-500/20 disabled:opacity-40 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> {moving ? "Moving..." : "Copy & remove from store (move to gen)"}
+              </button>
             </div>
           )}
           <div className="space-y-2 max-h-[38vh] overflow-y-auto pr-1" data-testid="keys-list">

@@ -206,3 +206,37 @@ def test_keystock_export_roundtrip():
     for k in rows:
         if f"EX_{u}" in (k.get("key") or "") or f"EX_{u}" in str((k.get("account") or {}).get("raw", "")):
             requests.delete(f"{API}/admin/keystock/{k['id']}", headers=headers, timeout=10)
+
+def test_keystock_export_move_removes_stock():
+    """export-move returns original-format lines AND deletes available stock (one-way to gen)."""
+    admin = requests.post(f"{API}/auth/login", json={"username": "voidowner", "password": "VoidGhost!26"}, timeout=15)
+    headers = {"Authorization": f"Bearer {admin.json()['token']}"}
+    prods = requests.get(f"{API}/admin/products", headers=headers, timeout=15).json()
+    prod = next(p for p in prods if "PHANTOM" in p["name"].upper())
+    u = uuid.uuid4().hex[:6]
+    lines = [f"MOVE-{u}-1", f"MOVE-{u}-2"]
+    r = requests.post(f"{API}/admin/keystock",
+                      json={"product_id": prod["id"], "duration": "day", "keys": "\n".join(lines), "mode": "keys"},
+                      headers=headers, timeout=15)
+    assert r.status_code == 200 and r.json()["added"] == 2, r.text
+
+    m = requests.post(f"{API}/admin/keystock/{prod['id']}/export-move", headers=headers, timeout=15)
+    assert m.status_code == 200, m.text
+    data = m.json()
+    moved_lines = [l for l in data["lines"] if f"MOVE-{u}" in l]
+    assert moved_lines == lines, moved_lines
+    assert data["removed"] >= 2
+
+    # moved lines are gone from stock
+    rows = requests.get(f"{API}/admin/keystock/{prod['id']}", headers=headers, timeout=15).json()
+    assert not any(f"MOVE-{u}" in (k.get("key") or "") for k in rows)
+
+    # restore the pool so other tests keep their stock
+    requests.post(f"{API}/admin/keystock",
+                  json={"product_id": prod["id"], "duration": "day",
+                        "keys": "\n".join(f"TESTKEY-replenish-{uuid.uuid4().hex[:8]}" for _ in range(max(3, data["removed"]))),
+                        "mode": "keys"},
+                  headers=headers, timeout=15)
+
+    # unauth blocked
+    assert requests.post(f"{API}/admin/keystock/{prod['id']}/export-move", timeout=15).status_code == 401

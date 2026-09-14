@@ -11,6 +11,12 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-14 — Export & remove (one-way move to gen)
+- POST /api/admin/keystock/{id}/export-move: returns available stock in original paste format AND deletes those docs (id-scoped delete_many). 401 unauth. Logged with admin username
+- KeyManager export panel: red "Copy & remove from store (move to gen)" button (keys-export-move) — confirm dialog → copies lines to clipboard → moves → reloads counts
+- Verified: 5 available → move returned all 5 lines in format and pool hit 0; pool replenished after tests; pytest test_keystock_export_move_removes_stock; 40/40 suite
+
+
 ### 2026-09-14 — Stock export in original paste format (for Discord gen)
 - keystock docs now store raw_line (the exact pasted line); GET /api/admin/keystock/{id}/export?status=available returns {count, lines} — byte-identical to what was pasted; older stock without raw_line is reconstructed (discord colon format, steam/rockstar labeled pipes, raw verbatim, plain keys)
 - KeyManager: Export button (keys-export-button) next to filter → review panel (keys-export-panel) with "N available items — original paste format", readonly textarea, Copy all (keys-export-copy) + Download .txt (keys-export-download)
