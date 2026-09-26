@@ -20,7 +20,7 @@ import AlertsTab from "@/components/AlertsTab";
 
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
-  features: [], anticheat: "", prices: { day: "", week: "", month: "", lifetime: "" },
+  features: [], anticheat: "", prices: { day: "", "3d": "", week: "", month: "", lifetime: "" },
   min_buy: 1, kind: "cheat", account_type: null, delivery: "stock", ticket_url: "", loader_link: "",
   discord_url: "", instructions: "", system_requirements: "", troubleshooting: [], active: true, sort_order: 0,
 };
@@ -30,7 +30,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
     if (!initial) return EMPTY_PRODUCT;
     return {
       ...initial,
-      prices: { day: "", week: "", month: "", lifetime: "", ...initial.prices },
+      prices: { day: "", "3d": "", week: "", month: "", lifetime: "", ...initial.prices },
       features: (initial.features || []).join(", "),
     };
   });
@@ -210,7 +210,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             )}
           </div>
           )}
-          {["day", "week", "month", "lifetime"].map((d) => (
+          {["day", "3d", "week", "month", "lifetime"].map((d) => (
             <div key={d}>
               <label className={labelCls}>{DURATION_LABELS[d]} Price (AUD) — blank to hide</label>
               <Input type="number" step="0.01" value={form.prices[d]} onChange={(e) => setPrice(d, e.target.value)} data-testid={`product-form-price-${d}`} className={fieldCls} />

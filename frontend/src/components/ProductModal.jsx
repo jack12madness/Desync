@@ -6,7 +6,7 @@ import { useCart, DURATION_LABELS } from "@/context/CartContext";
 import { aud, BASE_URL } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 
-const DURATION_ORDER = ["day", "week", "month", "lifetime"];
+const DURATION_ORDER = ["day", "3d", "week", "month", "lifetime"];
 
 function renderInline(text) {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>

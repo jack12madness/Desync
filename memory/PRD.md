@@ -11,6 +11,17 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-26 — Round 2: form simplification, category drag, sysreq/troubleshooting, wheel-scroll fix, product coupons, live promo banner, 3-day duration
+- Account-type selector removed from product form; keystock parser now auto-detects ALL formats by labels/shape (rockstar by 2FA labels, steam by Steam/Webmail labels, discord colon format, email:password, raw fallback) — account_type ignored
+- Categories drag-to-reorder (CategoriesTab, POST /api/admin/categories/reorder, full-set validation); storefront collections follow
+- Product fields system_requirements (multiline) + troubleshooting [{issue, fix}]; ProductModal collapsible "System Requirements" (checklist) + "Troubleshooting" accordion; hidden when blank
+- SCROLL ROOT CAUSE: Lenis smooth-scroll (App.js) hijacks wheel events — fixed with data-lenis-prevent on ScrollModal outer, ui/dialog DialogContent, ui/sheet SheetContent. New ScrollModal.jsx (custom, no Radix) used by ProductForm, KeyManager (all 3 views), ProductModal
+- Product-specific coupons: CouponIn.product_id (404 if unknown), _price_cart discounts only matching lines, CartDrawer computes discount on scoped lines only, CouponsTab product Select + scope tag
+- Promo chip self-updates from GET /api/coupons/banner (best active store-wide code; null → chip hidden; product codes never shown)
+- New duration "3d" (3 Days) everywhere: DURATIONS, DURATION_LABELS, DURATION_ORDER, KeyManager pools, price form grid
+- Tests: test_round2.py (coupon scoping, banner, category reorder, sysreq roundtrip) — 44 pass, 2 env skips; PHANTOM in PREVIEW has demo 3 Days A$7.99 + demo key TESTKEY-3D-DEMO1 for user to see
+
+
 ### 2026-09-14 — Send N stock items to an email (original format, removed from stock)
 - POST /api/admin/keystock/{id}/send-stock {count, email}: emails the FIRST N available lines (oldest-first, matches export panel order) via send_stock_transfer_email (mono pre block, no customer formatting), then deletes exactly those docs. Email failure → 500 and stock NOT removed. Guards: count<1 → 400, no stock → 400, unauth → 401
 - KeyManager export panel: "Send some to an email" row — number input (keys-send-count), email input (keys-send-email), Send (keys-send-button); confirm dialog, panel + counts refresh after

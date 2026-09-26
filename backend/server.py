@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 DURATIONS = {
     "day": "1 Day",
+    "3d": "3 Days",
     "week": "1 Week",
     "month": "1 Month",
     "lifetime": "Lifetime",

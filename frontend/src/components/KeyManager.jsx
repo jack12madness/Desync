@@ -6,7 +6,7 @@ import { api, apiError } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 import { DURATION_LABELS } from "@/context/CartContext";
 
-const DURATIONS = ["day", "week", "month", "lifetime"];
+const DURATIONS = ["day", "3d", "week", "month", "lifetime"];
 
 export default function KeyManager({ product, onClose, onChanged }) {
   const isAccountProduct = product.kind === "account";

@@ -5,6 +5,7 @@ const CartContext = createContext(null);
 
 export const DURATION_LABELS = {
   day: "1 Day",
+  "3d": "3 Days",
   week: "1 Week",
   month: "1 Month",
   lifetime: "Lifetime",
