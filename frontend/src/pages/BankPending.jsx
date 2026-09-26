@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Landmark, Copy, Clock, CheckCircle2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { api, apiError, eur } from "@/lib/api";
+import { api, apiError, aud } from "@/lib/api";
 import { useCart } from "@/context/CartContext";
 import { toast } from "@/components/ui/sonner";
 
@@ -112,7 +112,7 @@ export default function BankPending() {
                 <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-500 mb-2">
                   Transfer to
                 </div>
-                <CopyRow label="Amount" value={eur(data.total)} testid="bank-amount" />
+                <CopyRow label="Amount" value={aud(data.total)} testid="bank-amount" />
                 <CopyRow label="PayID" value={data.bank?.payid} testid="bank-payid" />
                 <CopyRow label="BSB" value={data.bank?.bank_bsb} testid="bank-bsb" />
                 <CopyRow label="Account number" value={data.bank?.bank_account_number} testid="bank-account-number" />

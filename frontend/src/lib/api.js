@@ -24,4 +24,4 @@ export function apiError(e) {
   return String(d);
 }
 
-export const eur = (n) => `€${Number(n).toFixed(2)}`;
+export const aud = (n) => `A$${Number(n).toFixed(2)}`;

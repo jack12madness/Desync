@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Tag, Pencil, Check, X } from "lucide-react";
+import { Plus, Trash2, Tag, Pencil, Check, X, GripVertical } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { api, apiError } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
@@ -11,6 +11,8 @@ export default function CategoriesTab({ onChanged }) {
   const [imageFile, setImageFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(null); // {id, name, image_url, file}
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
 
   const load = () =>
     api.get("/categories").then(({ data }) => setCategories(data)).catch(() => {});
@@ -18,6 +20,27 @@ export default function CategoriesTab({ onChanged }) {
   useEffect(() => {
     load();
   }, []);
+
+  const handleDrop = async (idx) => {
+    setOverIdx(null);
+    if (dragIdx === null || dragIdx === idx) {
+      setDragIdx(null);
+      return;
+    }
+    const next = [...categories];
+    const [moved] = next.splice(dragIdx, 1);
+    next.splice(idx, 0, moved);
+    setDragIdx(null);
+    setCategories(next);
+    try {
+      await api.post("/admin/categories/reorder", { ids: next.map((c) => c.id) });
+      toast.success("Category order saved");
+      onChanged?.();
+    } catch (e) {
+      toast.error(apiError(e));
+      load();
+    }
+  };
 
   const uploadImage = async (categoryId, file) => {
     const fd = new FormData();
@@ -76,9 +99,12 @@ export default function CategoriesTab({ onChanged }) {
 
   return (
     <div data-testid="categories-tab">
-      <h2 className="font-display text-xl font-bold uppercase tracking-tight mb-6">
+      <h2 className="font-display text-xl font-bold uppercase tracking-tight mb-2">
         {categories.length} Categories
       </h2>
+      <p className="text-xs font-mono text-slate-500 mb-6">
+        Drag categories to order them — the storefront collections follow this order
+      </p>
       <div className="p-5 bg-[#0F1F38] border border-blue-900/40 rounded-lg mb-6">
         <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-slate-500 mb-4">
           Create a category (e.g. FiveM, Accounts) — the photo shows on its shop collection card
@@ -122,12 +148,24 @@ export default function CategoriesTab({ onChanged }) {
             No categories yet
           </div>
         )}
-        {categories.map((c) => (
+        {categories.map((c, i) => (
           <div
             key={c.id}
-            className="flex items-center gap-4 p-3 bg-[#0F1F38] border border-blue-900/40 rounded-lg"
+            draggable={!editing}
+            onDragStart={() => setDragIdx(i)}
+            onDragOver={(e) => { e.preventDefault(); setOverIdx(i); }}
+            onDragLeave={() => setOverIdx((o) => (o === i ? null : o))}
+            onDrop={() => handleDrop(i)}
+            onDragEnd={() => { setDragIdx(null); setOverIdx(null); }}
+            className={`flex items-center gap-4 p-3 bg-[#0F1F38] border rounded-lg transition-colors ${
+              overIdx === i && dragIdx !== null && dragIdx !== i ? "border-blue-400" : "border-blue-900/40"
+            } ${dragIdx === i ? "opacity-50" : ""}`}
             data-testid={`category-row-${c.id}`}
           >
+            <GripVertical
+              className="w-4 h-4 text-slate-600 cursor-grab active:cursor-grabbing shrink-0"
+              data-testid={`category-drag-${c.id}`}
+            />
             {c.image_url ? (
               <img src={c.image_url} alt="" className="w-10 h-10 rounded-md object-cover shrink-0" />
             ) : (

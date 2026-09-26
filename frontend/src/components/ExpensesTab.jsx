@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Receipt } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { api, apiError, eur } from "@/lib/api";
+import { api, apiError, aud } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 
 const CATEGORIES = ["Development", "Ads", "Hosting", "Design", "General"];
@@ -58,7 +58,7 @@ export default function ExpensesTab() {
           {expenses.length} Expenses
         </h2>
         <div className="font-mono text-sm text-slate-400">
-          Total: <span className="text-rose-300 font-bold" data-testid="expenses-total">{eur(total)}</span>
+          Total: <span className="text-rose-300 font-bold" data-testid="expenses-total">{aud(total)}</span>
         </div>
       </div>
 
@@ -68,7 +68,7 @@ export default function ExpensesTab() {
         </div>
         <div className="grid sm:grid-cols-5 gap-3">
           <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label *" data-testid="expense-label-input" className={fieldCls} />
-          <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount € *" type="number" step="0.01" min="0" data-testid="expense-amount-input" className={fieldCls} />
+          <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount (AUD) *" type="number" step="0.01" min="0" data-testid="expense-amount-input" className={fieldCls} />
           <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" list="expense-categories" data-testid="expense-category-input" className={fieldCls} />
           <datalist id="expense-categories">
             {CATEGORIES.map((c) => <option key={c} value={c} />)}
@@ -103,7 +103,7 @@ export default function ExpensesTab() {
               <span className="ml-3 text-[10px] font-mono uppercase tracking-widest text-slate-500">{e.category}</span>
             </div>
             <span className="text-[10px] font-mono text-slate-600">{e.date}</span>
-            <span className="font-mono text-sm font-bold text-rose-300">{eur(e.amount)}</span>
+            <span className="font-mono text-sm font-bold text-rose-300">{aud(e.amount)}</span>
             <button
               onClick={() => remove(e.id)}
               data-testid={`expense-delete-${e.id}`}

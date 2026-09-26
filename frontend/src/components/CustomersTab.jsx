@@ -3,7 +3,7 @@ import { UserPlus, KeyRound, Send } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { api, apiError, eur } from "@/lib/api";
+import { api, apiError, aud } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 import { DURATION_LABELS } from "@/context/CartContext";
 
@@ -109,7 +109,7 @@ export default function CustomersTab() {
               )}
             </div>
             <span className="font-mono text-sm font-bold text-[#8FB8E8]" data-testid={`customer-spent-${c.email}`}>
-              {eur(c.total_spent)}
+              {aud(c.total_spent)}
             </span>
             <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
               {c.orders} order{c.orders === 1 ? "" : "s"}

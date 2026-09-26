@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { CheckCircle2, Loader2, ArrowRight, Mail } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { KeyRow } from "@/pages/OrderLookup";
-import { api, eur } from "@/lib/api";
+import { api, aud } from "@/lib/api";
 import { useCart } from "@/context/CartContext";
 
 export default function PaymentSuccess() {
@@ -84,7 +84,7 @@ export default function PaymentSuccess() {
               <div className="p-6 bg-[#0A1628] border border-[#2E6BFF]/30 rounded-xl shadow-[0_0_60px_rgba(46,107,255,0.1)]" data-testid="license-key-display">
                 <div className="flex items-center justify-between mb-5 text-sm text-slate-400">
                   <span>Order {state.order.id.slice(0, 8).toUpperCase()}</span>
-                  <span className="text-white font-mono font-semibold">{eur(state.order.total)}</span>
+                  <span className="text-white font-mono font-semibold">{aud(state.order.total)}</span>
                 </div>
                 <div className="space-y-3">
                   {state.order.items.map((item) => (

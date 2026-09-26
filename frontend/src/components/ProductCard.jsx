@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import StatusPill from "@/components/StatusPill";
-import { eur } from "@/lib/api";
+import { aud } from "@/lib/api";
 
 export default function ProductCard({ product, index, onSelect }) {
   const prices = Object.values(product.prices || {});
@@ -57,7 +57,7 @@ export default function ProductCard({ product, index, onSelect }) {
           <div className="mt-3 flex items-end justify-between">
             <div>
               <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500">From</span>
-              <span className="ml-2 font-mono text-lg font-bold text-[#7FB0FF]">{eur(minPrice)}</span>
+              <span className="ml-2 font-mono text-lg font-bold text-[#7FB0FF]">{aud(minPrice)}</span>
             </div>
             <button
               data-testid={`product-buy-button-${product.id}`}

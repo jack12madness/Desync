@@ -372,7 +372,7 @@ async def send_bank_transfer_email(order: dict, bank: dict, reference: str, expi
         + bank_row("BSB", bank.get("bank_bsb"))
         + bank_row("Account number", bank.get("bank_account_number"))
         + bank_row("Account name", bank.get("bank_account_name"))
-        + bank_row("Amount", "EUR %.2f" % order.get("total", 0))
+        + bank_row("Amount", "AUD %.2f" % order.get("total", 0))
         + '</table>'
     )
     link_html = ""

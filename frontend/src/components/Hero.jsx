@@ -10,9 +10,11 @@ export default function Hero() {
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const imgY = useTransform(scrollYProgress, [0, 1], ["0%", "12%"]);
   const [categories, setCategories] = useState([]);
+  const [promo, setPromo] = useState(null); // {code, percent} or null — hidden when no store-wide code is active
 
   useEffect(() => {
     api.get("/categories").then(({ data }) => setCategories(data)).catch(() => {});
+    api.get("/coupons/banner").then(({ data }) => setPromo(data?.code ? data : null)).catch(() => {});
   }, []);
 
   const stats = [
@@ -151,17 +153,21 @@ export default function Hero() {
         </div>
       </div>
 
-      {/* 5% off chip */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.5, duration: 0.6 }}
-        className="absolute bottom-6 left-4 sm:left-8 z-20 flex items-center gap-2 px-3 py-2 rounded-md bg-[#0A1628]/85 border border-[#1E2D4A] backdrop-blur-md"
-        data-testid="hero-discount-chip"
-      >
-        <Percent className="w-3.5 h-3.5 text-[#8FB8E8]" />
-        <span className="text-xs font-mono text-slate-300">10% off site-wide — code DESYNC10</span>
-      </motion.div>
+      {/* live promo chip — shows the active store-wide code, hides when none */}
+      {promo && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.5, duration: 0.6 }}
+          className="absolute bottom-6 left-4 sm:left-8 z-20 flex items-center gap-2 px-3 py-2 rounded-md bg-[#0A1628]/85 border border-[#1E2D4A] backdrop-blur-md"
+          data-testid="hero-discount-chip"
+        >
+          <Percent className="w-3.5 h-3.5 text-[#8FB8E8]" />
+          <span className="text-xs font-mono text-slate-300">
+            {Math.round(promo.percent)}% off site-wide — code {promo.code}
+          </span>
+        </motion.div>
+      )}
     </section>
   );
 }

@@ -8,7 +8,7 @@ import ProductCard from "@/components/ProductCard";
 import ProductModal from "@/components/ProductModal";
 import Faq from "@/components/Faq";
 import Footer from "@/components/Footer";
-import { api, eur } from "@/lib/api";
+import { api, aud } from "@/lib/api";
 
 const FALLBACK_IMG = "/images/og-banner.png";
 
@@ -42,7 +42,7 @@ function CollectionCard({ category, index, onSelect }) {
           </h3>
           {category.min_price != null && (
             <div className="font-mono text-sm text-[#8FB8E8]" data-testid={`collection-price-${category.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
-              {eur(category.min_price)}{category.max_price !== category.min_price ? ` – ${eur(category.max_price)}` : ""}
+              {aud(category.min_price)}{category.max_price !== category.min_price ? ` – ${aud(category.max_price)}` : ""}
             </div>
           )}
         </div>

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trash2, LogOut, Mail } from "lucide-react";
+import { Trash2, LogOut, Mail, Plus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import ScrollModal from "@/components/ScrollModal";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { api, apiError, eur } from "@/lib/api";
+import { api, apiError, aud } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 import { DURATION_LABELS } from "@/context/CartContext";
 import KeyManager from "@/components/KeyManager";
@@ -21,8 +21,8 @@ import AlertsTab from "@/components/AlertsTab";
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
   features: [], anticheat: "", prices: { day: "", week: "", month: "", lifetime: "" },
-  min_buy: 1, kind: "cheat", account_type: "discord", delivery: "stock", ticket_url: "", loader_link: "",
-  discord_url: "", instructions: "", active: true, sort_order: 0,
+  min_buy: 1, kind: "cheat", account_type: null, delivery: "stock", ticket_url: "", loader_link: "",
+  discord_url: "", instructions: "", system_requirements: "", troubleshooting: [], active: true, sort_order: 0,
 };
 
 function ProductForm({ initial, categories, onSave, onClose }) {
@@ -55,10 +55,14 @@ function ProductForm({ initial, categories, onSave, onClose }) {
       loader_link: form.loader_link?.trim() || null,
       discord_url: form.discord_url?.trim() || null,
       instructions: form.instructions?.trim() || null,
+      system_requirements: form.system_requirements?.trim() || null,
+      troubleshooting: (Array.isArray(form.troubleshooting) ? form.troubleshooting : [])
+        .map((t) => ({ issue: (t.issue || "").trim(), fix: (t.fix || "").trim() }))
+        .filter((t) => t.issue && t.fix),
       features: typeof form.features === "string"
         ? form.features.split(",").map((s) => s.trim()).filter(Boolean)
         : form.features,
-      prices, min_buy: Math.max(1, parseInt(form.min_buy) || 1), account_type: form.kind === "account" ? (form.account_type || "discord") : null, delivery: form.delivery || "stock", ticket_url: form.delivery === "ticket" ? (form.ticket_url?.trim() || null) : null, active: form.active, sort_order: Number(form.sort_order) || 0,
+      prices, min_buy: Math.max(1, parseInt(form.min_buy) || 1), account_type: null, delivery: form.delivery || "stock", ticket_url: form.delivery === "ticket" ? (form.ticket_url?.trim() || null) : null, active: form.active, sort_order: Number(form.sort_order) || 0,
     }, loaderFile, removeLoader, imageFile);
   };
 
@@ -66,14 +70,11 @@ function ProductForm({ initial, categories, onSave, onClose }) {
   const labelCls = "text-[10px] font-mono uppercase tracking-[0.25em] text-slate-500 block mb-1.5";
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl bg-[#0A1628] border-blue-500/20 text-slate-100 max-h-[90vh] overflow-y-auto" data-testid="product-form-modal">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl font-bold uppercase tracking-tight">
-            {initial?.id ? "Edit Product" : form.kind === "account" ? "New Discord Account" : "New Cheat"}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="grid sm:grid-cols-2 gap-4 mt-2">
+    <ScrollModal onClose={onClose} testid="product-form-modal" className="max-w-2xl">
+      <h2 className="font-display text-xl font-bold uppercase tracking-tight mb-4">
+        {initial?.id ? "Edit Product" : form.kind === "account" ? "New Discord Account" : "New Cheat"}
+      </h2>
+      <div className="grid sm:grid-cols-2 gap-4 mt-2">
           <div>
             <label className={labelCls}>Category</label>
             <Select value={form.game} onValueChange={(v) => set("game", v)}>
@@ -134,21 +135,6 @@ function ProductForm({ initial, categories, onSave, onClose }) {
               Uploaded files are stored on Desync storage — Discord links expire after a few days
             </div>
           </div>
-          {form.kind === "account" && (
-            <div>
-              <label className={labelCls}>Account type</label>
-              <Select value={form.account_type || "discord"} onValueChange={(v) => set("account_type", v)}>
-                <SelectTrigger data-testid="product-form-account-type" className={fieldCls}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
-                  <SelectItem value="discord">Discord (email:email pass:discord pass:token)</SelectItem>
-                  <SelectItem value="steam">Steam (username | password | email | email pass | webmail)</SelectItem>
-                  <SelectItem value="rockstar">Rockstar (email | password | 2FA key | redeem link)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
           {form.kind !== "account" && (
             <>
               <div>
@@ -226,7 +212,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
           )}
           {["day", "week", "month", "lifetime"].map((d) => (
             <div key={d}>
-              <label className={labelCls}>{DURATION_LABELS[d]} Price (€) — blank to hide</label>
+              <label className={labelCls}>{DURATION_LABELS[d]} Price (AUD) — blank to hide</label>
               <Input type="number" step="0.01" value={form.prices[d]} onChange={(e) => setPrice(d, e.target.value)} data-testid={`product-form-price-${d}`} className={fieldCls} />
             </div>
           ))}
@@ -271,6 +257,62 @@ function ProductForm({ initial, categories, onSave, onClose }) {
               Delivered after payment — in the delivery email, on the success page and in My Orders
             </div>
           </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>System requirements (optional)</label>
+            <Textarea
+              value={form.system_requirements || ""}
+              onChange={(e) => set("system_requirements", e.target.value)}
+              placeholder={"Windows 10/11 (64-bit)\n8 GB RAM\nAdministrator access\nAntivirus disabled for the loader"}
+              rows={4}
+              data-testid="product-form-system-requirements"
+              className={`${fieldCls} resize-y`}
+            />
+            <div className="text-[10px] font-mono text-slate-500 mt-1.5">
+              One requirement per line — buyers see it as a collapsible section in the product popup. Hidden when blank
+            </div>
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Troubleshooting (optional) — issue + fix pairs</label>
+            <div className="space-y-2" data-testid="troubleshooting-editor">
+              {(Array.isArray(form.troubleshooting) ? form.troubleshooting : []).map((t, i) => (
+                <div key={i} className="flex gap-2 items-start" data-testid={`trouble-row-${i}`}>
+                  <Input
+                    value={t.issue}
+                    onChange={(e) => set("troubleshooting", form.troubleshooting.map((x, j) => (j === i ? { ...x, issue: e.target.value } : x)))}
+                    placeholder="Issue — e.g. Loader won't open"
+                    data-testid={`trouble-issue-${i}`}
+                    className={fieldCls}
+                  />
+                  <Input
+                    value={t.fix}
+                    onChange={(e) => set("troubleshooting", form.troubleshooting.map((x, j) => (j === i ? { ...x, fix: e.target.value } : x)))}
+                    placeholder="Fix — e.g. Disable antivirus and run as admin"
+                    data-testid={`trouble-fix-${i}`}
+                    className={fieldCls}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => set("troubleshooting", form.troubleshooting.filter((_, j) => j !== i))}
+                    data-testid={`trouble-remove-${i}`}
+                    className="p-2 border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 rounded transition-colors shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => set("troubleshooting", [...(Array.isArray(form.troubleshooting) ? form.troubleshooting : []), { issue: "", fix: "" }])}
+                data-testid="trouble-add"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#1E2D4A] text-xs font-mono uppercase tracking-widest text-slate-300 hover:border-blue-400/50 hover:text-white transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add entry
+              </button>
+            </div>
+            <div className="text-[10px] font-mono text-slate-500 mt-1.5">
+              Buyers see these as an expandable Troubleshooting accordion in the product popup. Hidden when empty
+            </div>
+          </div>
           <div className="flex items-end pb-1">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -291,8 +333,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
         >
           Save Product
         </button>
-      </DialogContent>
-    </Dialog>
+    </ScrollModal>
   );
 }
 
@@ -586,7 +627,7 @@ export default function AdminDashboard() {
                     {o.discord_username && (
                       <span className="text-xs font-mono text-violet-300" data-testid={`order-discord-${o.id}`}>discord: {o.discord_username}</span>
                     )}
-                    <span className="font-mono text-sm font-bold text-slate-100">{eur(o.total)}</span>
+                    <span className="font-mono text-sm font-bold text-slate-100">{aud(o.total)}</span>
                     <span className={`text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 border rounded-lg ${
                       o.payment_status === "paid" ? "text-emerald-400 border-emerald-400/40"
                       : o.payment_status === "cancelled" ? "text-rose-400 border-rose-400/40"

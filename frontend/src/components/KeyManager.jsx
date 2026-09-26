@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Trash2, Plus, KeyRound, Download, Copy, X } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import ScrollModal from "@/components/ScrollModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api, apiError } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
@@ -158,34 +158,27 @@ export default function KeyManager({ product, onClose, onChanged }) {
 
   if (isTicket) {
     return (
-      <Dialog open onOpenChange={(o) => !o && onClose()}>
-        <DialogContent className="max-w-2xl bg-[#0A1628] border-[#1E2D4A] text-slate-100 rounded-xl" data-testid="key-manager-modal">
-          <DialogHeader>
-            <DialogTitle className="font-display text-xl font-bold tracking-tight text-white flex items-center gap-2">
-              <KeyRound className="w-5 h-5 text-[#5B8CFF]" /> Key Stock — {product.name}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="p-5 rounded-lg bg-[#050B18] border border-[#2E6BFF]/30 text-sm text-slate-400 leading-relaxed" data-testid="ticket-mode-note">
-            This product uses <span className="text-white font-semibold">Discord ticket delivery</span> — infinite
-            stock, never sold out. After paying, buyers are sent to{" "}
-            <span className="font-mono text-[#8FB8E8]">{product.ticket_url || "https://discord.gg/de-sync"}</span>{" "}
-            to open a ticket. Nothing to manage here.
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ScrollModal onClose={onClose} testid="key-manager-modal" className="max-w-2xl">
+        <h2 className="font-display text-xl font-bold tracking-tight text-white flex items-center gap-2 mb-4">
+          <KeyRound className="w-5 h-5 text-[#5B8CFF]" /> Key Stock — {product.name}
+        </h2>
+        <div className="p-5 rounded-lg bg-[#050B18] border border-[#2E6BFF]/30 text-sm text-slate-400 leading-relaxed" data-testid="ticket-mode-note">
+          This product uses <span className="text-white font-semibold">Discord ticket delivery</span> — infinite
+          stock, never sold out. After paying, buyers are sent to{" "}
+          <span className="font-mono text-[#8FB8E8]">{product.discord_url || product.ticket_url || "https://discord.gg/de-sync"}</span>{" "}
+          to open a ticket. Nothing to manage here.
+        </div>
+      </ScrollModal>
     );
   }
 
   if (confirm) {
     const noun = confirm.mode === "accounts" ? "account" : "key";
     return (
-      <Dialog open onOpenChange={(o) => !o && setConfirm(null)}>
-        <DialogContent className="max-w-md bg-[#0A1628] border-[#1E2D4A] text-slate-100 rounded-xl" data-testid="restock-confirm-modal">
-          <DialogHeader>
-            <DialogTitle className="font-display text-xl font-bold tracking-tight text-white flex items-center gap-2">
-              <KeyRound className="w-5 h-5 text-emerald-400" /> Restock complete
-            </DialogTitle>
-          </DialogHeader>
+      <ScrollModal onClose={() => setConfirm(null)} testid="restock-confirm-modal" className="max-w-md">
+        <h2 className="font-display text-xl font-bold tracking-tight text-white flex items-center gap-2 mb-4">
+          <KeyRound className="w-5 h-5 text-emerald-400" /> Restock complete
+        </h2>
           <div className="p-4 rounded-lg bg-[#050B18] border border-[#1E2D4A] space-y-2" data-testid="restock-confirm-summary">
             <div className="text-sm text-slate-300">
               <span className="text-emerald-300 font-mono font-bold">{confirm.added}</span>{" "}
@@ -230,19 +223,15 @@ export default function KeyManager({ product, onClose, onChanged }) {
               Add more
             </button>
           </div>
-        </DialogContent>
-      </Dialog>
+      </ScrollModal>
     );
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl bg-[#0A1628] border-[#1E2D4A] text-slate-100 max-h-[85vh] overflow-y-auto rounded-xl" data-testid="key-manager-modal">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <KeyRound className="w-5 h-5 text-[#5B8CFF]" /> Key Stock — {product.name}
-          </DialogTitle>
-        </DialogHeader>
+    <ScrollModal onClose={onClose} testid="key-manager-modal" className="max-w-2xl">
+        <h2 className="font-display text-xl font-bold tracking-tight text-white flex items-center gap-2 mb-4">
+          <KeyRound className="w-5 h-5 text-[#5B8CFF]" /> Key Stock — {product.name}
+        </h2>
 
         <div className="flex flex-wrap items-center gap-2 mt-1" data-testid="keys-count">
           {productDurations.map((d) => (
@@ -283,15 +272,11 @@ export default function KeyManager({ product, onClose, onChanged }) {
           <label className="text-sm text-slate-300 block mb-2">
             {mode === "keys"
               ? "Add keys — one per line, into a duration pool"
-              : product.account_type === "rockstar"
-                ? "Add Rockstar accounts — one per line: E-Mail: x | Rockstar Password: y | 2FA Key: z | 2FA Redeem: url"
-                : product.account_type === "steam"
-                ? "Add Steam accounts — one per line: Steam Username: x | Steam Password: y | E-Mail: z | Password: w | Webmail: url"
-                : "Add Discord accounts — one per line as email:email password:discord password:discord token"}
+              : "Add accounts — one per line, any format is auto-detected"}
           </label>
           {mode === "accounts" && (
             <div className="text-[10px] font-mono text-slate-500 -mt-1.5 mb-2">
-              Any format works — lines we don't recognise are delivered exactly as pasted
+              Discord (email:email pass:discord pass:token), labeled pipes (Steam / Rockstar) and email:password all auto-detect — anything else is stored and delivered exactly as pasted
             </div>
           )}
           <div className="flex gap-3 mb-3">
@@ -312,11 +297,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
             rows={4}
             placeholder={mode === "keys"
               ? "XXXX-XXXX-XXXX-XXXX\nYYYY-YYYY-YYYY-YYYY"
-              : product.account_type === "rockstar"
-                ? "E-Mail: buyer@mail.com | Rockstar Password: pass123 | 2FA Key: ABCDEF123 | 2FA Redeem: https://totp.danhersam.com/"
-                : product.account_type === "steam"
-                ? "Steam Username: ertau410256 | Steam Password: pass123 | E-Mail: acc@mail.com | Password: mailpass | Webmail: https://webmail.example.com"
-                : "buyer@mail.com:emailpass123:discordpass456:MTIzNDU2.token.xyz\nnext@mail.com:pass2:dpass2:OTk4.token.abc"}
+              : "buyer@mail.com:emailpass123:discordpass456:MTIzNDU2.token.xyz\nE-Mail: acc@mail.com | Steam Password: pass | Steam Username: user123\nE-Mail: acc2@mail.com | Rockstar Password: pass | 2FA Key: ABCDEF | 2FA Redeem: https://..."}
             data-testid="keys-input"
             className="w-full rounded-lg bg-[#050B18] border border-[#1E2D4A] focus:border-[#2E6BFF] focus:outline-none font-mono text-sm p-3 text-slate-100 placeholder:text-slate-600"
           />
@@ -488,7 +469,6 @@ export default function KeyManager({ product, onClose, onChanged }) {
             </button>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+    </ScrollModal>
   );
 }

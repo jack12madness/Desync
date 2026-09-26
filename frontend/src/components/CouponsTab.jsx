@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api, apiError } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 
 export default function CouponsTab() {
   const [coupons, setCoupons] = useState(null);
-  const [form, setForm] = useState({ code: "", percent: "", max_uses: "" });
+  const [products, setProducts] = useState([]);
+  const [form, setForm] = useState({ code: "", percent: "", max_uses: "", product_id: "" });
   const [saving, setSaving] = useState(false);
 
   const load = () => api.get("/admin/coupons").then(({ data }) => setCoupons(data)).catch(() => setCoupons([]));
 
   useEffect(() => {
     load();
+    api.get("/admin/products").then(({ data }) => setProducts(data)).catch(() => {});
   }, []);
 
   const create = async () => {
@@ -26,9 +29,10 @@ export default function CouponsTab() {
         code: form.code,
         percent: parseFloat(form.percent),
         max_uses: form.max_uses ? parseInt(form.max_uses, 10) : null,
+        product_id: form.product_id || null,
       });
       toast.success(`Code ${form.code.toUpperCase()} created`);
-      setForm({ code: "", percent: "", max_uses: "" });
+      setForm({ code: "", percent: "", max_uses: "", product_id: "" });
       load();
     } catch (e) {
       toast.error(apiError(e));
@@ -66,8 +70,8 @@ export default function CouponsTab() {
           <Tag className="w-4 h-4 text-[#5B8CFF]" />
           <div className="text-sm font-semibold text-white">Create a discount code</div>
         </div>
-        <p className="text-xs text-slate-500 mb-4">Percent off the whole cart — for launch promos and Discord giveaways</p>
-        <div className="grid sm:grid-cols-4 gap-3">
+        <p className="text-xs text-slate-500 mb-4">Percent off — store-wide, or tied to one product. Product codes discount only that product's line in the cart</p>
+        <div className="grid sm:grid-cols-5 gap-3">
           <Input
             value={form.code}
             onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
@@ -94,6 +98,20 @@ export default function CouponsTab() {
             data-testid="coupon-max-uses-input"
             className={fieldCls}
           />
+          <Select
+            value={form.product_id || "all"}
+            onValueChange={(v) => setForm((f) => ({ ...f, product_id: v === "all" ? "" : v }))}
+          >
+            <SelectTrigger data-testid="coupon-product-select" className={fieldCls}>
+              <SelectValue placeholder="Whole store" />
+            </SelectTrigger>
+            <SelectContent className="bg-[#0A1628] border-[#1E2D4A] text-slate-100">
+              <SelectItem value="all">Whole store</SelectItem>
+              {products.map((p) => (
+                <SelectItem key={p.id} value={p.id} data-testid={`coupon-product-${p.id}`}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <button
             onClick={create}
             disabled={saving}
@@ -120,6 +138,15 @@ export default function CouponsTab() {
               {c.code}
             </code>
             <span className="text-sm text-[#8FB8E8] font-semibold">{c.percent}% off</span>
+            {c.product_id ? (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-violet-400/10 border border-violet-400/40 text-violet-300" data-testid={`coupon-scope-${c.code}`}>
+                {products.find((p) => p.id === c.product_id)?.name || "One product"} only
+              </span>
+            ) : (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#2E6BFF]/10 border border-[#2E6BFF]/30 text-[#8FB8E8]" data-testid={`coupon-scope-${c.code}`}>
+                Store-wide
+              </span>
+            )}
             <span className="text-xs text-slate-500">
               {c.used_count} used{c.max_uses ? ` / ${c.max_uses} max` : " · unlimited"}
             </span>

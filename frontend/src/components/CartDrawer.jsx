@@ -5,7 +5,7 @@ import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { useCart, DURATION_LABELS } from "@/context/CartContext";
-import { api, apiError, eur } from "@/lib/api";
+import { api, apiError, aud } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 
 const PAYPAL_CLIENT_ID = process.env.REACT_APP_PAYPAL_CLIENT_ID;
@@ -22,7 +22,11 @@ export default function CartDrawer() {
   const [checking, setChecking] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const discount = coupon ? (total * coupon.percent) / 100 : 0;
+  // product-tied codes discount only that product's lines; store-wide codes discount everything
+  const discountable = coupon?.product_id
+    ? items.reduce((s, i) => (i.product.id === coupon.product_id ? s + i.price * (i.qty || 1) : s), 0)
+    : total;
+  const discount = coupon ? (discountable * coupon.percent) / 100 : 0;
   const payable = Math.max(0, total - discount);
 
   const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
@@ -39,7 +43,12 @@ export default function CartDrawer() {
     try {
       const { data } = await api.post("/coupons/validate", { code: couponInput.trim() });
       setCoupon(data);
-      toast.success(`${data.code} applied — ${data.percent}% off`);
+      const targeted = data.product_id && !items.some((i) => i.product.id === data.product_id);
+      toast.success(
+        targeted
+          ? `${data.code} applied — it discounts its product once it's in your cart`
+          : `${data.code} applied — ${data.percent}% off`
+      );
     } catch (e) {
       toast.error(apiError(e));
     } finally {
@@ -184,7 +193,7 @@ export default function CartDrawer() {
                   </button>
                 </div>
               </div>
-              <div className="font-mono text-sm font-bold text-[#8FB8E8]">{eur(item.price * (item.qty || 1))}</div>
+              <div className="font-mono text-sm font-bold text-[#8FB8E8]">{aud(item.price * (item.qty || 1))}</div>
               <button
                 onClick={() => removeItem(idx)}
                 data-testid={`cart-remove-${item.product.id}`}
@@ -233,17 +242,17 @@ export default function CartDrawer() {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-400">Subtotal</span>
-              <span className="font-mono text-sm text-slate-300" data-testid="cart-subtotal">{eur(total)}</span>
+              <span className="font-mono text-sm text-slate-300" data-testid="cart-subtotal">{aud(total)}</span>
             </div>
             {coupon && (
               <div className="flex items-center justify-between" data-testid="cart-discount-line">
                 <span className="text-sm text-emerald-300">Discount ({coupon.code})</span>
-                <span className="font-mono text-sm text-emerald-300">-{eur(discount)}</span>
+                <span className="font-mono text-sm text-emerald-300">-{aud(discount)}</span>
               </div>
             )}
             <div className="flex items-center justify-between pt-1.5 border-t border-[#1E2D4A]">
               <span className="text-sm font-semibold text-white">Total</span>
-              <span className="font-mono text-xl font-bold text-white" data-testid="cart-total">{eur(payable)}</span>
+              <span className="font-mono text-xl font-bold text-white" data-testid="cart-total">{aud(payable)}</span>
             </div>
           </div>
 
@@ -342,7 +351,7 @@ export default function CartDrawer() {
                 <span>or</span>
                 <div className="flex-1 h-px bg-[#1E2D4A]" />
               </div>
-              <PayPalScriptProvider options={{ clientId: PAYPAL_CLIENT_ID, currency: "EUR" }}>
+              <PayPalScriptProvider options={{ clientId: PAYPAL_CLIENT_ID, currency: "AUD" }}>
                 <div data-testid="paypal-buttons" className="min-h-[45px]">
                   <PayPalButtons
                     style={{ layout: "vertical", color: "gold", shape: "rect", label: "paypal", height: 45 }}

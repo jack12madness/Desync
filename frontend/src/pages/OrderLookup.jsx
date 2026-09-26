@@ -4,7 +4,7 @@ import { Search, Copy, KeyRound, Download } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Input } from "@/components/ui/input";
-import { api, apiError, eur, BASE_URL } from "@/lib/api";
+import { api, apiError, aud, BASE_URL } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 
 function CredentialRow({ label, value, testid }) {
@@ -355,7 +355,7 @@ export default function OrderLookup() {
                       Order {o.id.slice(0, 8).toUpperCase()}
                     </div>
                     <div className="text-sm text-slate-500">
-                      {new Date(o.created_at).toLocaleDateString()} · <span className="text-white font-mono font-semibold">{eur(o.total)}</span>
+                      {new Date(o.created_at).toLocaleDateString()} · <span className="text-white font-mono font-semibold">{aud(o.total)}</span>
                     </div>
                   </div>
                   <div className="space-y-2">

@@ -174,6 +174,8 @@ class ProductIn(BaseModel):
     loader_link: Optional[str] = None  # external download URL instead of an uploaded file
     discord_url: Optional[str] = None  # per-product Discord link, delivered to buyers after purchase
     instructions: Optional[str] = None  # install/setup notes shown after payment (email, success, My Orders)
+    system_requirements: Optional[str] = None  # one requirement per line, collapsible in the product modal
+    troubleshooting: Optional[List[dict]] = None  # [{"issue": "...", "fix": "..."}] accordion in the product modal
     active: bool = True
     sort_order: int = 0
 
@@ -461,6 +463,21 @@ async def admin_delete_category(category_id: str, admin: dict = Depends(get_admi
         raise HTTPException(400, f"Category is used by {in_use} product(s) — reassign them first")
     await db.categories.delete_one({"id": category_id})
     return {"deleted": True}
+
+
+class CategoryReorderIn(BaseModel):
+    ids: List[str]
+
+
+@api_router.post("/admin/categories/reorder")
+async def admin_reorder_categories(body: CategoryReorderIn, admin: dict = Depends(get_admin)):
+    cats = await db.categories.find({}, {"_id": 0, "id": 1}).to_list(200)
+    existing = {c["id"] for c in cats}
+    if len(body.ids) != len(existing) or set(body.ids) != existing:
+        raise HTTPException(400, "List must include every category exactly once")
+    for i, cid in enumerate(body.ids):
+        await db.categories.update_one({"id": cid}, {"$set": {"sort_order": i + 1}})
+    return {"reordered": len(body.ids)}
 
 
 @api_router.get("/status")
@@ -759,7 +776,7 @@ async def share_product(product_id: str):
     if not img.startswith("http"):
         img = f"{SITE_URL}{img}"
     prices = [v for v in (product.get("prices") or {}).values() if v is not None]
-    price_txt = f"from €{min(prices):.2f}" if prices else ""
+    price_txt = f"from A${min(prices):.2f}" if prices else ""
     title = f"{product['name']} — Desync"
     desc = product.get("description") or "Undetected software. Instant key delivery."
     if price_txt:
@@ -846,7 +863,7 @@ async def keystock_list(product_id: str, admin: dict = Depends(get_admin)):
 
 @api_router.post("/admin/keystock")
 async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
-    product = await db.products.find_one({"id": body.product_id}, {"_id": 0, "id": 1, "account_type": 1})
+    product = await db.products.find_one({"id": body.product_id}, {"_id": 0, "id": 1})
     if not product:
         raise HTTPException(404, "Product not found")
     if body.duration not in DURATIONS:
@@ -855,7 +872,6 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
     lines = [k for k in lines if k]
     if not lines:
         raise HTTPException(400, "No keys provided")
-    account_type = product.get("account_type") or "discord"
     email_re = re.compile(r"^[\w.+-]+@[\w-]+\.[\w.-]+$")
     seen = set()
     added, skipped, raw_count = 0, 0, 0
@@ -871,39 +887,38 @@ async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
                     if ":" in seg:
                         k, v = seg.split(":", 1)
                         fields[k.strip().lower()] = v.strip()
-            if account_type == "rockstar":
+            if fields:
+                # labeled pipe format — auto-detect by which labels are present
                 email = fields.get("e-mail") or fields.get("email")
-                password = fields.get("rockstar password") or fields.get("password")
-                if email and password:
-                    account = {"email": email, "password": password}
-                    if fields.get("2fa key"):
-                        account["twofa_key"] = fields["2fa key"]
-                    if fields.get("2fa redeem"):
-                        account["twofa_redeem"] = fields["2fa redeem"]
-                elif not fields and len(parts) >= 2 and email_re.match(parts[0]) and parts[-1]:
-                    account = {"email": parts[0], "password": ":".join(parts[1:])}
-            elif account_type == "steam":
-                email = fields.get("e-mail") or fields.get("email")
-                mail_pass = fields.get("password")
-                if email and mail_pass:
-                    account = {"email": email, "password": mail_pass}
-                    if fields.get("steam username"):
-                        account["steam_username"] = fields["steam username"]
-                    if fields.get("steam password"):
-                        account["steam_password"] = fields["steam password"]
-                    if fields.get("webmail"):
-                        account["webmail"] = fields["webmail"]
-                elif not fields and len(parts) >= 2 and email_re.match(parts[0]) and parts[-1]:
-                    account = {"email": parts[0], "password": ":".join(parts[1:])}
-            else:
-                # discord: email:email password:discord password:discord token
-                if len(parts) >= 4 and email_re.match(parts[0]) and parts[1] and parts[-1] and ":".join(parts[2:-1]):
-                    account = {
-                        "email": parts[0],
-                        "email_password": parts[1],
-                        "discord_password": ":".join(parts[2:-1]),
-                        "discord_token": parts[-1],
-                    }
+                if fields.get("2fa key") or fields.get("2fa redeem") or fields.get("rockstar password"):
+                    password = fields.get("rockstar password") or fields.get("password")
+                    if email and password:
+                        account = {"email": email, "password": password}
+                        if fields.get("2fa key"):
+                            account["twofa_key"] = fields["2fa key"]
+                        if fields.get("2fa redeem"):
+                            account["twofa_redeem"] = fields["2fa redeem"]
+                else:
+                    mail_pass = fields.get("password")
+                    if email and mail_pass:
+                        account = {"email": email, "password": mail_pass}
+                        if fields.get("steam username"):
+                            account["steam_username"] = fields["steam username"]
+                        if fields.get("steam password"):
+                            account["steam_password"] = fields["steam password"]
+                        if fields.get("webmail"):
+                            account["webmail"] = fields["webmail"]
+            elif len(parts) >= 4 and email_re.match(parts[0]) and parts[1] and parts[-1] and ":".join(parts[2:-1]):
+                # discord colon format: email:email password:discord password:discord token
+                account = {
+                    "email": parts[0],
+                    "email_password": parts[1],
+                    "discord_password": ":".join(parts[2:-1]),
+                    "discord_token": parts[-1],
+                }
+            elif len(parts) >= 2 and email_re.match(parts[0]) and parts[-1]:
+                # plain email:password
+                account = {"email": parts[0], "password": ":".join(parts[1:])}
             if account is None:
                 # universal fallback — store the line exactly as pasted, deliver verbatim
                 m = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", line)
@@ -1133,7 +1148,7 @@ async def admin_restock_announce(product_id: str, body: RestockAnnounceIn, admin
             continue
         label = DURATIONS[d] + (f" · +{body.added} new" if d == body.duration and body.added else "")
         fields.append({"name": "Variant", "value": label, "inline": True})
-        fields.append({"name": "Price", "value": f"€{float(price):.2f}", "inline": True})
+        fields.append({"name": "Price", "value": f"A${float(price):.2f}", "inline": True})
         fields.append({"name": "Stock", "value": str(pstock.get(d, 0)), "inline": True})
     buy_link = f"{SITE_URL}/product/{product_id}" if SITE_URL else ""
     desc = f"Our product **{product['name']}** has just been restocked!"
@@ -1305,7 +1320,7 @@ def _order_fields(order: dict) -> list:
     )
     fields = [
         {"name": "Order", "value": f"`{order['id'][:8].upper()}`", "inline": True},
-        {"name": "Total", "value": f"€{order.get('total', 0):.2f}", "inline": True},
+        {"name": "Total", "value": f"A${order.get('total', 0):.2f}", "inline": True},
         {"name": "Items", "value": items_txt or "—", "inline": False},
         {"name": "Email", "value": order.get("email", "—"), "inline": False},
     ]
@@ -1370,7 +1385,7 @@ async def bank_transfer_checkout(body: CheckoutIn):
         "discord_username": (body.discord_username or "").strip() or None,
         "subtotal": subtotal_cents / 100.0, "total": total,
         "discount": round((subtotal_cents - total_cents) / 100.0, 2),
-        "currency": "eur", "provider": "bank_transfer",
+        "currency": "aud", "provider": "bank_transfer",
         "payment_session_id": f"bank-{order_id}", "reference": reference,
         "coupon_code": coupon_code,
         "status": "awaiting_payment", "payment_status": "awaiting_payment",
@@ -1640,7 +1655,7 @@ async def admin_send_key(body: SendKeyIn, admin: dict = Depends(get_admin)):
     order = {
         "id": order_id, "email": body.email.lower(),
         "items": [item],
-        "subtotal": 0.0, "total": 0.0, "discount": 0.0, "currency": "eur",
+        "subtotal": 0.0, "total": 0.0, "discount": 0.0, "currency": "aud",
         "provider": "manual", "payment_session_id": f"manual-{order_id}",
         "coupon_code": None, "status": "completed", "payment_status": "paid",
         "download_token": secrets.token_urlsafe(24),
@@ -1706,6 +1721,7 @@ class CouponIn(BaseModel):
     percent: float
     max_uses: Optional[int] = None
     active: bool = True
+    product_id: Optional[str] = None  # tie the code to one product; None = store-wide
 
 
 class CouponValidateIn(BaseModel):
@@ -1726,7 +1742,21 @@ async def validate_coupon(body: CouponValidateIn):
     c = await _find_valid_coupon(body.code)
     if not c:
         raise HTTPException(404, "Invalid or expired code")
-    return {"code": c["code"], "percent": c["percent"]}
+    return {"code": c["code"], "percent": c["percent"], "product_id": c.get("product_id")}
+
+
+@api_router.get("/coupons/banner")
+async def coupon_banner():
+    """Best active store-wide coupon for the promo chip — null when none is active."""
+    coupons = await db.coupons.find(
+        {"active": True, "$or": [{"product_id": None}, {"product_id": {"$exists": False}}]},
+        {"_id": 0, "code": 1, "percent": 1, "max_uses": 1, "used_count": 1},
+    ).to_list(100)
+    valid = [c for c in coupons if c.get("max_uses") is None or c.get("used_count", 0) < c["max_uses"]]
+    if not valid:
+        return {"code": None, "percent": None}
+    best = max(valid, key=lambda c: float(c["percent"]))
+    return {"code": best["code"], "percent": best["percent"]}
 
 
 @api_router.get("/admin/coupons")
@@ -1743,9 +1773,13 @@ async def admin_create_coupon(body: CouponIn, admin: dict = Depends(get_admin)):
         raise HTTPException(400, "Percent must be between 1 and 100")
     if await db.coupons.find_one({"code": code}):
         raise HTTPException(409, "That code already exists")
+    if body.product_id:
+        if not await db.products.find_one({"id": body.product_id}, {"_id": 0, "id": 1}):
+            raise HTTPException(404, "Product not found")
     doc = {
         "id": str(uuid.uuid4()), "code": code, "percent": float(body.percent),
         "max_uses": body.max_uses, "active": body.active, "used_count": 0,
+        "product_id": body.product_id or None,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.coupons.insert_one(doc)
@@ -1906,12 +1940,14 @@ async def fulfill_order(session_id: str) -> Optional[dict]:
 async def _price_cart(items: List[CartItemIn], coupon: Optional[str]):
     discount_pct = 0.0
     coupon_code = None
+    coupon_product_id = None
     if coupon:
         c = await _find_valid_coupon(coupon)
         if not c:
             raise HTTPException(400, "Invalid or expired coupon code")
         discount_pct = float(c["percent"])
         coupon_code = c["code"]
+        coupon_product_id = c.get("product_id")
     order_items = []
     total_cents = 0
     subtotal_cents = 0
@@ -1936,7 +1972,8 @@ async def _price_cart(items: List[CartItemIn], coupon: Optional[str]):
                 raise HTTPException(400, f"{product['name']} ({DURATIONS[item.duration]}) is sold out")
             if in_stock < qty:
                 raise HTTPException(400, f"Only {in_stock} left of {product['name']} ({DURATIONS[item.duration]})")
-        unit_cents = int(round(float(price) * 100 * (1 - discount_pct / 100)))
+        applies = not coupon_product_id or product["id"] == coupon_product_id
+        unit_cents = int(round(float(price) * 100 * (1 - (discount_pct if applies else 0) / 100)))
         subtotal_cents += int(round(float(price) * 100)) * qty
         total_cents += unit_cents * qty
         order_items.append({
@@ -1958,7 +1995,7 @@ async def create_checkout(body: CheckoutIn):
     line_items = [
         {
             "price_data": {
-                "currency": "eur",
+                "currency": "aud",
                 "unit_amount": int(round(it["unit_price"] * 100)),
                 "product_data": {"name": f"{it['name']} — {it['duration_label']}", "tax_code": "txcd_10000000"},
             },
@@ -2000,7 +2037,7 @@ async def create_checkout(body: CheckoutIn):
     new_order = {
         "id": order_id, "session_id": session.id, "email": email,
         "discord_username": (body.discord_username or "").strip() or None,
-        "items": order_items, "total": total_cents / 100.0, "currency": "eur",
+        "items": order_items, "total": total_cents / 100.0, "currency": "aud",
         "subtotal": subtotal_cents / 100.0, "discount_percent": discount_pct,
         "coupon_code": coupon_code,
         "status": "initiated", "payment_status": "pending",
@@ -2118,7 +2155,7 @@ async def paypal_create(body: PayPalCreateIn):
             "reference_id": order_id,
             "custom_id": order_id,
             "description": "Desync — game keys",
-            "amount": {"currency_code": "EUR", "value": f"{total_cents / 100:.2f}"},
+            "amount": {"currency_code": "AUD", "value": f"{total_cents / 100:.2f}"},
         }],
     }
     async with httpx.AsyncClient(timeout=30) as client:
@@ -2136,7 +2173,7 @@ async def paypal_create(body: PayPalCreateIn):
         "id": order_id, "session_id": None, "paypal_order_id": pp["id"],
         "payment_provider": "paypal", "email": email,
         "discord_username": (body.discord_username or "").strip() or None,
-        "items": order_items, "total": total_cents / 100.0, "currency": "eur",
+        "items": order_items, "total": total_cents / 100.0, "currency": "aud",
         "subtotal": subtotal_cents / 100.0, "discount_percent": discount_pct,
         "coupon_code": coupon_code,
         "status": "initiated", "payment_status": "pending",
@@ -2190,7 +2227,7 @@ async def crypto_checkout(body: CheckoutIn):
     order = {
         "id": order_id, "session_id": None, "email": email,
         "discord_username": (body.discord_username or "").strip() or None,
-        "items": order_items, "total": total_cents / 100.0, "currency": "eur",
+        "items": order_items, "total": total_cents / 100.0, "currency": "aud",
         "subtotal": subtotal_cents / 100.0, "discount_percent": discount_pct,
         "coupon_code": coupon_code,
         "provider": "crypto", "status": "initiated", "payment_status": "pending",
@@ -2199,7 +2236,7 @@ async def crypto_checkout(body: CheckoutIn):
     }
     payload = {
         "price_amount": round(total_cents / 100.0, 2),
-        "price_currency": "eur",
+        "price_currency": "aud",
         "order_id": order_id,
         "order_description": f"Desync order {order_id[:8].upper()}",
         "ipn_callback_url": f"{SITE_URL}/api/payments/crypto/webhook",

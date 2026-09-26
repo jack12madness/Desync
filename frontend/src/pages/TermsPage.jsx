@@ -88,7 +88,7 @@ const SECTIONS = [
   {
     title: "5. Payments",
     paragraphs: [
-      "Prices are displayed in EUR (€) unless otherwise stated. You authorise Desync and its payment providers to charge the displayed amount and any clearly disclosed taxes or fees.",
+      "Prices are displayed in AUD (A$) unless otherwise stated. You authorise Desync and its payment providers to charge the displayed amount and any clearly disclosed taxes or fees.",
       "You must only use a payment method you are legally authorised to use.",
       "Fraudulent payments, stolen payment methods and deliberately false payment information may result in immediate termination of access.",
     ],

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Euro, ShoppingBag, KeyRound, Users, Receipt, TrendingUp } from "lucide-react";
-import { api, eur } from "@/lib/api";
+import { DollarSign, ShoppingBag, KeyRound, Users, Receipt, TrendingUp } from "lucide-react";
+import { api, aud } from "@/lib/api";
 
 export default function SalesStats() {
   const [stats, setStats] = useState(null);
@@ -14,9 +14,9 @@ export default function SalesStats() {
   if (!stats) return null;
 
   const cards = [
-    { icon: Euro, label: "Revenue", value: eur(stats.total_revenue), testid: "stat-revenue" },
-    { icon: Receipt, label: "Expenses", value: eur(stats.total_expenses ?? 0), testid: "stat-expenses" },
-    { icon: TrendingUp, label: "Profit", value: eur(stats.profit ?? stats.total_revenue), testid: "stat-profit" },
+    { icon: DollarSign, label: "Revenue", value: aud(stats.total_revenue), testid: "stat-revenue" },
+    { icon: Receipt, label: "Expenses", value: aud(stats.total_expenses ?? 0), testid: "stat-expenses" },
+    { icon: TrendingUp, label: "Profit", value: aud(stats.profit ?? stats.total_revenue), testid: "stat-profit" },
     { icon: ShoppingBag, label: "Paid Orders", value: stats.total_orders, testid: "stat-orders" },
     { icon: KeyRound, label: "Keys Sold", value: stats.keys_sold, testid: "stat-keys" },
     { icon: Users, label: "Customers", value: stats.customers ?? 0, testid: "stat-customers" },
@@ -55,7 +55,7 @@ export default function SalesStats() {
                   />
                 </div>
                 <div className="text-xs text-slate-500 w-16 text-right">{p.sold} sold</div>
-                <div className="font-mono text-sm text-[#8FB8E8] w-20 text-right">{eur(p.revenue)}</div>
+                <div className="font-mono text-sm text-[#8FB8E8] w-20 text-right">{aud(p.revenue)}</div>
               </div>
             ))}
           </div>
