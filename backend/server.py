@@ -2400,10 +2400,17 @@ async def _entitlement_state(email: str) -> dict:
     )
     has_standard = any(float(o.get("total") or 0) > 10 for o in paid)
     cust = await db.customers.find_one({"email": email}, {"_id": 0})
-    gen_access = has_generator or bool(cust and cust.get("gen_access_manual"))
-    limits = {t: (GENERATOR_LIMIT if gen_access else STANDARD_LIMIT if has_standard else 0) for t in GEN_TYPES}
+    manual = bool(cust and cust.get("gen_access_manual"))
+    key_redeemed = bool(cust and cust.get("gen_key_redeemed"))
+    tier3 = has_generator or manual                       # full rate
+    gen_access = tier3 or key_redeemed                    # key redemption = lifetime, standard rate
+    limits = {
+        t: (GENERATOR_LIMIT if tier3 else STANDARD_LIMIT if (key_redeemed or has_standard) else 0)
+        for t in GEN_TYPES
+    }
     return {
         "customer": cust, "has_generator": has_generator, "has_standard": has_standard,
+        "key_redeemed": key_redeemed, "tier3": tier3,
         "gen_access": gen_access, "entitled": gen_access or has_standard, "limits": limits,
     }
 
@@ -2504,6 +2511,8 @@ async def portal_me(request: Request):
         "orders": orders,
         "generator": {
             "access": bool(cust.get("gen_access")),
+            "tier3": state["tier3"],
+            "key_redeemed": state["key_redeemed"],
             "key": cust.get("gen_key"),
             "key_active": bool(cust.get("gen_key_active")),
             "entitled": state["entitled"],
@@ -2629,6 +2638,53 @@ async def gen_validate(body: GenValidateIn):
     }
 
 
+async def _perform_generation(email: str, key: str, gtype: str, rid: str) -> dict:
+    """Core generation: rolling-hour allowance check, stock consumption, usage record."""
+    usage = await _gen_usage_counts(email)
+    state = await _entitlement_state(email)
+    limit = state["limits"][gtype]
+    if usage["counts"][gtype] >= limit:
+        await db.gen_usage.insert_one({
+            "id": str(uuid.uuid4()), "email": email, "key": key, "type": gtype,
+            "request_id": rid, "success": False, "reason": "rate_limited",
+            "ts": datetime.now(timezone.utc),
+        })
+        reset = usage["resets"].get(gtype)
+        raise HTTPException(429, f"Hourly {gtype} allowance used up" + (f" — resets at {reset}" if reset else ""))
+    settings = await _get_settings_doc()
+    pools = settings.get("gen_pools") or {}
+    pool_pid = pools.get(gtype)
+    if not pool_pid:
+        p = await db.products.find_one(
+            {"kind": "account", "name": {"$regex": gtype, "$options": "i"}}, {"_id": 0, "id": 1})
+        pool_pid = p["id"] if p else None
+    if not pool_pid:
+        raise HTTPException(503, f"No stock pool configured for {gtype}")
+    key_doc = await db.keystock.find_one_and_update(
+        {"product_id": pool_pid, "status": "available"},
+        {"$set": {"status": "assigned", "assigned_order_id": f"gen-{email}",
+                  "assigned_at": datetime.now(timezone.utc).isoformat()}},
+        sort=[("created_at", 1)],
+    )
+    if not key_doc:
+        await db.gen_usage.insert_one({
+            "id": str(uuid.uuid4()), "email": email, "key": key, "type": gtype,
+            "request_id": rid, "success": False, "reason": "out_of_stock",
+            "ts": datetime.now(timezone.utc),
+        })
+        raise HTTPException(409, f"{gtype} accounts are out of stock right now")
+    await db.gen_usage.insert_one({
+        "id": str(uuid.uuid4()), "email": email, "key": key, "type": gtype,
+        "request_id": rid, "success": True, "ts": datetime.now(timezone.utc),
+    })
+    return {
+        "ok": True, "type": gtype,
+        "raw": _export_line(key_doc),
+        "account": key_doc.get("account") or {"key": key_doc["key"]},
+        "remaining": limit - usage["counts"][gtype] - 1,
+    }
+
+
 @api_router.post("/gen/generate")
 async def gen_generate(body: GenGenerateIn):
     if body.type not in GEN_TYPES:
@@ -2640,48 +2696,102 @@ async def gen_generate(body: GenGenerateIn):
         raise HTTPException(400, "request_id required")
     if await db.gen_usage.find_one({"key": body.key.strip(), "request_id": rid}):
         raise HTTPException(409, "Duplicate request_id — replay rejected")
-    usage = await _gen_usage_counts(email)
-    limit = ctx["state"]["limits"][body.type]
-    if usage["counts"][body.type] >= limit:
-        await db.gen_usage.insert_one({
-            "id": str(uuid.uuid4()), "email": email, "key": body.key.strip(), "type": body.type,
-            "request_id": rid, "success": False, "reason": "rate_limited",
-            "ts": datetime.now(timezone.utc),
+    return await _perform_generation(email, body.key.strip(), body.type, rid)
+
+
+# ---------- portal: redeem a generator key + generate on the website ----------
+
+class PortalRedeemIn(BaseModel):
+    code: str
+
+
+class PortalGenIn(BaseModel):
+    type: str
+
+
+@api_router.post("/portal/gen/redeem")
+async def portal_redeem_key(body: PortalRedeemIn, request: Request):
+    email = _buyer_email(request)
+    code = body.code.strip().upper()
+    if not code:
+        raise HTTPException(400, "Enter a key")
+    gen_pid = await _generator_product_id()
+    if not gen_pid:
+        raise HTTPException(503, "Generator product not configured")
+    doc = await db.keystock.find_one({"key": code, "product_id": gen_pid})
+    if not doc:
+        raise HTTPException(404, "Invalid Generator key")
+    cust = await _ensure_customer(email)
+    if cust.get("gen_key_redeemed") == code:
+        return {"ok": True, "already": True}
+    if doc.get("status") == "available":
+        res = await db.keystock.update_one(
+            {"id": doc["id"], "status": "available"},
+            {"$set": {"status": "assigned", "assigned_order_id": f"redeem-{email}",
+                      "assigned_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        if res.modified_count == 0:
+            raise HTTPException(409, "That key was just claimed by someone else")
+    else:
+        owned = await db.orders.find_one(
+            {"email": email, "payment_status": "paid", "items.deliverables.license_key": code},
+            {"_id": 0, "id": 1},
+        )
+        if not owned:
+            raise HTTPException(403, "That key belongs to a different order")
+    key = await _ensure_gen_key(email)
+    await db.customers.update_one({"email": email}, {"$set": {
+        "gen_access": True, "gen_access_source": "key", "gen_key_redeemed": code,
+        "gen_key": key, "gen_key_active": True,
+        "updated_at": datetime.now(timezone.utc).isoformat()}})
+    logger.info("Generator key redeemed by %s", email)
+    return {"ok": True}
+
+
+@api_router.post("/portal/gen/generate")
+async def portal_generate(body: PortalGenIn, request: Request):
+    email = _buyer_email(request)
+    if body.type not in GEN_TYPES:
+        raise HTTPException(400, f"Unknown type — use one of: {', '.join(GEN_TYPES)}")
+    cust = await db.customers.find_one({"email": email})
+    if not cust or not cust.get("gen_key"):
+        raise HTTPException(403, "No Generator key — redeem one or buy the Generator first")
+    await _gen_check_key(cust["gen_key"])
+    return await _perform_generation(email, cust["gen_key"], body.type, f"portal-{uuid.uuid4().hex[:12]}")
+
+
+# ---------- admin: generate DSYNC keys straight into Generator stock ----------
+
+class GenKeysIn(BaseModel):
+    count: int
+    duration: str
+
+
+@api_router.post("/admin/products/{product_id}/generate-keys")
+async def admin_generate_keys(product_id: str, body: GenKeysIn, admin: dict = Depends(get_admin)):
+    gen_pid = await _generator_product_id()
+    if product_id != gen_pid:
+        raise HTTPException(400, "Key generation is only for the Generator product")
+    product = await db.products.find_one({"id": product_id}, {"_id": 0, "prices": 1})
+    if body.duration not in (product.get("prices") or {}):
+        raise HTTPException(400, "Duration not priced on this product")
+    count = max(1, min(body.count, 100))
+    now = datetime.now(timezone.utc).isoformat()
+    docs = []
+    keys = []
+    for _ in range(count):
+        k = _gen_key()
+        while await db.keystock.find_one({"product_id": product_id, "key": k}):
+            k = _gen_key()
+        keys.append(k)
+        docs.append({
+            "id": str(uuid.uuid4()), "product_id": product_id, "duration": body.duration,
+            "key": k, "status": "available", "assigned_order_id": None, "assigned_at": None,
+            "raw_line": k, "created_at": now,
         })
-        reset = usage["resets"].get(body.type)
-        raise HTTPException(429, f"Hourly {body.type} allowance used up" + (f" — resets at {reset}" if reset else ""))
-    settings = await _get_settings_doc()
-    pools = settings.get("gen_pools") or {}
-    pool_pid = pools.get(body.type)
-    if not pool_pid:
-        p = await db.products.find_one(
-            {"kind": "account", "name": {"$regex": body.type, "$options": "i"}}, {"_id": 0, "id": 1})
-        pool_pid = p["id"] if p else None
-    if not pool_pid:
-        raise HTTPException(503, f"No stock pool configured for {body.type}")
-    key_doc = await db.keystock.find_one_and_update(
-        {"product_id": pool_pid, "status": "available"},
-        {"$set": {"status": "assigned", "assigned_order_id": f"gen-{email}",
-                  "assigned_at": datetime.now(timezone.utc).isoformat()}},
-        sort=[("created_at", 1)],
-    )
-    if not key_doc:
-        await db.gen_usage.insert_one({
-            "id": str(uuid.uuid4()), "email": email, "key": body.key.strip(), "type": body.type,
-            "request_id": rid, "success": False, "reason": "out_of_stock",
-            "ts": datetime.now(timezone.utc),
-        })
-        raise HTTPException(409, f"{body.type} accounts are out of stock right now")
-    await db.gen_usage.insert_one({
-        "id": str(uuid.uuid4()), "email": email, "key": body.key.strip(), "type": body.type,
-        "request_id": rid, "success": True, "ts": datetime.now(timezone.utc),
-    })
-    return {
-        "ok": True, "type": body.type,
-        "raw": _export_line(key_doc),
-        "account": key_doc.get("account") or {"key": key_doc["key"]},
-        "remaining": limit - usage["counts"][body.type] - 1,
-    }
+    await db.keystock.insert_many(docs)
+    await _audit(admin, "generator:keys_generated", "-", f"{count} keys into {body.duration} pool")
+    return {"created": count, "keys": keys}
 
 
 # ---------- admin: customer & generator management ----------

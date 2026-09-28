@@ -11,6 +11,15 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-28 — Generator keys: staff generation, portal redemption, on-site generation
+- POST /admin/products/{id}/generate-keys {count, duration} — generator product only, creates DSYNC-XXXX-XXXX-XXXX into a price pool (KeyManager "Generator keys" card with count + pool picker)
+- Generator product flipped ticket → stock delivery so purchases deliver a DSYNC key automatically
+- POST /portal/gen/redeem {code}: available key → claimed; order-owned key → re-activatable; grants lifetime access at STANDARD rate (1/type/hr), source "key" (survives refunds — lifetime per user). tier3 (3/hr) = purchase or manual admin grant
+- POST /portal/gen/generate {type}: generate accounts on the website (shared _perform_generation core with the app API); result panel with raw line + copy
+- _entitlement_state: tier3 = purchase|manual; key_redeemed or >A$10 = 1/hr; portal payload exposes tier3/key_redeemed
+- Verified E2E: generate→redeem→limits 1/1/1→portal generate→429 cap→idempotent re-redeem; UI screenshots of staff card + portal tab; 54 tests pass (2 env skips). Preview has generated test DSYNC keys in the day pool
+
+
 ### 2026-09-28 — OTP "expired" bug: out-of-order email fix
 - Report: portal code says expired right after entering. Verified live API flow works (request → doc found → wrong code = "Incorrect code"). Likely cause: relay delays delivering an older email after a newer code was requested (verify only checked the NEWEST doc) or mixed deploy window
 - Fix: verify now accepts ANY unexpired unused code for the email (up to 5 recent docs), error copy says "make sure it's from the newest email", warning logs added on no-doc failures for diagnosis

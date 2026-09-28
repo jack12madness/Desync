@@ -189,6 +189,40 @@ export default function CustomerPortal() {
   const [reviewFor, setReviewFor] = useState(null); // order
   const [review, setReview] = useState({ rating: 5, text: "", name: "", product_id: "" });
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [redeemCode, setRedeemCode] = useState("");
+  const [redeeming, setRedeeming] = useState(false);
+  const [genBusy, setGenBusy] = useState(null); // type currently generating
+  const [genResult, setGenResult] = useState(null); // {type, raw}
+
+  const redeemKey = async () => {
+    if (!redeemCode.trim()) return;
+    setRedeeming(true);
+    try {
+      await api.post("/portal/gen/redeem", { code: redeemCode.trim() }, { headers: { Authorization: `Bearer ${token}` } });
+      toast.success("Generator activated — lifetime access, 1 of each type per hour");
+      setRedeemCode("");
+      await loadPortal(token);
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setRedeeming(false);
+    }
+  };
+
+  const generateNow = async (type) => {
+    setGenBusy(type);
+    setGenResult(null);
+    try {
+      const { data: r } = await api.post("/portal/gen/generate", { type }, { headers: { Authorization: `Bearer ${token}` } });
+      setGenResult({ type, raw: r.raw });
+      toast.success(`${type[0].toUpperCase() + type.slice(1)} account generated`);
+      await loadPortal(token);
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setGenBusy(null);
+    }
+  };
 
   const loadPortal = async (tok) => {
     const { data: d } = await api.get("/portal/me", { headers: { Authorization: `Bearer ${tok}` } });
@@ -383,10 +417,10 @@ export default function CustomerPortal() {
                     <div className="p-5 bg-[#0A1628] border border-[#1E2D4A] rounded-xl">
                       <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500 mb-1">Generator</div>
                       <div className={`text-sm font-semibold ${gen.access || gen.entitled ? "text-emerald-300" : "text-slate-500"}`} data-testid="portal-gen-status">
-                        {gen.access ? "Active — full access" : gen.entitled ? "Standard allowance" : "Not active"}
+                        {gen.access && gen.tier3 ? "Active — full access" : gen.access ? "Active — lifetime key" : gen.entitled ? "Standard allowance" : "Not active"}
                       </div>
                       <div className="text-xs text-slate-500 mt-1">
-                        {gen.entitled ? `${gen.limits.steam} of each type / hour` : "Unlocks with the Generator or any order over A$10"}
+                        {gen.entitled ? `${gen.limits.steam} of each type / hour` : "Unlocks with a Generator key or any order over A$10"}
                       </div>
                     </div>
                   </div>
@@ -449,12 +483,36 @@ export default function CustomerPortal() {
                 </TabsContent>
 
                 <TabsContent value="generator" data-testid="portal-generator">
+                  {!gen.access && (
+                    <div className="p-5 bg-[#0A1628] border border-violet-400/30 rounded-xl mb-4" data-testid="gen-redeem-card">
+                      <div className="text-sm font-semibold text-white mb-1">Have a Generator key?</div>
+                      <div className="text-xs text-slate-500 mb-3">Redeem a DSYNC key for lifetime Generator access — 1 of each type per hour.</div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={redeemCode}
+                          onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => e.key === "Enter" && redeemKey()}
+                          placeholder="DSYNC-XXXX-XXXX-XXXX"
+                          data-testid="gen-redeem-input"
+                          className="bg-[#050B18] border-[#1E2D4A] font-mono text-sm h-11"
+                        />
+                        <button
+                          onClick={redeemKey}
+                          disabled={redeeming || !redeemCode.trim()}
+                          data-testid="gen-redeem-button"
+                          className="shrink-0 inline-flex items-center gap-2 px-5 rounded-lg bg-violet-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-violet-300 disabled:opacity-40 transition-all"
+                        >
+                          {redeeming ? "..." : "Redeem"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {!gen.entitled ? (
                     <div className="p-6 bg-[#0A1628] border border-[#1E2D4A] rounded-xl text-center" data-testid="gen-locked">
                       <Zap className="w-8 h-8 text-slate-600 mx-auto mb-3" />
                       <div className="text-sm text-slate-300 font-semibold mb-1">Generator not active</div>
                       <div className="text-xs text-slate-500 max-w-md mx-auto">
-                        Get the FiveM Account Generator for full access (3 of each type per hour), or place any order over A$10 for the standard allowance (1 of each per hour).
+                        Get the FiveM Account Generator for full access (3 of each type per hour), redeem a key above for lifetime standard access, or place any order over A$10 for the standard allowance (1 of each per hour).
                       </div>
                     </div>
                   ) : (
@@ -475,21 +533,41 @@ export default function CustomerPortal() {
                         ) : (
                           <div className="text-xs text-slate-500">Key is issued automatically — refresh in a moment</div>
                         )}
-                        <div className="text-[11px] text-slate-500 mt-2">Paste this into the Generator app — never share it</div>
+                        <div className="text-[11px] text-slate-500 mt-2">Paste this into the Generator app, or generate right here — never share it</div>
                       </div>
+                      {genResult && (
+                        <div className="p-5 bg-[#050B18] border border-emerald-400/40 rounded-xl" data-testid="gen-result">
+                          <div className="text-[10px] font-mono uppercase tracking-widest text-emerald-300 mb-2">
+                            Fresh {genResult.type} account — just generated for you
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <code className="font-mono text-xs text-[#8FB8E8] whitespace-pre-wrap break-all flex-1" data-testid="gen-result-raw">{genResult.raw}</code>
+                            <CopyButton text={genResult.raw} />
+                          </div>
+                        </div>
+                      )}
                       <div className="grid sm:grid-cols-3 gap-4">
                         {Object.entries(GEN_LABELS).map(([t, label]) => {
                           const limit = gen.limits[t] || 0;
                           const used = gen.used[t] || 0;
+                          const left = Math.max(0, limit - used);
                           return (
                             <div key={t} className="p-5 bg-[#0A1628] border border-[#1E2D4A] rounded-xl" data-testid={`gen-allowance-${t}`}>
                               <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">{label}</div>
                               <div className="text-2xl font-display font-bold text-white mt-1">
-                                {Math.max(0, limit - used)} <span className="text-sm text-slate-500 font-normal">/ {limit} remaining</span>
+                                {left} <span className="text-sm text-slate-500 font-normal">/ {limit} remaining</span>
                               </div>
                               <div className="text-[11px] text-slate-500 mt-1">
                                 {used > 0 && gen.resets[t] ? <>Next refill in <Countdown iso={gen.resets[t]} /></> : "Rolling hourly allowance"}
                               </div>
+                              <button
+                                onClick={() => generateNow(t)}
+                                disabled={genBusy !== null || left === 0}
+                                data-testid={`gen-generate-${t}`}
+                                className="mt-3 w-full px-3 py-2 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-xs font-semibold disabled:opacity-40 transition-all duration-200 active:scale-95"
+                              >
+                                {genBusy === t ? "Generating..." : "Generate now"}
+                              </button>
                             </div>
                           );
                         })}

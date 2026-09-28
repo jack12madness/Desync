@@ -71,6 +71,29 @@ export default function KeyManager({ product, onClose, onChanged }) {
   const [sendCount, setSendCount] = useState(12);
   const [sendEmail, setSendEmail] = useState("");
   const [sendingStock, setSendingStock] = useState(false);
+  const isGeneratorProduct = /generator/i.test(product.name || "");
+  const [genCount, setGenCount] = useState(5);
+  const [genDuration, setGenDuration] = useState("");
+  const [generating, setGenerating] = useState(false);
+
+  const generateKeys = async () => {
+    const dur = genDuration || productDurations[0];
+    if (!dur) {
+      toast.error("This product has no priced durations to stock into");
+      return;
+    }
+    setGenerating(true);
+    try {
+      const { data } = await api.post(`/admin/products/${product.id}/generate-keys`, { count: genCount, duration: dur });
+      toast.success(`${data.created} DSYNC keys generated into the ${DURATION_LABELS[dur]} pool`);
+      load();
+      onChanged && onChanged();
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setGenerating(false);
+    }
+  };
   const sendStock = async () => {
     const n = Math.max(1, Math.min(parseInt(sendCount) || 0, exportData.length));
     if (!sendEmail.trim()) {
@@ -310,6 +333,46 @@ export default function KeyManager({ product, onClose, onChanged }) {
             <Plus className="w-4 h-4" /> {adding ? "Adding..." : `Add to ${DURATION_LABELS[duration]} pool`}
           </button>
         </div>
+
+        {isGeneratorProduct && (
+          <div className="mt-4 p-4 rounded-lg bg-violet-400/5 border border-violet-400/30" data-testid="gen-keys-card">
+            <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-violet-300 mb-1">
+              Generator keys
+            </div>
+            <div className="text-xs text-slate-400 mb-3 leading-relaxed">
+              Create DSYNC-XXXX keys straight into stock. Customers redeem them in their portal for lifetime Generator access (1 of each type per hour).
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={genCount}
+                onChange={(e) => setGenCount(parseInt(e.target.value) || 1)}
+                data-testid="gen-keys-count"
+                className="w-20 h-9 rounded-lg bg-[#050B18] border border-[#1E2D4A] focus:border-violet-400 focus:outline-none font-mono text-xs px-3 text-slate-100"
+              />
+              <Select value={genDuration || productDurations[0] || ""} onValueChange={setGenDuration}>
+                <SelectTrigger data-testid="gen-keys-duration" className="w-36 h-9 bg-[#050B18] border-[#1E2D4A] font-mono text-xs">
+                  <SelectValue placeholder="Pool" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
+                  {productDurations.map((d) => (
+                    <SelectItem key={d} value={d}>{DURATION_LABELS[d] || d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <button
+                onClick={generateKeys}
+                disabled={generating}
+                data-testid="gen-keys-button"
+                className="inline-flex items-center gap-2 px-4 h-9 rounded-lg bg-violet-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-violet-300 disabled:opacity-40 transition-all"
+              >
+                <Plus className="w-4 h-4" /> {generating ? "Generating..." : "Generate keys"}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="mt-6">
           <div className="flex items-center gap-3 mb-2">

@@ -56,6 +56,10 @@ def products(admin_headers):
     prods = requests.get(f"{API}/admin/products", headers=admin_headers, timeout=15).json()
     gen = next((p for p in prods if "generator" in p["name"].lower()), None)
     assert gen, "generator product missing"
+    # keep the generator's pools stocked (stock delivery consumes a key per purchase)
+    gen_dur = next(iter(gen["prices"]))
+    requests.post(f"{API}/admin/products/{gen['id']}/generate-keys",
+                  json={"count": 10, "duration": gen_dur}, headers=admin_headers, timeout=15)
     # stock the steam/discord/rockstar pools
     u = uuid.uuid4().hex[:6]
     for p in prods:
@@ -71,7 +75,7 @@ def products(admin_headers):
             requests.post(f"{API}/admin/keystock",
                           json={"product_id": p["id"], "duration": dur, "keys": "\n".join(lines), "mode": "accounts"},
                           headers=admin_headers, timeout=20)
-    return prods
+    return requests.get(f"{API}/admin/products", headers=admin_headers, timeout=15).json()
 
 
 def _buy(admin_headers, email, items, coupon=None):
@@ -268,3 +272,59 @@ def test_reviews_flow(admin_headers, products):
     requests.post(f"{API}/admin/reviews/{review['id']}/action", json={"action": "hide"}, headers=admin_headers, timeout=15)
     pub3 = requests.get(f"{API}/reviews", timeout=15).json()
     assert all(rv["id"] != review["id"] for rv in pub3["reviews"])
+
+
+def test_generator_keys_redeem_and_portal_generation(admin_headers):
+    """Staff generate DSYNC keys into stock -> customer redeems in portal -> lifetime
+    1/hr access -> generates on the website -> hourly limit enforced."""
+    db = _db()
+    gen_pid = None
+    prods = requests.get(f"{API}/admin/products", headers=admin_headers, timeout=15).json()
+    gen_pid = next(p["id"] for p in prods if "generator" in p["name"].lower())
+    dur = next(iter(next(p for p in prods if p["id"] == gen_pid)["prices"]))
+
+    # staff generate keys
+    g = requests.post(f"{API}/admin/products/{gen_pid}/generate-keys",
+                      json={"count": 2, "duration": dur}, headers=admin_headers, timeout=15)
+    assert g.status_code == 200, g.text
+    keys = g.json()["keys"]
+    assert len(keys) == 2 and all(k.startswith("DSYNC-") for k in keys)
+    # only for generator product
+    other = next(p for p in prods if p["id"] != gen_pid)
+    bad = requests.post(f"{API}/admin/products/{other['id']}/generate-keys",
+                        json={"count": 1, "duration": "day"}, headers=admin_headers, timeout=15)
+    assert bad.status_code == 400
+    # unauth
+    assert requests.post(f"{API}/admin/products/{gen_pid}/generate-keys",
+                         json={"count": 1, "duration": dur}, timeout=15).status_code == 401
+
+    # customer redeems in portal
+    email = f"keybuyer-{uuid.uuid4().hex[:6]}@resend.dev"
+    token = _buyer_token(email)
+    h = {"Authorization": f"Bearer {token}"}
+    r = requests.post(f"{API}/portal/gen/redeem", json={"code": keys[0]}, headers=h, timeout=15)
+    assert r.status_code == 200, r.text
+    me = requests.get(f"{API}/portal/me", headers=h, timeout=20).json()["generator"]
+    assert me["access"] is True and me["tier3"] is False and me["limits"]["steam"] == 1
+    assert me["key"] and me["key"].startswith("DSYNC-")
+
+    # redeemed key is consumed from stock
+    doc = db.keystock.find_one({"key": keys[0]})
+    assert doc["status"] == "assigned"
+
+    # bogus + someone else's key
+    assert requests.post(f"{API}/portal/gen/redeem", json={"code": "DSYNC-0000-0000-0000"}, headers=h, timeout=15).status_code == 404
+
+    # generate on the website
+    g1 = requests.post(f"{API}/portal/gen/generate", json={"type": "steam"}, headers=h, timeout=15)
+    assert g1.status_code == 200, g1.text
+    assert g1.json()["raw"]
+    g2 = requests.post(f"{API}/portal/gen/generate", json={"type": "steam"}, headers=h, timeout=15)
+    assert g2.status_code == 429  # 1/hr for key-redeemed customers
+
+    # other type still available
+    g3 = requests.post(f"{API}/portal/gen/generate", json={"type": "discord"}, headers=h, timeout=15)
+    assert g3.status_code in (200, 409)  # 409 only if pool empty
+
+    # portal generate requires auth
+    assert requests.post(f"{API}/portal/gen/generate", json={"type": "steam"}, timeout=15).status_code == 401
