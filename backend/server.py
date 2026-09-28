@@ -264,19 +264,26 @@ async def lookup_request_code(body: RequestCodeIn):
 async def lookup_verify_code(body: VerifyCodeIn):
     email = body.email.lower()
     now = datetime.now(timezone.utc)
-    doc = await db.lookup_codes.find_one(
+    docs = await db.lookup_codes.find(
         {"email": email, "used": False, "expires_dt": {"$gt": now}},
-        sort=[("created_dt", -1)],
-    )
-    if not doc:
+    ).sort("created_dt", -1).to_list(5)
+    if not docs:
+        total = await db.lookup_codes.count_documents({"email": email})
+        logger.warning("OTP verify failed for %s: no valid doc (total docs: %d)", email, total)
         raise HTTPException(400, "Code expired or never requested — request a new one")
-    if doc.get("attempts", 0) >= OTP_MAX_ATTEMPTS:
-        raise HTTPException(429, "Too many wrong attempts — request a new code")
-    digest = hashlib.sha256(body.code.strip().encode()).hexdigest()
-    if not secrets.compare_digest(doc["code_hash"], digest):
-        await db.lookup_codes.update_one({"id": doc["id"]}, {"$inc": {"attempts": 1}})
-        raise HTTPException(400, "Incorrect code")
-    await db.lookup_codes.update_one({"id": doc["id"]}, {"$set": {"used": True}})
+    # accept any unexpired code for this email — relay delays can deliver emails out of order
+    match = None
+    for doc in docs:
+        if doc.get("attempts", 0) >= OTP_MAX_ATTEMPTS:
+            continue
+        digest = hashlib.sha256(body.code.strip().encode()).hexdigest()
+        if secrets.compare_digest(doc["code_hash"], digest):
+            match = doc
+            break
+    if not match:
+        await db.lookup_codes.update_one({"id": docs[0]["id"]}, {"$inc": {"attempts": 1}})
+        raise HTTPException(400, "Incorrect code — make sure it's from the newest email")
+    await db.lookup_codes.update_one({"id": match["id"]}, {"$set": {"used": True}})
     return {"token": _create_lookup_token(email)}
 
 

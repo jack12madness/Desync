@@ -162,3 +162,27 @@ def test_otp_expired_code_rejected():
     })
     r = requests.post(f"{API}/orders/lookup/verify", json={"email": email, "code": code}, timeout=15)
     assert r.status_code == 400
+
+
+def test_otp_accepts_older_unexpired_code_when_emails_arrive_out_of_order():
+    """If relay delay delivers the first email after a second code was requested,
+    the older (still valid) code must still work."""
+    import hashlib as _h
+    from datetime import timedelta as _td
+    email = f"otp-ooo-{uuid.uuid4().hex[:6]}@example.com"
+    now = datetime.now(timezone.utc)
+    db = _db()
+    for code, mins_ago in [("111111", 3), ("222222", 1)]:  # older, then newer
+        db.lookup_codes.insert_one({
+            "id": str(uuid.uuid4()), "email": email,
+            "code_hash": _h.sha256(code.encode()).hexdigest(),
+            "attempts": 0, "used": False,
+            "created_dt": now - _td(minutes=mins_ago),
+            "expires_dt": now + _td(minutes=12),
+        })
+    # enter the OLDER code (first email arrived late)
+    r = requests.post(f"{API}/orders/lookup/verify", json={"email": email, "code": "111111"}, timeout=15)
+    assert r.status_code == 200, r.text
+    # newer code still independently usable is fine (not used) — but single-use per code
+    r2 = requests.post(f"{API}/orders/lookup/verify", json={"email": email, "code": "111111"}, timeout=15)
+    assert r2.status_code == 400

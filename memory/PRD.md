@@ -11,6 +11,13 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-28 — OTP "expired" bug: out-of-order email fix
+- Report: portal code says expired right after entering. Verified live API flow works (request → doc found → wrong code = "Incorrect code"). Likely cause: relay delays delivering an older email after a newer code was requested (verify only checked the NEWEST doc) or mixed deploy window
+- Fix: verify now accepts ANY unexpired unused code for the email (up to 5 recent docs), error copy says "make sure it's from the newest email", warning logs added on no-doc failures for diagnosis
+- Test: test_otp_accepts_older_unexpired_code_when_emails_arrive_out_of_order; 8/8 OTP tests pass
+- NOTE: this fix is preview-only until redeployed; the deployment in progress started before it
+
+
 ### 2026-09-28 — 22 starter reviews seeded (PREVIEW DB only)
 - 22 owner-approved drafted reviews inserted into reviews collection (status approved, spread over past 45 days, ratings 4-5, avg 4.9, gamer-tag display names, product-tagged across SPECTRE/PHANTOM/Generator/Discord/Steam/Rockstar + 2 store-wide). Homepage shows recent 12 + "4.9 · 22 reviews" summary
 - Earlier test-junk reviews deleted
