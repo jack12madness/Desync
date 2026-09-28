@@ -3,7 +3,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 const FAQS = [
   {
     q: "How fast do I get my key?",
-    a: "Instantly. The second your payment clears, your license key is emailed to you and shown on the confirmation page. You can re-pull it anytime from the My Orders page.",
+    a: "Instantly. The second your payment clears, your license key is emailed to you and shown on the confirmation page. You can re-pull it anytime from the Customer Portal.",
   },
   {
     q: "Is this safe to use on my main account?",

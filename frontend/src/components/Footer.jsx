@@ -25,7 +25,7 @@ export default function Footer() {
           <ul className="space-y-2.5 text-sm text-slate-400">
             <li><a href="/#shop" data-testid="footer-link-shop" className="hover:text-white transition-colors">All Products</a></li>
             <li><Link to="/status" data-testid="footer-link-status" className="hover:text-white transition-colors">Cheat Status</Link></li>
-            <li><Link to="/orders" data-testid="footer-link-orders" className="hover:text-white transition-colors">My Orders</Link></li>
+            <li><Link to="/orders" data-testid="footer-link-orders" className="hover:text-white transition-colors">Customer Portal</Link></li>
           </ul>
         </div>
         <div>

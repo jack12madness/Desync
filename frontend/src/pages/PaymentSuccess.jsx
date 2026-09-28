@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CheckCircle2, Loader2, ArrowRight, Mail } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import { KeyRow } from "@/pages/OrderLookup";
+import { KeyRow } from "@/pages/CustomerPortal";
 import { api, aud } from "@/lib/api";
 import { useCart } from "@/context/CartContext";
 
@@ -123,7 +123,7 @@ export default function PaymentSuccess() {
                   data-testid="success-view-orders-link"
                   className="inline-flex items-center gap-2 text-sm font-medium text-[#8FB8E8] hover:text-white transition-colors"
                 >
-                  View in My Orders <ArrowRight className="w-4 h-4" />
+                  View in Customer Portal <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </motion.div>
@@ -134,10 +134,10 @@ export default function PaymentSuccess() {
               <h1 className="font-display text-2xl font-bold tracking-tight text-white">Still processing</h1>
               <p className="text-sm text-slate-400 mt-4 max-w-md mx-auto">
                 We couldn't confirm your payment yet. If you completed checkout, your keys will appear under
-                My Orders within a few minutes — and in your email inbox.
+                Customer Portal within a few minutes — and in your email inbox.
               </p>
               <Link to="/orders" className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-[#8FB8E8] hover:text-white transition-colors">
-                Check My Orders <ArrowRight className="w-4 h-4" />
+                Check Customer Portal <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           )}

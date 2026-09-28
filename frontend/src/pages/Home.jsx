@@ -7,6 +7,7 @@ import StatusBanner from "@/components/StatusBanner";
 import ProductCard from "@/components/ProductCard";
 import ProductModal from "@/components/ProductModal";
 import Faq from "@/components/Faq";
+import ReviewsSection from "@/components/ReviewsSection";
 import Footer from "@/components/Footer";
 import { api, aud } from "@/lib/api";
 
@@ -169,6 +170,7 @@ export default function Home() {
         </div>
       </section>
 
+      <ReviewsSection />
       <Faq />
       <Footer />
 

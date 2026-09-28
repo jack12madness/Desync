@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Lenis from "lenis";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { Toaster } from "@/components/ui/sonner";
 import { CartProvider } from "@/context/CartContext";
@@ -9,7 +9,7 @@ import SplashScreen from "@/components/SplashScreen";
 import Home from "@/pages/Home";
 import ProductPage from "@/pages/ProductPage";
 import StatusPage from "@/pages/StatusPage";
-import OrderLookup from "@/pages/OrderLookup";
+import CustomerPortal from "@/pages/CustomerPortal";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import BankPending from "@/pages/BankPending";
 import PaymentCancel from "@/pages/PaymentCancel";
@@ -50,7 +50,8 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/product/:id" element={<ProductPage />} />
             <Route path="/status" element={<StatusPage />} />
-            <Route path="/orders" element={<OrderLookup />} />
+            <Route path="/portal" element={<CustomerPortal />} />
+            <Route path="/orders" element={<Navigate to="/portal" replace />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/payment/success" element={<PaymentSuccess />} />

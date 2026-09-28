@@ -17,6 +17,7 @@ import ProductsTab from "@/components/ProductsTab";
 import CustomersTab from "@/components/CustomersTab";
 import ExpensesTab from "@/components/ExpensesTab";
 import AlertsTab from "@/components/AlertsTab";
+import ReviewsTab from "@/components/ReviewsTab";
 
 const EMPTY_PRODUCT = {
   game: "", name: "", description: "", image_url: "", status: "undetected",
@@ -254,7 +255,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
               className={`${fieldCls} resize-y`}
             />
             <div className="text-[10px] font-mono text-slate-500 mt-1.5">
-              Delivered after payment — in the delivery email, on the success page and in My Orders
+              Delivered after payment — in the delivery email, on the success page and in Customer Portal
             </div>
           </div>
           <div className="sm:col-span-2">
@@ -548,6 +549,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="orders" data-testid="admin-tab-orders" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Orders</TabsTrigger>
             <TabsTrigger value="coupons" data-testid="admin-tab-coupons" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Coupons</TabsTrigger>
             <TabsTrigger value="customers" data-testid="admin-tab-customers" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Customers</TabsTrigger>
+            <TabsTrigger value="reviews" data-testid="admin-tab-reviews" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Reviews</TabsTrigger>
             <TabsTrigger value="expenses" data-testid="admin-tab-expenses" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Expenses</TabsTrigger>
             <TabsTrigger value="alerts" data-testid="admin-tab-alerts" className="font-mono text-xs uppercase tracking-widest data-[state=active]:bg-blue-400 data-[state=active]:text-[#050B18]">Alerts</TabsTrigger>
             {admin.role === "owner" && (
@@ -701,6 +703,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="customers">
             <CustomersTab />
+          </TabsContent>
+
+          <TabsContent value="reviews">
+            <ReviewsTab />
           </TabsContent>
 
           <TabsContent value="expenses">

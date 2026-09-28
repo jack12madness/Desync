@@ -76,7 +76,7 @@ export default function BankPending() {
           {failed && (
             <div className="p-5 rounded-xl bg-[#0A1628] border border-[#1E2D4A] text-sm text-slate-400" data-testid="bank-pending-error">
               This order wasn't found or is no longer awaiting payment. If you already paid, check
-              the <Link to="/orders" className="text-[#7FB0FF] hover:text-white">My Orders</Link> page — your keys appear there once we confirm the transfer.
+              the <Link to="/orders" className="text-[#7FB0FF] hover:text-white">Customer Portal</Link> page — your keys appear there once we confirm the transfer.
             </div>
           )}
 
@@ -133,7 +133,7 @@ export default function BankPending() {
                   <div className="text-sm text-slate-300 leading-relaxed">
                     <span className="text-emerald-300 font-semibold block mb-1">Payment reported</span>
                     We've set aside your stock and will verify the transfer. Once confirmed, your key or
-                    account details are emailed to you and appear on My Orders. If we can't verify it, the
+                    account details are emailed to you and appear on Customer Portal. If we can't verify it, the
                     stock is released and the order is cancelled.
                   </div>
                 </div>
@@ -155,7 +155,7 @@ export default function BankPending() {
                   data-testid="bank-pending-my-orders"
                   className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold transition-colors"
                 >
-                  <Landmark className="w-4 h-4" /> Go to My Orders
+                  <Landmark className="w-4 h-4" /> Go to Customer Portal
                 </Link>
                 <Link
                   to="/"

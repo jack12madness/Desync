@@ -357,6 +357,12 @@ async def startup():
     await db.expenses.create_index("id", unique=True)
     await db.lookup_codes.create_index("expires_dt", expireAfterSeconds=0)
     await db.lookup_codes.create_index("email")
+    await db.gen_usage.create_index([("key", 1), ("request_id", 1)])
+    await db.gen_usage.create_index([("email", 1), ("ts", -1)])
+    await db.customers.create_index("gen_key", sparse=True)
+    await db.reviews.create_index([("status", 1), ("created_at", -1)])
+    await db.reviews.create_index([("email", 1), ("order_id", 1)], unique=True)
+    await db.audit_log.create_index("ts")
     asyncio.create_task(_bank_expiry_loop())
     try:
         init_storage()
@@ -1071,6 +1077,8 @@ class SettingsIn(BaseModel):
     bank_account_number: Optional[str] = None
     bank_account_name: Optional[str] = None
     discord_webhooks: Optional[Dict[str, str]] = None
+    gen_pools: Optional[Dict[str, str]] = None  # {"steam": product_id, "discord": ..., "rockstar": ...}
+    generator_product_id: Optional[str] = None
 
 
 @api_router.get("/admin/settings")
@@ -1485,6 +1493,10 @@ async def admin_cancel_order(order_id: str, admin: dict = Depends(get_admin)):
         "bank", "Bank order cancelled", f"Released {rel.modified_count} reserved item(s) back to stock.",
         fields=_order_fields(order), color=0xEF4444,
     )
+    try:
+        await _recompute_entitlements(order["email"])
+    except Exception as e:
+        logger.error("Entitlement recompute failed for %s: %s", order.get("email"), e)
     return {"cancelled": True, "released": rel.modified_count}
 
 
@@ -1931,6 +1943,11 @@ async def _fulfill_order(where: dict) -> Optional[dict]:
             "payments", "Payment received", f"Order paid via **{provider}** and fulfilled.",
             fields=_order_fields(updated), color=0x22C55E,
         )
+        if updated.get("email"):
+            try:
+                await _recompute_entitlements(updated["email"])
+            except Exception as e:
+                logger.error("Entitlement recompute failed for %s: %s", updated.get("email"), e)
     return updated
 
 
@@ -2329,6 +2346,506 @@ async def order_by_id(order_id: str):
     await _attach_loader_links(order)
     order.pop("download_token", None)
     return order
+
+
+# ---------- customer portal, generator entitlements & reviews ----------
+
+GEN_TYPES = ("steam", "discord", "rockstar")
+STANDARD_LIMIT = 1   # per type per hour for >A$10 orders
+GENERATOR_LIMIT = 3  # per type per hour for Generator owners
+
+
+def _gen_key():
+    seg = lambda: "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(4))
+    return f"DSYNC-{seg()}-{seg()}-{seg()}"
+
+
+async def _get_settings_doc() -> dict:
+    return await db.settings.find_one({"id": "main"}, {"_id": 0}) or {}
+
+
+async def _generator_product_id(settings: Optional[dict] = None) -> Optional[str]:
+    s = settings or await _get_settings_doc()
+    if s.get("generator_product_id"):
+        return s["generator_product_id"]
+    p = await db.products.find_one({"name": {"$regex": "generator", "$options": "i"}}, {"_id": 0, "id": 1})
+    return p["id"] if p else None
+
+
+async def _audit(admin: dict, action: str, customer_email: str, detail: str = ""):
+    await db.audit_log.insert_one({
+        "id": str(uuid.uuid4()), "admin": admin.get("username", "?"), "action": action,
+        "customer_email": customer_email, "detail": detail,
+        "ts": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+async def _entitlement_state(email: str) -> dict:
+    paid = await db.orders.find(
+        {"email": email, "payment_status": "paid"}, {"_id": 0, "total": 1, "items": 1}
+    ).to_list(500)
+    gen_pid = await _generator_product_id()
+    has_generator = any(
+        gen_pid and any(i.get("product_id") == gen_pid for i in o.get("items", [])) for o in paid
+    )
+    has_standard = any(float(o.get("total") or 0) > 10 for o in paid)
+    cust = await db.customers.find_one({"email": email}, {"_id": 0})
+    gen_access = has_generator or bool(cust and cust.get("gen_access_manual"))
+    limits = {t: (GENERATOR_LIMIT if gen_access else STANDARD_LIMIT if has_standard else 0) for t in GEN_TYPES}
+    return {
+        "customer": cust, "has_generator": has_generator, "has_standard": has_standard,
+        "gen_access": gen_access, "entitled": gen_access or has_standard, "limits": limits,
+    }
+
+
+async def _ensure_customer(email: str) -> dict:
+    await db.customers.update_one(
+        {"email": email},
+        {"$setOnInsert": {"id": str(uuid.uuid4()), "created_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return await db.customers.find_one({"email": email}, {"_id": 0})
+
+
+async def _ensure_gen_key(email: str) -> str:
+    cust = await _ensure_customer(email)
+    if cust.get("gen_key"):
+        return cust["gen_key"]
+    key = _gen_key()
+    while await db.customers.find_one({"gen_key": key}):
+        key = _gen_key()
+    await db.customers.update_one(
+        {"email": email},
+        {"$set": {"gen_key": key, "gen_key_active": True, "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return key
+
+
+async def _recompute_entitlements(email: str):
+    """Grant/revoke Generator access + key based on paid orders. Manual admin grants are untouched."""
+    state = await _entitlement_state(email)
+    cust = state["customer"] or {}
+    now = datetime.now(timezone.utc).isoformat()
+    if state["has_generator"]:
+        key = await _ensure_gen_key(email)
+        await db.customers.update_one(
+            {"email": email},
+            {"$set": {"gen_access": True, "gen_access_source": "purchase", "gen_key": key,
+                      "gen_key_active": True, "updated_at": now}},
+        )
+    elif cust.get("gen_access") and cust.get("gen_access_source") == "purchase":
+        # the order that granted access is gone (refunded/cancelled) — revoke
+        await db.customers.update_one(
+            {"email": email},
+            {"$set": {"gen_access": False, "gen_key_active": False, "updated_at": now}},
+        )
+    if state["entitled"]:
+        await _ensure_gen_key(email)
+
+
+async def _gen_usage_counts(email: str) -> dict:
+    since = datetime.now(timezone.utc) - timedelta(hours=1)
+    counts = {t: 0 for t in GEN_TYPES}
+    resets = {}
+    async for doc in db.gen_usage.find({"email": email, "success": True, "ts": {"$gt": since}}):
+        t = doc["type"]
+        counts[t] = counts.get(t, 0) + 1
+        ts = doc["ts"] if doc["ts"].tzinfo else doc["ts"].replace(tzinfo=timezone.utc)
+        reset = ts + timedelta(hours=1)
+        if t not in resets or reset < resets[t]:
+            resets[t] = reset
+    return {"counts": counts, "resets": {t: resets[t].isoformat() for t in resets}}
+
+
+def _buyer_email(request: Request) -> str:
+    auth = request.headers.get("authorization", "")
+    token = auth[7:] if auth.startswith("Bearer ") else ""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "Verification required")
+    if payload.get("type") != "buyer_lookup":
+        raise HTTPException(401, "Verification required")
+    return payload["sub"]
+
+
+@api_router.get("/portal/me")
+async def portal_me(request: Request):
+    email = _buyer_email(request)
+    orders = await db.orders.find(
+        {"email": email, "payment_status": "paid"}, {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    for o in orders:
+        await _attach_loader_links(o)
+        o.pop("download_token", None)
+    cust = await _ensure_customer(email)
+    await _recompute_entitlements(email)
+    cust = await db.customers.find_one({"email": email}, {"_id": 0})
+    state = await _entitlement_state(email)
+    usage = await _gen_usage_counts(email)
+    history = await db.gen_usage.find(
+        {"email": email}, {"_id": 0}
+    ).sort("ts", -1).to_list(20)
+    my_reviews = await db.reviews.find({"email": email}, {"_id": 0}).to_list(100)
+    return {
+        "email": email,
+        "customer_since": cust.get("created_at"),
+        "disabled": bool(cust.get("disabled")),
+        "orders": orders,
+        "generator": {
+            "access": bool(cust.get("gen_access")),
+            "key": cust.get("gen_key"),
+            "key_active": bool(cust.get("gen_key_active")),
+            "entitled": state["entitled"],
+            "has_standard": state["has_standard"],
+            "limits": state["limits"],
+            "used": usage["counts"],
+            "resets": usage["resets"],
+        },
+        "gen_history": [
+            {"type": h["type"], "ts": h["ts"].isoformat() if hasattr(h["ts"], "isoformat") else h["ts"],
+             "success": h.get("success"), "reason": h.get("reason")}
+            for h in history
+        ],
+        "reviews": my_reviews,
+    }
+
+
+class ReviewIn(BaseModel):
+    order_id: str
+    rating: int
+    text: str
+    product_id: Optional[str] = None
+    name: Optional[str] = None
+
+
+def _clean_text(s: str, max_len: int) -> str:
+    s = re.sub(r"<[^>]+>", "", s or "").strip()
+    return s[:max_len]
+
+
+@api_router.post("/portal/reviews")
+async def portal_submit_review(body: ReviewIn, request: Request):
+    email = _buyer_email(request)
+    if not (1 <= body.rating <= 5):
+        raise HTTPException(400, "Rating must be 1-5")
+    text = _clean_text(body.text, 1000)
+    if len(text) < 3:
+        raise HTTPException(400, "Review is too short")
+    order = await db.orders.find_one({"id": body.order_id, "email": email, "payment_status": "paid"})
+    if not order:
+        raise HTTPException(404, "Paid order not found for your email")
+    if await db.reviews.find_one({"email": email, "order_id": body.order_id}):
+        raise HTTPException(409, "You already reviewed that order")
+    since = datetime.now(timezone.utc) - timedelta(hours=1)
+    recent = await db.reviews.count_documents({"email": email, "created_at": {"$gt": since.isoformat()}})
+    if recent >= 5:
+        raise HTTPException(429, "Too many reviews — try again later")
+    name = _clean_text(body.name or "", 40) or "Verified Customer"
+    product_name = None
+    if body.product_id:
+        if not any(i.get("product_id") == body.product_id for i in order.get("items", [])):
+            raise HTTPException(400, "That product is not on this order")
+        p = await db.products.find_one({"id": body.product_id}, {"_id": 0, "name": 1})
+        product_name = (p or {}).get("name")
+    doc = {
+        "id": str(uuid.uuid4()), "email": email, "order_id": body.order_id,
+        "product_id": body.product_id, "product_name": product_name,
+        "name": name, "rating": int(body.rating), "text": text,
+        "status": "pending", "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.reviews.insert_one(doc)
+    doc.pop("_id", None)
+    doc.pop("email", None)
+    return doc
+
+
+@api_router.get("/reviews")
+async def public_reviews(limit: int = 12, product_id: Optional[str] = None):
+    q = {"status": "approved"}
+    if product_id:
+        q["product_id"] = product_id
+    docs = await db.reviews.find(
+        q, {"_id": 0, "email": 0, "order_id": 0}
+    ).sort("created_at", -1).to_list(max(1, min(limit, 50)))
+    agg = await db.reviews.aggregate([
+        {"$match": {"status": "approved"}},
+        {"$group": {"_id": None, "avg": {"$avg": "$rating"}, "count": {"$sum": 1}}},
+    ]).to_list(1)
+    return {
+        "reviews": docs,
+        "average": round(agg[0]["avg"], 1) if agg else None,
+        "count": agg[0]["count"] if agg else 0,
+    }
+
+
+# ---------- generator API (desktop app: key only, nothing else client-side) ----------
+
+class GenValidateIn(BaseModel):
+    key: str
+
+
+class GenGenerateIn(BaseModel):
+    key: str
+    type: str
+    request_id: str
+
+
+async def _gen_check_key(key: str) -> dict:
+    cust = await db.customers.find_one({"gen_key": key.strip()}, {"_id": 0})
+    if not cust:
+        raise HTTPException(401, "Invalid key")
+    if cust.get("disabled"):
+        raise HTTPException(403, "This customer is disabled")
+    if not cust.get("gen_key_active"):
+        raise HTTPException(403, "This key has been revoked")
+    email = cust["email"]
+    state = await _entitlement_state(email)
+    if not state["entitled"]:
+        raise HTTPException(403, "No active Generator entitlement")
+    return {"customer": cust, "email": email, "state": state}
+
+
+@api_router.post("/gen/validate")
+async def gen_validate(body: GenValidateIn):
+    ctx = await _gen_check_key(body.key)
+    usage = await _gen_usage_counts(ctx["email"])
+    return {
+        "valid": True,
+        "limits": ctx["state"]["limits"],
+        "used": usage["counts"],
+        "resets": usage["resets"],
+        "generator_access": ctx["state"]["gen_access"],
+    }
+
+
+@api_router.post("/gen/generate")
+async def gen_generate(body: GenGenerateIn):
+    if body.type not in GEN_TYPES:
+        raise HTTPException(400, f"Unknown type — use one of: {', '.join(GEN_TYPES)}")
+    ctx = await _gen_check_key(body.key)
+    email = ctx["email"]
+    rid = (body.request_id or "").strip()
+    if not rid or len(rid) > 80:
+        raise HTTPException(400, "request_id required")
+    if await db.gen_usage.find_one({"key": body.key.strip(), "request_id": rid}):
+        raise HTTPException(409, "Duplicate request_id — replay rejected")
+    usage = await _gen_usage_counts(email)
+    limit = ctx["state"]["limits"][body.type]
+    if usage["counts"][body.type] >= limit:
+        await db.gen_usage.insert_one({
+            "id": str(uuid.uuid4()), "email": email, "key": body.key.strip(), "type": body.type,
+            "request_id": rid, "success": False, "reason": "rate_limited",
+            "ts": datetime.now(timezone.utc),
+        })
+        reset = usage["resets"].get(body.type)
+        raise HTTPException(429, f"Hourly {body.type} allowance used up" + (f" — resets at {reset}" if reset else ""))
+    settings = await _get_settings_doc()
+    pools = settings.get("gen_pools") or {}
+    pool_pid = pools.get(body.type)
+    if not pool_pid:
+        p = await db.products.find_one(
+            {"kind": "account", "name": {"$regex": body.type, "$options": "i"}}, {"_id": 0, "id": 1})
+        pool_pid = p["id"] if p else None
+    if not pool_pid:
+        raise HTTPException(503, f"No stock pool configured for {body.type}")
+    key_doc = await db.keystock.find_one_and_update(
+        {"product_id": pool_pid, "status": "available"},
+        {"$set": {"status": "assigned", "assigned_order_id": f"gen-{email}",
+                  "assigned_at": datetime.now(timezone.utc).isoformat()}},
+        sort=[("created_at", 1)],
+    )
+    if not key_doc:
+        await db.gen_usage.insert_one({
+            "id": str(uuid.uuid4()), "email": email, "key": body.key.strip(), "type": body.type,
+            "request_id": rid, "success": False, "reason": "out_of_stock",
+            "ts": datetime.now(timezone.utc),
+        })
+        raise HTTPException(409, f"{body.type} accounts are out of stock right now")
+    await db.gen_usage.insert_one({
+        "id": str(uuid.uuid4()), "email": email, "key": body.key.strip(), "type": body.type,
+        "request_id": rid, "success": True, "ts": datetime.now(timezone.utc),
+    })
+    return {
+        "ok": True, "type": body.type,
+        "raw": _export_line(key_doc),
+        "account": key_doc.get("account") or {"key": key_doc["key"]},
+        "remaining": limit - usage["counts"][body.type] - 1,
+    }
+
+
+# ---------- admin: customer & generator management ----------
+
+@api_router.get("/admin/customers/search")
+async def admin_search_customers(q: str = "", admin: dict = Depends(get_admin)):
+    q = q.strip()
+    if len(q) < 2:
+        return []
+    emails = set()
+    async for c in db.customers.find(
+        {"$or": [{"email": {"$regex": re.escape(q), "$options": "i"}},
+                 {"gen_key": {"$regex": re.escape(q), "$options": "i"}},
+                 {"id": q}]},
+        {"_id": 0, "email": 1},
+    ).limit(20):
+        emails.add(c["email"])
+    async for o in db.orders.find(
+        {"$or": [{"id": q}, {"email": {"$regex": re.escape(q), "$options": "i"}}]},
+        {"_id": 0, "email": 1},
+    ).limit(20):
+        emails.add(o["email"])
+    return sorted(emails)
+
+
+@api_router.get("/admin/customers/{email}/profile")
+async def admin_customer_profile(email: str, admin: dict = Depends(get_admin)):
+    email = email.lower()
+    cust = await db.customers.find_one({"email": email}, {"_id": 0})
+    orders = await db.orders.find({"email": email}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    state = await _entitlement_state(email)
+    usage = await _gen_usage_counts(email)
+    history = await db.gen_usage.find({"email": email}, {"_id": 0}).sort("ts", -1).to_list(50)
+    audits = await db.audit_log.find({"customer_email": email}, {"_id": 0}).sort("ts", -1).to_list(50)
+    reviews = await db.reviews.find({"email": email}, {"_id": 0}).to_list(100)
+    settings = await _get_settings_doc()
+    return {
+        "customer": cust, "orders": orders,
+        "generator": {
+            "access": bool(cust and cust.get("gen_access")),
+            "key": cust.get("gen_key") if cust else None,
+            "key_active": bool(cust and cust.get("gen_key_active")),
+            "manual": bool(cust and cust.get("gen_access_manual")),
+            "source": cust.get("gen_access_source") if cust else None,
+            "limits": state["limits"], "used": usage["counts"], "resets": usage["resets"],
+        },
+        "gen_history": [
+            {"type": h["type"], "ts": h["ts"].isoformat() if hasattr(h["ts"], "isoformat") else h["ts"],
+             "success": h.get("success"), "reason": h.get("reason")}
+            for h in history
+        ],
+        "audit": audits, "reviews": reviews,
+        "gen_pools": settings.get("gen_pools") or {},
+        "generator_product_id": await _generator_product_id(settings),
+    }
+
+
+class GenActionIn(BaseModel):
+    action: str  # grant | revoke | regenerate_key | reset_usage | disable | enable
+
+
+@api_router.post("/admin/customers/{email}/generator")
+async def admin_generator_action(email: str, body: GenActionIn, admin: dict = Depends(get_admin)):
+    email = email.lower()
+    cust = await _ensure_customer(email)
+    now = datetime.now(timezone.utc).isoformat()
+    action = body.action
+    if action == "grant":
+        key = cust.get("gen_key") or _gen_key()
+        await db.customers.update_one({"email": email}, {"$set": {
+            "gen_access": True, "gen_access_manual": True, "gen_access_source": "manual",
+            "gen_key": key, "gen_key_active": True, "updated_at": now}})
+    elif action == "revoke":
+        await db.customers.update_one({"email": email}, {"$set": {
+            "gen_access": False, "gen_access_manual": False, "gen_key_active": False, "updated_at": now}})
+    elif action == "regenerate_key":
+        key = _gen_key()
+        while await db.customers.find_one({"gen_key": key}):
+            key = _gen_key()
+        await db.customers.update_one({"email": email}, {"$set": {
+            "gen_key": key, "gen_key_active": True, "gen_access": True, "updated_at": now}})
+    elif action == "reset_usage":
+        await db.gen_usage.delete_many({"email": email})
+    elif action == "disable":
+        await db.customers.update_one({"email": email}, {"$set": {"disabled": True, "updated_at": now}})
+    elif action == "enable":
+        await db.customers.update_one({"email": email}, {"$set": {"disabled": False, "updated_at": now}})
+    else:
+        raise HTTPException(400, "Unknown action")
+    await _audit(admin, f"generator:{action}", email)
+    return {"ok": True, "action": action}
+
+
+class ImportGenIn(BaseModel):
+    email: EmailStr
+
+
+@api_router.post("/admin/customers/import-generator")
+async def admin_import_generator_customer(body: ImportGenIn, admin: dict = Depends(get_admin)):
+    email = body.email.lower()
+    await _ensure_customer(email)
+    key = _gen_key()
+    while await db.customers.find_one({"gen_key": key}):
+        key = _gen_key()
+    await db.customers.update_one({"email": email}, {"$set": {
+        "gen_access": True, "gen_access_manual": True, "gen_access_source": "manual",
+        "gen_key": key, "gen_key_active": True,
+        "updated_at": datetime.now(timezone.utc).isoformat()}})
+    await _audit(admin, "generator:import", email, "existing Generator customer migrated")
+    return {"email": email, "key": key}
+
+
+@api_router.get("/admin/audit-log")
+async def admin_audit_log(limit: int = 50, admin: dict = Depends(get_admin)):
+    return await db.audit_log.find({}, {"_id": 0}).sort("ts", -1).to_list(max(1, min(limit, 200)))
+
+
+# ---------- admin: reviews moderation ----------
+
+@api_router.get("/admin/reviews")
+async def admin_reviews(status: Optional[str] = None, product_id: Optional[str] = None,
+                        admin: dict = Depends(get_admin)):
+    q = {}
+    if status in ("pending", "approved", "hidden"):
+        q["status"] = status
+    if product_id:
+        q["product_id"] = product_id
+    return await db.reviews.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+
+
+class ReviewActionIn(BaseModel):
+    action: str  # approve | hide
+
+
+@api_router.post("/admin/reviews/{review_id}/action")
+async def admin_review_action(review_id: str, body: ReviewActionIn, admin: dict = Depends(get_admin)):
+    if body.action not in ("approve", "hide"):
+        raise HTTPException(400, "Unknown action")
+    res = await db.reviews.update_one(
+        {"id": review_id},
+        {"$set": {"status": "approved" if body.action == "approve" else "hidden"}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Review not found")
+    return {"ok": True}
+
+
+@api_router.delete("/admin/reviews/{review_id}")
+async def admin_review_delete(review_id: str, admin: dict = Depends(get_admin)):
+    res = await db.reviews.delete_one({"id": review_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Review not found")
+    return {"deleted": True}
+
+
+@api_router.post("/admin/orders/{order_id}/refund")
+async def admin_refund_order(order_id: str, admin: dict = Depends(get_admin)):
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order.get("payment_status") != "paid":
+        raise HTTPException(400, "Only paid orders can be refunded")
+    now = datetime.now(timezone.utc).isoformat()
+    await db.orders.update_one(
+        {"id": order_id},
+        {"$set": {"payment_status": "refunded", "status": "refunded", "updated_at": now}},
+    )
+    await _recompute_entitlements(order["email"])
+    await _audit(admin, "order:refund", order["email"], order_id)
+    await _discord_alert(
+        "payments", "Order refunded", f"Order `{order_id[:8]}` refunded — entitlements revoked.",
+        fields=_order_fields(order), color=0xEF4444,
+    )
+    return {"refunded": True}
 
 
 app.include_router(api_router)

@@ -7,7 +7,7 @@ const links = [
   { label: "Home", to: "/", testid: "nav-link-home" },
   { label: "Shop", to: "/#shop", testid: "nav-link-shop", anchor: true },
   { label: "Status", to: "/status", testid: "nav-link-status" },
-  { label: "My Orders", to: "/orders", testid: "nav-link-orders" },
+  { label: "Customer Portal", to: "/portal", testid: "nav-link-orders" },
 ];
 
 export default function Navbar() {
