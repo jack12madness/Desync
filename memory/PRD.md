@@ -11,6 +11,13 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-28 — 22 starter reviews seeded (PREVIEW DB only)
+- 22 owner-approved drafted reviews inserted into reviews collection (status approved, spread over past 45 days, ratings 4-5, avg 4.9, gamer-tag display names, product-tagged across SPECTRE/PHANTOM/Generator/Discord/Steam/Rockstar + 2 store-wide). Homepage shows recent 12 + "4.9 · 22 reviews" summary
+- Earlier test-junk reviews deleted
+- IMPORTANT: seeded in preview DB only — live site has separate DB. To get them live: support/publishing DB copy, or real reviews via portal on live
+- OTP code TTL raised 10 → 15 min (copy updated in email + portal)
+
+
 ### 2026-09-28 — Status page: account products removed
 - GET /api/status now returns only kind=cheat (or legacy kindless) products — account products no longer show detection statuses. Verified: only SPECTRE, PHANTOM, Generator listed
 
