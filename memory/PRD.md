@@ -11,6 +11,15 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-28 — Social media boosts + custom durations + bulk discounts
+- Boost products (kind "boost"): ONE product per platform (tiktok/instagram); buyer picks Followers/Likes/Views inside it, enters an amount, pays amount × per-type unit price; min_spend enforced (e.g. A$7.50); blank type price = hidden from buyers; never sold out, no keys
+- Bulk tiers per boost product: [{"min_qty": 10000, "percent": 5}] — auto-applied; bigger of bulk vs coupon wins per line (NO stacking, user decision); shown in modal, cart, and charged in _price_cart
+- Post-payment link intake: BoostIntake on PaymentSuccess + Customer Portal orders (public endpoint keyed by order id, entries keyed by product+duration); followers ask page link, likes/views ask video link; link change resets status to pending; admin sets pending/processing/completed in Orders tab; Discord "orders" alert on submit; order email shows action-needed box
+- Custom key durations for cheats/accounts: staff adds label+price rows ("2 Weeks"); slugged price keys flow through pricing/stock/checkout/emails; duration_labels map; keystock_add accepts custom pools
+- Smart duration ordering: price keys sort by parsed length (day<3d<week<2 Weeks<month<lifetime) in ProductModal/KeyManager/ProductsTab/restock announce (shared orderedPriceKeys in CartContext + _ordered_price_keys server-side)
+- Backend: ProductIn + platform/min_spend/bulk_tiers/duration_labels; _validate_boost; _price_cart boost branch (line_cents, bulk vs coupon max); Stripe line item for boost = one line with qty in name; fulfill skips key assignment (boost_pending)
+- Tests: tests/test_boost.py (5 tests: validation, unit pricing+min spend, link/status flow, bulk vs coupon, custom cheat duration); old sold-out tests now skip boost products; full suite 60 passed 2 skipped. UI verified via screenshots (modal qty/total, split prices, cart, admin form, duration ordering)
+
 ### 2026-09-28 — ROOT CAUSE of live OTP "invalid/expired": axios interceptor clobbered buyer token
 - Deployer RCA (multi-pod theory disproven — same-pod verify 200 → /portal/me 401 pairs, identical JWT_SECRET across replicas): lib/api.js request interceptor unconditionally overwrote Authorization with the admin token (localStorage void_admin_token). Owner's browser (logged into admin) sent admin token to /portal/me → backend requires type buyer_lookup → 401 → misleading "expired" toast. Pure customers unaffected
 - Fix: interceptor now skips attaching the admin token when the caller already set Authorization (api.js)

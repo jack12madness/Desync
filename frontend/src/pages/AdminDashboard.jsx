@@ -24,7 +24,8 @@ const EMPTY_PRODUCT = {
   features: [], anticheat: "", prices: { day: "", "3d": "", week: "", month: "", lifetime: "" },
   min_buy: 1, kind: "cheat", account_type: null, delivery: "stock", ticket_url: "", loader_link: "",
   discord_url: "", instructions: "", system_requirements: "", troubleshooting: [], active: true, sort_order: 0,
-  platform: "", boost_type: "", duration_labels: {}, unit_price: "", min_spend: "",
+  platform: "", boost_type: "", duration_labels: {}, min_spend: "",
+  boost_prices: { followers: "", likes: "", views: "" },
 };
 
 const FIXED_DURATIONS = ["day", "3d", "week", "month", "lifetime"];
@@ -33,13 +34,17 @@ const slugify = (s) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replac
 function ProductForm({ initial, categories, onSave, onClose }) {
   const [form, setForm] = useState(() => {
     if (!initial) return EMPTY_PRODUCT;
-    const boostUnit = initial.kind === "boost" ? (Object.values(initial.prices || {})[0] ?? "") : (initial.unit_price ?? "");
+    const bp = initial.kind === "boost" ? (initial.prices || {}) : {};
     return {
       ...EMPTY_PRODUCT,
       ...initial,
       prices: { day: "", "3d": "", week: "", month: "", lifetime: "", ...initial.prices },
       features: (initial.features || []).join(", "),
-      unit_price: boostUnit === "" ? "" : String(boostUnit),
+      boost_prices: {
+        followers: bp.followers != null ? String(bp.followers) : "",
+        likes: bp.likes != null ? String(bp.likes) : "",
+        views: bp.views != null ? String(bp.views) : "",
+      },
       min_spend: initial.min_spend != null ? String(initial.min_spend) : "",
     };
   });
@@ -67,14 +72,20 @@ function ProductForm({ initial, categories, onSave, onClose }) {
     const prices = {};
     const duration_labels = {};
     if (isBoost) {
-      const unit = parseFloat(form.unit_price);
-      if (isNaN(unit) || unit <= 0) {
-        toast.error("Set a unit price — e.g. 0.002 for 0.2c per follower/like/view");
-        return;
-      }
       for (const t of ["followers", "likes", "views"]) {
-        prices[t] = unit;
+        const v = form.boost_prices[t];
+        if (v === "" || v == null) continue; // blank = not offered
+        const p = parseFloat(v);
+        if (isNaN(p) || p <= 0) {
+          toast.error(`Set a valid price for ${t} — e.g. 0.002 for 0.2c each`);
+          return;
+        }
+        prices[t] = p;
         duration_labels[t] = t[0].toUpperCase() + t.slice(1);
+      }
+      if (Object.keys(prices).length === 0) {
+        toast.error("Set a price for at least one of followers, likes or views");
+        return;
       }
     } else {
       for (const [k, v] of Object.entries(form.prices)) {
@@ -151,9 +162,19 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             </Select>
           </div>
           <div>
-            <label className={labelCls}>Price per follower/like/view (AUD)</label>
-            <Input type="number" step="0.0001" min="0" value={form.unit_price} onChange={(e) => set("unit_price", e.target.value)} placeholder="0.002" data-testid="product-form-unit-price" className={fieldCls} />
-            <div className="text-[10px] font-mono text-slate-600 mt-1">0.002 = 0.2c each — buyers pick Followers, Likes or Views and the amount</div>
+            <label className={labelCls}>Price per follower (AUD)</label>
+            <Input type="number" step="0.0001" min="0" value={form.boost_prices.followers} onChange={(e) => set("boost_prices", { ...form.boost_prices, followers: e.target.value })} placeholder="0.002" data-testid="product-form-price-followers" className={fieldCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Price per like (AUD)</label>
+            <Input type="number" step="0.0001" min="0" value={form.boost_prices.likes} onChange={(e) => set("boost_prices", { ...form.boost_prices, likes: e.target.value })} placeholder="0.001" data-testid="product-form-price-likes" className={fieldCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Price per view (AUD)</label>
+            <Input type="number" step="0.0001" min="0" value={form.boost_prices.views} onChange={(e) => set("boost_prices", { ...form.boost_prices, views: e.target.value })} placeholder="0.0005" data-testid="product-form-price-views" className={fieldCls} />
+          </div>
+          <div className="sm:col-span-3 -mt-2">
+            <div className="text-[10px] font-mono text-slate-600">0.002 = 0.2c each. Leave a type blank to hide it from buyers.</div>
           </div>
           <div>
             <label className={labelCls}>Minimum spend (AUD)</label>
