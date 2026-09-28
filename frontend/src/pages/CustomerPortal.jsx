@@ -462,7 +462,7 @@ export default function CustomerPortal() {
                                 key={`${item.product_id}-${item.duration}`}
                                 orderId={o.id}
                                 item={item}
-                                detail={(o.boost_details || []).find((d) => d.product_id === item.product_id)}
+                                detail={(o.boost_details || []).find((d) => d.product_id === item.product_id && d.duration === item.duration)}
                                 onSaved={() => loadPortal(token)}
                               />
                             ) : (

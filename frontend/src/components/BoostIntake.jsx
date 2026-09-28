@@ -30,7 +30,7 @@ export default function BoostIntake({ orderId, item, detail, onSaved }) {
     setSaving(true);
     try {
       const { data } = await api.post(`/orders/by-id/${orderId}/boost-details`, {
-        details: [{ product_id: item.product_id, link: link.trim() }],
+        details: [{ product_id: item.product_id, duration: item.duration, link: link.trim() }],
       });
       toast.success("Link received — our team will start your boost");
       onSaved?.(data.boost_details);
@@ -47,7 +47,7 @@ export default function BoostIntake({ orderId, item, detail, onSaved }) {
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-slate-100">{item.name}</div>
           <div className="text-[10px] font-mono uppercase tracking-widest text-pink-300/80 mt-0.5">
-            {platform} {item.boost_type} · {item.duration_label}
+            {platform} {item.boost_type} · {(item.qty || 1).toLocaleString()} {item.duration_label}
           </div>
         </div>
         {detail && <BoostStatusBadge status={detail.status} testid={`boost-status-${item.product_id}`} />}

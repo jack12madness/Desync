@@ -1,13 +1,16 @@
-"""Social boost products + custom key durations E2E tests.
+"""Social boost products (unit pricing) + custom key durations E2E tests.
 
+Boost model: ONE product per platform. Buyers pick followers/likes/views and an
+amount; price = amount x unit price (e.g. 0.2c each), min spend enforced.
 Covers:
-- boost product CRUD validation (platform/type required, tiktok/instagram only)
-- tiered amount pricing (custom price keys) through checkout
-- boost items skip key assignment on fulfillment (boost_pending, no license_key)
-- buyer submits page/video link (public endpoint, order id is the secret)
+- boost product validation (platform required, tiktok/instagram only)
+- unit pricing through checkout incl. min-spend rejection
+- boost items skip key assignment (boost_pending, no license_key)
+- buyer submits page/video link keyed by product+type; same product can be
+  bought as followers AND likes in one order
 - link validation, resubmit keeps status, changed link resets to pending
-- admin sets boost status (pending/processing/completed), invalid rejected
-- custom cheat durations ("2 Weeks") work through pricing, stock and checkout
+- admin sets boost status, invalid rejected, auth required
+- custom cheat durations ("2 Weeks") through pricing, stock and checkout
 """
 import os
 import uuid
@@ -21,6 +24,9 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 API = f"{BASE}/api"
 
+UNIT = 0.002  # 0.2c per follower/like/view
+MIN_SPEND = 7.50
+
 
 @pytest.fixture(scope="session")
 def admin_headers():
@@ -33,9 +39,9 @@ def admin_headers():
 def boost_product(admin_headers):
     r = requests.post(f"{API}/admin/products", json={
         "game": "FiveM", "name": f"TEST-Boost-{uuid.uuid4().hex[:6]}", "kind": "boost",
-        "platform": "instagram", "boost_type": "likes",
-        "prices": {"500-likes": 2.99, "1000-likes": 4.99},
-        "duration_labels": {"500-likes": "500 Likes", "1000-likes": "1,000 Likes"},
+        "platform": "tiktok", "min_spend": MIN_SPEND,
+        "prices": {"followers": UNIT, "likes": UNIT, "views": UNIT},
+        "duration_labels": {"followers": "Followers", "likes": "Likes", "views": "Views"},
         "image_url": "https://example.com/boost.png",
     }, headers=admin_headers, timeout=15)
     assert r.status_code == 200, r.text
@@ -56,69 +62,99 @@ def _buy_and_pay(admin_headers, email, items):
 
 
 def test_boost_product_validation(admin_headers):
-    base = {"game": "FiveM", "name": "x", "kind": "boost", "prices": {"a": 1.0}}
-    bad_platform = requests.post(f"{API}/admin/products", json={**base, "platform": "youtube", "boost_type": "likes"}, headers=admin_headers, timeout=15)
+    base = {"game": "FiveM", "name": "x", "kind": "boost", "prices": {"followers": UNIT}}
+    bad_platform = requests.post(f"{API}/admin/products", json={**base, "platform": "youtube"}, headers=admin_headers, timeout=15)
     assert bad_platform.status_code == 400
-    bad_type = requests.post(f"{API}/admin/products", json={**base, "platform": "tiktok", "boost_type": "comments"}, headers=admin_headers, timeout=15)
-    assert bad_type.status_code == 400
-    missing = requests.post(f"{API}/admin/products", json=base, headers=admin_headers, timeout=15)
-    assert missing.status_code == 400
+    missing_platform = requests.post(f"{API}/admin/products", json=base, headers=admin_headers, timeout=15)
+    assert missing_platform.status_code == 400
+    no_prices = requests.post(f"{API}/admin/products", json={
+        "game": "FiveM", "name": "x", "kind": "boost", "platform": "tiktok", "prices": {},
+    }, headers=admin_headers, timeout=15)
+    assert no_prices.status_code == 400
 
 
-def test_boost_purchase_link_and_status_flow(admin_headers, boost_product):
+def test_boost_unit_pricing_and_min_spend(admin_headers, boost_product):
     pid = boost_product["id"]
-    assert boost_product["kind"] == "boost" and boost_product["platform"] == "instagram"
-
-    # boost products never sell out and skip stock checks entirely
     email = f"boost-{uuid.uuid4().hex[:6]}@resend.dev"
-    oid = _buy_and_pay(admin_headers, email, [{"product_id": pid, "duration": "1000-likes", "qty": 1}])
 
+    # below min spend: 1,000 x 0.2c = A$2.00 < A$7.50 -> rejected
+    r = requests.post(f"{API}/payments/bank-transfer", json={
+        "email": email, "items": [{"product_id": pid, "duration": "followers", "qty": 1000}], "origin_url": BASE,
+    }, timeout=30)
+    assert r.status_code == 400 and "minimum spend" in r.json()["detail"]
+
+    # 5,000 followers x 0.2c = A$10.00
+    oid = _buy_and_pay(admin_headers, email, [{"product_id": pid, "duration": "followers", "qty": 5000}])
     order = requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()
     item = order["items"][0]
-    assert item["kind"] == "boost" and item["platform"] == "instagram" and item["boost_type"] == "likes"
-    assert item["duration_label"] == "1,000 Likes"
+    assert order["total"] == 10.0
+    assert item["kind"] == "boost" and item["platform"] == "tiktok"
+    assert item["boost_type"] == "followers" and item["duration_label"] == "Followers"
+    assert item["qty"] == 5000 and item["unit_price"] == UNIT
     assert item.get("license_key") is None and item.get("boost_pending") is True
     assert item.get("key_pending") is False
 
-    # buyer submits their video link
-    r = requests.post(f"{API}/orders/by-id/{oid}/boost-details", json={
-        "details": [{"product_id": pid, "link": "https://instagram.com/p/abc123"}],
-    }, timeout=15)
-    assert r.status_code == 200, r.text
-    detail = r.json()["boost_details"][0]
-    assert detail["link"] == "https://instagram.com/p/abc123" and detail["status"] == "pending"
 
-    # link validation
+def test_boost_link_and_status_flow(admin_headers, boost_product):
+    pid = boost_product["id"]
+    email = f"boost-{uuid.uuid4().hex[:6]}@resend.dev"
+    # same product bought as followers AND likes in one order
+    oid = _buy_and_pay(admin_headers, email, [
+        {"product_id": pid, "duration": "followers", "qty": 5000},
+        {"product_id": pid, "duration": "likes", "qty": 10000},
+    ])
+    order = requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()
+    assert order["total"] == 10.0 + 20.0
+    assert len([i for i in order["items"] if i["kind"] == "boost"]) == 2
+
+    # submit a link for each type separately
+    for dur, link in [("followers", "https://tiktok.com/@mypage"), ("likes", "https://tiktok.com/video/123")]:
+        r = requests.post(f"{API}/orders/by-id/{oid}/boost-details", json={
+            "details": [{"product_id": pid, "duration": dur, "link": link}],
+        }, timeout=15)
+        assert r.status_code == 200, r.text
+    details = requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["boost_details"]
+    assert len(details) == 2
+    by_dur = {d["duration"]: d for d in details}
+    assert by_dur["followers"]["link"].endswith("@mypage") and by_dur["followers"]["status"] == "pending"
+    assert by_dur["likes"]["link"].endswith("video/123") and by_dur["likes"]["qty"] == 10000
+
+    # link validation + wrong duration rejected
     bad = requests.post(f"{API}/orders/by-id/{oid}/boost-details", json={
-        "details": [{"product_id": pid, "link": "tiktok.com/no-scheme"}],
+        "details": [{"product_id": pid, "duration": "followers", "link": "no-scheme"}],
     }, timeout=15)
     assert bad.status_code == 400
-    wrong_product = requests.post(f"{API}/orders/by-id/{oid}/boost-details", json={
-        "details": [{"product_id": "nope", "link": "https://x.com"}],
+    wrong = requests.post(f"{API}/orders/by-id/{oid}/boost-details", json={
+        "details": [{"product_id": pid, "duration": "views", "link": "https://x.com"}],
     }, timeout=15)
-    assert wrong_product.status_code == 400
+    assert wrong.status_code == 400  # views wasn't purchased on this order
 
-    # admin moves it to processing
-    s = requests.post(f"{API}/admin/orders/{oid}/boost-status", json={"product_id": pid, "status": "processing"}, headers=admin_headers, timeout=15)
+    # admin moves followers to processing; likes untouched
+    s = requests.post(f"{API}/admin/orders/{oid}/boost-status", json={
+        "product_id": pid, "duration": "followers", "status": "processing",
+    }, headers=admin_headers, timeout=15)
     assert s.status_code == 200, s.text
-    bogus = requests.post(f"{API}/admin/orders/{oid}/boost-status", json={"product_id": pid, "status": "shipped"}, headers=admin_headers, timeout=15)
+    bogus = requests.post(f"{API}/admin/orders/{oid}/boost-status", json={
+        "product_id": pid, "duration": "followers", "status": "shipped",
+    }, headers=admin_headers, timeout=15)
     assert bogus.status_code == 400
-
-    # resubmitting the SAME link keeps the status; a CHANGED link resets to pending
-    requests.post(f"{API}/orders/by-id/{oid}/boost-details", json={
-        "details": [{"product_id": pid, "link": "https://instagram.com/p/abc123"}],
+    noauth = requests.post(f"{API}/admin/orders/{oid}/boost-status", json={
+        "product_id": pid, "duration": "followers", "status": "completed",
     }, timeout=15)
-    kept = requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["boost_details"][0]
-    assert kept["status"] == "processing"
-    requests.post(f"{API}/orders/by-id/{oid}/boost-details", json={
-        "details": [{"product_id": pid, "link": "https://instagram.com/p/different"}],
-    }, timeout=15)
-    reset = requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["boost_details"][0]
-    assert reset["status"] == "pending" and reset["link"].endswith("different")
-
-    # boost-status requires admin auth
-    noauth = requests.post(f"{API}/admin/orders/{oid}/boost-status", json={"product_id": pid, "status": "completed"}, timeout=15)
     assert noauth.status_code == 401
+
+    # resubmitting the SAME link keeps status; CHANGED link resets to pending
+    requests.post(f"{API}/orders/by-id/{oid}/boost-details", json={
+        "details": [{"product_id": pid, "duration": "followers", "link": "https://tiktok.com/@mypage"}],
+    }, timeout=15)
+    kept = {d["duration"]: d for d in requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["boost_details"]}
+    assert kept["followers"]["status"] == "processing"
+    requests.post(f"{API}/orders/by-id/{oid}/boost-details", json={
+        "details": [{"product_id": pid, "duration": "followers", "link": "https://tiktok.com/@newpage"}],
+    }, timeout=15)
+    reset = {d["duration"]: d for d in requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["boost_details"]}
+    assert reset["followers"]["status"] == "pending" and reset["followers"]["link"].endswith("@newpage")
+    assert reset["likes"]["status"] == "pending"
 
 
 def test_custom_cheat_duration_end_to_end(admin_headers):
@@ -132,7 +168,6 @@ def test_custom_cheat_duration_end_to_end(admin_headers):
     assert r.status_code == 200, r.text
     pid = r.json()["id"]
     try:
-        # stock the custom pool (was rejected before: not in the fixed DURATIONS list)
         add = requests.post(f"{API}/admin/keystock", json={
             "product_id": pid, "duration": "2-weeks", "keys": "CUSTOM-2W-KEY-1",
         }, headers=admin_headers, timeout=15)

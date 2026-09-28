@@ -94,7 +94,7 @@ export default function PaymentSuccess() {
                         key={`${item.product_id}-${item.duration}`}
                         orderId={state.order.id}
                         item={item}
-                        detail={(state.order.boost_details || []).find((d) => d.product_id === item.product_id)}
+                        detail={(state.order.boost_details || []).find((d) => d.product_id === item.product_id && d.duration === item.duration)}
                         onSaved={(details) => setState((s) => ({ ...s, order: { ...s.order, boost_details: details } }))}
                       />
                     ) : (

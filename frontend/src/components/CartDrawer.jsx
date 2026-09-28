@@ -174,24 +174,39 @@ export default function CartDrawer() {
                   {item.product.game} · {item.duration_label || DURATION_LABELS[item.duration] || item.duration}
                   {(item.qty || 1) > 1 && <span className="text-[#8FB8E8]"> × {item.qty}</span>}
                 </div>
-                <div className="flex items-center gap-1.5 mt-1.5" data-testid={`qty-stepper-${item.product.id}`}>
-                  <button
-                    onClick={() => setQty(idx, (item.qty || 1) - 1)}
-                    disabled={(item.qty || 1) <= Math.max(1, item.product.min_buy || 1)}
-                    data-testid={`qty-minus-${item.product.id}`}
-                    className="w-5 h-5 inline-flex items-center justify-center rounded border border-[#1E2D4A] text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
-                  >
-                    <Minus className="w-3 h-3" />
-                  </button>
-                  <span className="font-mono text-xs text-slate-300 w-6 text-center" data-testid={`qty-value-${item.product.id}`}>{item.qty || 1}</span>
-                  <button
-                    onClick={() => setQty(idx, (item.qty || 1) + 1)}
-                    data-testid={`qty-plus-${item.product.id}`}
-                    className="w-5 h-5 inline-flex items-center justify-center rounded border border-[#1E2D4A] text-slate-400 hover:text-white transition-colors"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </button>
-                </div>
+                {item.product.kind === "boost" ? (
+                  <div className="flex items-center gap-1.5 mt-1.5" data-testid={`qty-stepper-${item.product.id}`}>
+                    <input
+                      type="number"
+                      value={item.qty || 1}
+                      min={item.min_units || 1}
+                      step="250"
+                      onChange={(e) => setQty(idx, e.target.value)}
+                      data-testid={`qty-input-${item.product.id}`}
+                      className="w-28 bg-[#0A1628] border border-[#1E2D4A] rounded px-2 py-1 font-mono text-xs text-slate-200 focus:outline-none focus:border-pink-400/60"
+                    />
+                    <span className="text-[10px] text-slate-600">min {(item.min_units || 1).toLocaleString()}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 mt-1.5" data-testid={`qty-stepper-${item.product.id}`}>
+                    <button
+                      onClick={() => setQty(idx, (item.qty || 1) - 1)}
+                      disabled={(item.qty || 1) <= Math.max(1, item.product.min_buy || 1)}
+                      data-testid={`qty-minus-${item.product.id}`}
+                      className="w-5 h-5 inline-flex items-center justify-center rounded border border-[#1E2D4A] text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="font-mono text-xs text-slate-300 w-6 text-center" data-testid={`qty-value-${item.product.id}`}>{item.qty || 1}</span>
+                    <button
+                      onClick={() => setQty(idx, (item.qty || 1) + 1)}
+                      data-testid={`qty-plus-${item.product.id}`}
+                      className="w-5 h-5 inline-flex items-center justify-center rounded border border-[#1E2D4A] text-slate-400 hover:text-white transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="font-mono text-sm font-bold text-[#8FB8E8]">{aud(item.price * (item.qty || 1))}</div>
               <button

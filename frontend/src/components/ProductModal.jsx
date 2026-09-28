@@ -118,6 +118,12 @@ export default function ProductModal({ product, onClose }) {
   const [duration, setDuration] = useState(null);
   const selected = duration && durations.includes(duration) ? duration : durations[0];
   const isBoost = product?.kind === "boost";
+  const [qtyInput, setQtyInput] = useState("");
+  const unit = product && selected ? Number(product.prices[selected]) || 0 : 0;
+  const minSpend = Number(product?.min_spend) || 0;
+  const minUnits = isBoost && unit > 0 && minSpend > 0 ? Math.ceil(minSpend / unit) : 1;
+  const boostQty = Math.max(minUnits, parseInt(qtyInput) || 0);
+  const boostTotal = unit * boostQty;
   const soldOut = product
     ? !isBoost && product.delivery !== "ticket" && durations.length > 0 && durations.every((d) => !(product.stock?.[d] > 0))
     : false;
@@ -191,8 +197,8 @@ export default function ProductModal({ product, onClose }) {
             )}
 
             <div className="mt-6">
-              <div className="text-sm font-medium text-slate-300 mb-2.5">{isBoost ? "Choose amount" : "Choose duration"}</div>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="text-sm font-medium text-slate-300 mb-2.5">{isBoost ? "What do you want boosted?" : "Choose duration"}</div>
+              <div className={`grid gap-2.5 ${isBoost ? "grid-cols-3" : "grid-cols-2"}`}>
                 {durations.map((d) => (
                   <button
                     key={d}
@@ -205,18 +211,55 @@ export default function ProductModal({ product, onClose }) {
                     }`}
                   >
                     <div className="text-xs text-slate-400">{durLabel(product, d)}</div>
-                    <div className={`font-mono font-bold mt-0.5 ${selected === d ? "text-[#8FB8E8]" : "text-slate-100"}`}>
-                      {aud(product.prices[d])}
-                    </div>
+                    {!isBoost && (
+                      <div className={`font-mono font-bold mt-0.5 ${selected === d ? "text-[#8FB8E8]" : "text-slate-100"}`}>
+                        {aud(product.prices[d])}
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
             </div>
 
             {isBoost && (
-              <div className="mt-4 p-3 rounded-lg bg-pink-500/10 border border-pink-400/30 text-xs text-pink-200 leading-relaxed" data-testid="modal-boost-note">
-                After payment you'll paste your {product.platform === "tiktok" ? "TikTok" : "Instagram"}{" "}
-                {product.boost_type === "followers" ? "page link" : "video/post link"} — our team starts the boost manually and you can track it in the Customer Portal.
+              <div className="mt-4" data-testid="boost-qty-section">
+                <div className="text-sm font-medium text-slate-300 mb-2.5">
+                  How many {durLabel(product, selected).toLowerCase()}? <span className="text-slate-500 font-normal">({(unit * 100).toFixed(1)}c each)</span>
+                </div>
+                <input
+                  type="number"
+                  min={minUnits}
+                  step="250"
+                  value={qtyInput === "" ? minUnits : qtyInput}
+                  onChange={(e) => setQtyInput(e.target.value)}
+                  data-testid="boost-qty-input"
+                  className="w-full bg-[#050B18] border border-[#1E2D4A] rounded-lg px-4 py-3 font-mono text-lg text-white focus:outline-none focus:border-pink-400/60"
+                />
+                <div className="flex gap-2 mt-2">
+                  {[2500, 5000, 10000, 25000].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setQtyInput(String(n))}
+                      data-testid={`boost-qty-chip-${n}`}
+                      className={`px-3 py-1.5 rounded-full border text-xs font-mono transition-colors ${
+                        boostQty === n ? "border-pink-400/60 text-pink-200 bg-pink-500/10" : "border-[#1E2D4A] text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      {n.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center justify-between p-3 rounded-lg bg-pink-500/10 border border-pink-400/30">
+                  <span className="text-xs text-pink-200">{boostQty.toLocaleString()} {durLabel(product, selected).toLowerCase()}</span>
+                  <span className="font-mono font-bold text-lg text-pink-100" data-testid="boost-total">{aud(boostTotal)}</span>
+                </div>
+                {minSpend > 0 && (
+                  <div className="mt-2 text-[11px] text-slate-500">
+                    Minimum spend {aud(minSpend)} (= {minUnits.toLocaleString()} at this price). After payment you'll paste your{" "}
+                    {product.platform === "tiktok" ? "TikTok" : "Instagram"}{" "}
+                    {selected === "followers" ? "page link" : "video/post link"} — our team starts the boost manually and you can track it in the Customer Portal.
+                  </div>
+                )}
               </div>
             )}
 
@@ -268,7 +311,7 @@ export default function ProductModal({ product, onClose }) {
               ) : (
                 <>
                   <button
-                    onClick={() => addItem(product, selected)}
+                    onClick={() => addItem(product, selected, isBoost ? boostQty : undefined)}
                     data-testid="add-to-cart-button"
                     className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-[#2E6BFF]/40 text-[#8FB8E8] text-sm font-semibold hover:bg-[#2E6BFF]/10 transition-all duration-200"
                   >
@@ -276,7 +319,7 @@ export default function ProductModal({ product, onClose }) {
                   </button>
                   <button
                     onClick={() => {
-                      addItem(product, selected);
+                      addItem(product, selected, isBoost ? boostQty : undefined);
                       onClose();
                       openCart();
                     }}

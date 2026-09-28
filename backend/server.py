@@ -192,7 +192,8 @@ class ProductIn(BaseModel):
     kind: str = "cheat"  # "cheat", "account" or "boost"
     account_type: Optional[str] = None  # for kind=account: "discord" | "steam" | "rockstar"
     platform: Optional[str] = None  # for kind=boost: "tiktok" | "instagram"
-    boost_type: Optional[str] = None  # for kind=boost: "followers" | "likes" | "views"
+    boost_type: Optional[str] = None  # legacy — buyers now pick the type at purchase time
+    min_spend: Optional[float] = None  # for kind=boost: minimum order value for the boost line
     duration_labels: Optional[Dict[str, str]] = None  # custom price-key labels, e.g. {"2-weeks": "2 Weeks"}
     delivery: str = "stock"  # "stock" (limited keys) or "ticket" (infinite, claim via Discord ticket)
     ticket_url: Optional[str] = None
@@ -599,8 +600,8 @@ def _validate_boost(body: ProductIn):
     if body.kind == "boost":
         if body.platform not in BOOST_PLATFORMS:
             raise HTTPException(400, "Boost products need a platform: tiktok or instagram")
-        if body.boost_type not in BOOST_TYPES:
-            raise HTTPException(400, "Boost products need a type: followers, likes or views")
+        if not body.prices:
+            raise HTTPException(400, "Boost products need a unit price")
 
 
 @api_router.post("/admin/products")
@@ -2026,11 +2027,29 @@ async def _price_cart(items: List[CartItemIn], coupon: Optional[str]):
         if price is None:
             raise HTTPException(400, f"Option not available for {product['name']}")
         label = _dur_label(product, item.duration)
-        min_buy = max(1, int(product.get("min_buy") or 1))
         qty = max(1, int(getattr(item, "qty", 1) or 1))
+        applies = not coupon_product_id or product["id"] == coupon_product_id
+        if product.get("kind") == "boost":
+            # unit pricing: qty = number of followers/likes/views, type = the chosen option
+            gross_cents = int(round(float(price) * qty * 100))
+            min_spend = float(product.get("min_spend") or 0)
+            if min_spend and gross_cents < int(round(min_spend * 100)):
+                raise HTTPException(400, f"{product['name']} has a minimum spend of A${min_spend:.2f}")
+            line_cents = int(round(gross_cents * (1 - (discount_pct if applies else 0) / 100)))
+            subtotal_cents += gross_cents
+            total_cents += line_cents
+            order_items.append({
+                "product_id": product["id"], "name": product["name"], "game": product["game"],
+                "duration": item.duration, "duration_label": label,
+                "kind": "boost", "platform": product.get("platform"), "boost_type": item.duration,
+                "unit_price": float(price), "license_key": None, "qty": qty,
+                "line_cents": line_cents,
+            })
+            continue
+        min_buy = max(1, int(product.get("min_buy") or 1))
         if qty < min_buy:
             raise HTTPException(400, f"{product['name']} has a minimum purchase of {min_buy}")
-        if product.get("kind") != "boost" and product.get("delivery") != "ticket":
+        if product.get("delivery") != "ticket":
             in_stock = await db.keystock.count_documents(
                 {"product_id": product["id"], "duration": item.duration, "status": "available"}
             )
@@ -2064,10 +2083,14 @@ async def create_checkout(body: CheckoutIn):
         {
             "price_data": {
                 "currency": "aud",
-                "unit_amount": int(round(it["unit_price"] * 100)),
-                "product_data": {"name": f"{it['name']} — {it['duration_label']}", "tax_code": "txcd_10000000"},
+                "unit_amount": it["line_cents"] if it.get("kind") == "boost" else int(round(it["unit_price"] * 100)),
+                "product_data": {
+                    "name": (f"{it['name']} — {it['duration_label']} × {int(it.get('qty', 1)):,}"
+                             if it.get("kind") == "boost" else f"{it['name']} — {it['duration_label']}"),
+                    "tax_code": "txcd_10000000",
+                },
             },
-            "quantity": int(it.get("qty", 1)),
+            "quantity": 1 if it.get("kind") == "boost" else int(it.get("qty", 1)),
         }
         for it in order_items
     ]
@@ -2402,11 +2425,16 @@ async def order_by_id(order_id: str):
 
 class BoostDetailIn(BaseModel):
     product_id: str
+    duration: str
     link: str
 
 
 class BoostDetailsIn(BaseModel):
     details: List[BoostDetailIn]
+
+
+def _boost_key(product_id: str, duration: str) -> str:
+    return f"{product_id}|{duration}"
 
 
 @api_router.post("/orders/by-id/{order_id}/boost-details")
@@ -2416,32 +2444,38 @@ async def submit_boost_details(order_id: str, body: BoostDetailsIn):
     order = await db.orders.find_one({"id": order_id, "payment_status": "paid"})
     if not order:
         raise HTTPException(404, "Order not found")
-    boost_items = {i["product_id"]: i for i in order.get("items", []) if i.get("kind") == "boost"}
+    boost_items = {
+        _boost_key(i["product_id"], i["duration"]): i
+        for i in order.get("items", []) if i.get("kind") == "boost"
+    }
     if not boost_items:
         raise HTTPException(400, "This order has no boost products")
     if not body.details:
         raise HTTPException(400, "Nothing to submit")
-    existing = {d["product_id"]: d for d in (order.get("boost_details") or [])}
+    existing = {_boost_key(d["product_id"], d.get("duration", "")): d for d in (order.get("boost_details") or [])}
     now = datetime.now(timezone.utc).isoformat()
     changed = []
     for d in body.details:
-        if d.product_id not in boost_items:
-            raise HTTPException(400, "That product is not a boost on this order")
+        key = _boost_key(d.product_id, d.duration)
+        if key not in boost_items:
+            raise HTTPException(400, "That boost is not on this order")
         link = d.link.strip()
         if not re.match(r"^https?://\S+$", link):
             raise HTTPException(400, "Link must start with http:// or https://")
-        prev = existing.get(d.product_id)
+        prev = existing.get(key)
         # a changed link resets to pending; an unchanged resubmit keeps its status
         status = prev.get("status", "pending") if prev and prev.get("link") == link else "pending"
+        item = boost_items[key]
         entry = {
-            "product_id": d.product_id, "link": link, "status": status,
+            "product_id": d.product_id, "duration": d.duration, "link": link, "status": status,
             "submitted_at": now,
-            "platform": boost_items[d.product_id].get("platform"),
-            "boost_type": boost_items[d.product_id].get("boost_type"),
-            "duration_label": boost_items[d.product_id].get("duration_label"),
-            "name": boost_items[d.product_id].get("name"),
+            "platform": item.get("platform"),
+            "boost_type": item.get("boost_type"),
+            "duration_label": item.get("duration_label"),
+            "qty": item.get("qty"),
+            "name": item.get("name"),
         }
-        existing[d.product_id] = entry
+        existing[key] = entry
         changed.append(entry)
     await db.orders.update_one(
         {"id": order_id},
@@ -2449,7 +2483,8 @@ async def submit_boost_details(order_id: str, body: BoostDetailsIn):
     )
     try:
         fields = [
-            {"name": e["name"] or e["product_id"], "value": e["link"], "inline": False}
+            {"name": f"{e['name'] or e['product_id']} — {e.get('duration_label') or ''} × {e.get('qty') or 1:,}",
+             "value": e["link"], "inline": False}
             for e in changed
         ]
         await _discord_alert(
@@ -2464,6 +2499,7 @@ async def submit_boost_details(order_id: str, body: BoostDetailsIn):
 
 class BoostStatusIn(BaseModel):
     product_id: str
+    duration: str
     status: str
 
 
@@ -2472,7 +2508,7 @@ async def admin_set_boost_status(order_id: str, body: BoostStatusIn, admin: dict
     if body.status not in BOOST_STATUSES:
         raise HTTPException(400, f"Status must be one of: {', '.join(BOOST_STATUSES)}")
     res = await db.orders.update_one(
-        {"id": order_id, "boost_details.product_id": body.product_id},
+        {"id": order_id, "boost_details.product_id": body.product_id, "boost_details.duration": body.duration},
         {"$set": {"boost_details.$.status": body.status,
                   "boost_details.$.status_updated_at": datetime.now(timezone.utc).isoformat(),
                   "updated_at": datetime.now(timezone.utc).isoformat()}},

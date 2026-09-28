@@ -24,7 +24,7 @@ const EMPTY_PRODUCT = {
   features: [], anticheat: "", prices: { day: "", "3d": "", week: "", month: "", lifetime: "" },
   min_buy: 1, kind: "cheat", account_type: null, delivery: "stock", ticket_url: "", loader_link: "",
   discord_url: "", instructions: "", system_requirements: "", troubleshooting: [], active: true, sort_order: 0,
-  platform: "", boost_type: "", duration_labels: {},
+  platform: "", boost_type: "", duration_labels: {}, unit_price: "", min_spend: "",
 };
 
 const FIXED_DURATIONS = ["day", "3d", "week", "month", "lifetime"];
@@ -33,16 +33,19 @@ const slugify = (s) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replac
 function ProductForm({ initial, categories, onSave, onClose }) {
   const [form, setForm] = useState(() => {
     if (!initial) return EMPTY_PRODUCT;
+    const boostUnit = initial.kind === "boost" ? (Object.values(initial.prices || {})[0] ?? "") : (initial.unit_price ?? "");
     return {
       ...EMPTY_PRODUCT,
       ...initial,
       prices: { day: "", "3d": "", week: "", month: "", lifetime: "", ...initial.prices },
       features: (initial.features || []).join(", "),
+      unit_price: boostUnit === "" ? "" : String(boostUnit),
+      min_spend: initial.min_spend != null ? String(initial.min_spend) : "",
     };
   });
-  // custom price options: custom durations for cheats/accounts, amount tiers for boosts
+  // custom price options: custom durations for cheats/accounts (boosts use unit pricing instead)
   const [customRows, setCustomRows] = useState(() => {
-    if (!initial) return [];
+    if (!initial || initial.kind === "boost") return [];
     const labels = initial.duration_labels || {};
     return Object.keys(initial.prices || {})
       .filter((k) => !FIXED_DURATIONS.includes(k))
@@ -59,37 +62,48 @@ function ProductForm({ initial, categories, onSave, onClose }) {
   const save = () => {
     const prices = {};
     const duration_labels = {};
-    if (!isBoost) {
+    if (isBoost) {
+      const unit = parseFloat(form.unit_price);
+      if (isNaN(unit) || unit <= 0) {
+        toast.error("Set a unit price — e.g. 0.002 for 0.2c per follower/like/view");
+        return;
+      }
+      for (const t of ["followers", "likes", "views"]) {
+        prices[t] = unit;
+        duration_labels[t] = t[0].toUpperCase() + t.slice(1);
+      }
+    } else {
       for (const [k, v] of Object.entries(form.prices)) {
         if (FIXED_DURATIONS.includes(k) && v !== "" && v != null && !isNaN(parseFloat(v))) prices[k] = parseFloat(v);
       }
-    }
-    const seenSlugs = new Set(Object.keys(prices));
-    for (const row of customRows) {
-      const label = (row.label || "").trim();
-      const slug = slugify(label);
-      if (!slug || row.price === "" || row.price == null || isNaN(parseFloat(row.price))) continue;
-      if (seenSlugs.has(slug)) {
-        toast.error(`Duplicate option: ${label}`);
-        return;
+      const seenSlugs = new Set(Object.keys(prices));
+      for (const row of customRows) {
+        const label = (row.label || "").trim();
+        const slug = slugify(label);
+        if (!slug || row.price === "" || row.price == null || isNaN(parseFloat(row.price))) continue;
+        if (seenSlugs.has(slug)) {
+          toast.error(`Duplicate option: ${label}`);
+          return;
+        }
+        seenSlugs.add(slug);
+        prices[slug] = parseFloat(row.price);
+        duration_labels[slug] = label;
       }
-      seenSlugs.add(slug);
-      prices[slug] = parseFloat(row.price);
-      duration_labels[slug] = label;
     }
     if (!form.game || !form.name || Object.keys(prices).length === 0) {
-      toast.error(isBoost ? "Category, name and at least one amount tier are required" : "Game, name and at least one price are required");
+      toast.error("Game, name and at least one price are required");
       return;
     }
-    if (isBoost && (!form.platform || !form.boost_type)) {
-      toast.error("Pick a platform and a boost type");
+    if (isBoost && !form.platform) {
+      toast.error("Pick a platform");
       return;
     }
     onSave({
       game: form.game, name: form.name, description: form.description,
       image_url: form.image_url, status: form.status, anticheat: form.anticheat, kind: form.kind || "cheat",
       platform: isBoost ? form.platform : null,
-      boost_type: isBoost ? form.boost_type : null,
+      boost_type: null,
+      min_spend: isBoost && form.min_spend !== "" && !isNaN(parseFloat(form.min_spend)) ? parseFloat(form.min_spend) : null,
       duration_labels: Object.keys(duration_labels).length ? duration_labels : null,
       loader_link: form.loader_link?.trim() || null,
       discord_url: form.discord_url?.trim() || null,
@@ -114,7 +128,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
         {initial?.id ? "Edit Product" : form.kind === "account" ? "New Discord Account" : isBoost ? "New Social Boost" : "New Cheat"}
       </h2>
       {isBoost && (
-        <div className="grid sm:grid-cols-2 gap-4 mt-2" data-testid="boost-fields">
+        <div className="grid sm:grid-cols-3 gap-4 mt-2" data-testid="boost-fields">
           <div>
             <label className={labelCls}>Platform</label>
             <Select value={form.platform} onValueChange={(v) => set("platform", v)}>
@@ -128,17 +142,14 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             </Select>
           </div>
           <div>
-            <label className={labelCls}>Boost type</label>
-            <Select value={form.boost_type} onValueChange={(v) => set("boost_type", v)}>
-              <SelectTrigger data-testid="product-form-boost-type" className={fieldCls}>
-                <SelectValue placeholder="Pick a type" />
-              </SelectTrigger>
-              <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
-                <SelectItem value="followers" data-testid="boost-type-followers">Followers (buyer gives page link)</SelectItem>
-                <SelectItem value="likes" data-testid="boost-type-likes">Likes (buyer gives video link)</SelectItem>
-                <SelectItem value="views" data-testid="boost-type-views">Views (buyer gives video link)</SelectItem>
-              </SelectContent>
-            </Select>
+            <label className={labelCls}>Price per follower/like/view (AUD)</label>
+            <Input type="number" step="0.0001" min="0" value={form.unit_price} onChange={(e) => set("unit_price", e.target.value)} placeholder="0.002" data-testid="product-form-unit-price" className={fieldCls} />
+            <div className="text-[10px] font-mono text-slate-600 mt-1">0.002 = 0.2c each — buyers pick Followers, Likes or Views and the amount</div>
+          </div>
+          <div>
+            <label className={labelCls}>Minimum spend (AUD)</label>
+            <Input type="number" step="0.50" min="0" value={form.min_spend} onChange={(e) => set("min_spend", e.target.value)} placeholder="7.50" data-testid="product-form-min-spend" className={fieldCls} />
+            <div className="text-[10px] font-mono text-slate-600 mt-1">At 0.2c each, A$7.50 = 3,750 minimum</div>
           </div>
         </div>
       )}
@@ -284,53 +295,48 @@ function ProductForm({ initial, categories, onSave, onClose }) {
               <Input type="number" step="0.01" value={form.prices[d]} onChange={(e) => setPrice(d, e.target.value)} data-testid={`product-form-price-${d}`} className={fieldCls} />
             </div>
           ))}
-          <div className="sm:col-span-2">
-            <label className={labelCls}>
-              {isBoost ? "Amount tiers — what the buyer picks (e.g. 500 Followers)" : "Custom durations (optional) — e.g. 2 Weeks"}
-            </label>
-            <div className="space-y-2" data-testid="custom-options-editor">
-              {customRows.map((row, i) => (
-                <div key={i} className="flex gap-2 items-start" data-testid={`custom-option-row-${i}`}>
-                  <Input
-                    value={row.label}
-                    onChange={(e) => setRow(i, "label", e.target.value)}
-                    placeholder={isBoost ? "Label — e.g. 1,000 Followers" : "Label — e.g. 2 Weeks"}
-                    data-testid={`custom-option-label-${i}`}
-                    className={fieldCls}
-                  />
-                  <Input
-                    type="number" step="0.01"
-                    value={row.price}
-                    onChange={(e) => setRow(i, "price", e.target.value)}
-                    placeholder="Price AUD"
-                    data-testid={`custom-option-price-${i}`}
-                    className={`${fieldCls} w-36 shrink-0`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setCustomRows((rows) => rows.filter((_, j) => j !== i))}
-                    data-testid={`custom-option-remove-${i}`}
-                    className="p-2 border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 rounded transition-colors shrink-0"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => setCustomRows((rows) => [...rows, { label: "", price: "" }])}
-                data-testid="custom-option-add"
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#1E2D4A] text-xs font-mono uppercase tracking-widest text-slate-300 hover:border-blue-400/50 hover:text-white transition-all"
-              >
-                <Plus className="w-3.5 h-3.5" /> {isBoost ? "Add tier" : "Add custom duration"}
-              </button>
-            </div>
-            {isBoost && (
-              <div className="text-[10px] font-mono text-slate-500 mt-1.5">
-                Boosts never sell out and need no keys — after payment the buyer pastes their link and you fulfil it from the Orders tab
+          {!isBoost && (
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Custom durations (optional) — e.g. 2 Weeks</label>
+              <div className="space-y-2" data-testid="custom-options-editor">
+                {customRows.map((row, i) => (
+                  <div key={i} className="flex gap-2 items-start" data-testid={`custom-option-row-${i}`}>
+                    <Input
+                      value={row.label}
+                      onChange={(e) => setRow(i, "label", e.target.value)}
+                      placeholder="Label — e.g. 2 Weeks"
+                      data-testid={`custom-option-label-${i}`}
+                      className={fieldCls}
+                    />
+                    <Input
+                      type="number" step="0.01"
+                      value={row.price}
+                      onChange={(e) => setRow(i, "price", e.target.value)}
+                      placeholder="Price AUD"
+                      data-testid={`custom-option-price-${i}`}
+                      className={`${fieldCls} w-36 shrink-0`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setCustomRows((rows) => rows.filter((_, j) => j !== i))}
+                      data-testid={`custom-option-remove-${i}`}
+                      className="p-2 border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 rounded transition-colors shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setCustomRows((rows) => [...rows, { label: "", price: "" }])}
+                  data-testid="custom-option-add"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#1E2D4A] text-xs font-mono uppercase tracking-widest text-slate-300 hover:border-blue-400/50 hover:text-white transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add custom duration
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
           <div>
             <label className={labelCls}>Sort Order</label>
             <Input type="number" value={form.sort_order} onChange={(e) => set("sort_order", e.target.value)} data-testid="product-form-sort" className={fieldCls} />
@@ -609,9 +615,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const setBoostStatus = async (orderId, productId, status) => {
+  const setBoostStatus = async (orderId, productId, duration, status) => {
     try {
-      await api.post(`/admin/orders/${orderId}/boost-status`, { product_id: productId, status });
+      await api.post(`/admin/orders/${orderId}/boost-status`, { product_id: productId, duration, status });
       toast.success(`Boost marked ${status}`);
       loadOrders();
     } catch (e) {
@@ -824,28 +830,28 @@ export default function AdminDashboard() {
                   {(o.boost_details || []).length > 0 && (
                     <div className="mt-3 pt-3 border-t border-blue-900/40 space-y-2" data-testid={`boost-details-${o.id}`}>
                       {o.boost_details.map((b) => (
-                        <div key={b.product_id} className="flex flex-wrap items-center gap-3 text-xs font-mono" data-testid={`boost-row-${o.id}-${b.product_id}`}>
+                        <div key={`${b.product_id}-${b.duration}`} className="flex flex-wrap items-center gap-3 text-xs font-mono" data-testid={`boost-row-${o.id}-${b.product_id}-${b.duration}`}>
                           <span className="text-pink-300 uppercase tracking-widest text-[10px] shrink-0">
                             {b.platform === "tiktok" ? "TikTok" : "Instagram"} {b.boost_type}
                           </span>
-                          <span className="text-slate-300">{b.name} ({b.duration_label})</span>
+                          <span className="text-slate-300">{b.name} — {(b.qty || 1).toLocaleString()} {b.duration_label}</span>
                           <a
                             href={b.link}
                             target="_blank"
                             rel="noopener noreferrer"
-                            data-testid={`boost-link-${o.id}-${b.product_id}`}
+                            data-testid={`boost-link-${o.id}-${b.product_id}-${b.duration}`}
                             className="text-blue-300 hover:text-white underline truncate max-w-[260px]"
                           >
                             {b.link}
                           </a>
-                          <Select value={b.status || "pending"} onValueChange={(v) => setBoostStatus(o.id, b.product_id, v)}>
-                            <SelectTrigger data-testid={`boost-status-select-${o.id}-${b.product_id}`} className="w-36 h-8 bg-[#050B18] border-[#1E2D4A] text-xs">
+                          <Select value={b.status || "pending"} onValueChange={(v) => setBoostStatus(o.id, b.product_id, b.duration, v)}>
+                            <SelectTrigger data-testid={`boost-status-select-${o.id}-${b.product_id}-${b.duration}`} className="w-36 h-8 bg-[#050B18] border-[#1E2D4A] text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
-                              <SelectItem value="pending" data-testid={`boost-status-pending-${o.id}-${b.product_id}`}>Pending</SelectItem>
-                              <SelectItem value="processing" data-testid={`boost-status-processing-${o.id}-${b.product_id}`}>Processing</SelectItem>
-                              <SelectItem value="completed" data-testid={`boost-status-completed-${o.id}-${b.product_id}`}>Completed</SelectItem>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="processing">Processing</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

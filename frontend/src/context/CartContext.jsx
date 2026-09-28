@@ -29,17 +29,24 @@ export function CartProvider({ children }) {
     localStorage.setItem("void_cart", JSON.stringify(items));
   }, [items]);
 
-  const addItem = useCallback((product, duration) => {
+  const addItem = useCallback((product, duration, qty) => {
     setItems((prev) => {
       if (prev.some((i) => i.product.id === product.id && i.duration === duration)) {
         toast.error("Already in your cart");
         return prev;
       }
+      const isBoost = product.kind === "boost";
       const minBuy = Math.max(1, product.min_buy || 1);
+      const unit = Number(product.prices[duration]) || 0;
+      const minSpend = Number(product.min_spend) || 0;
+      const minUnits = isBoost && unit > 0 && minSpend > 0 ? Math.ceil(minSpend / unit) : minBuy;
+      const finalQty = isBoost ? Math.max(minUnits, parseInt(qty) || 0) : minBuy;
       const label = durLabel(product, duration);
-      toast.success(minBuy > 1
-        ? `${product.name} (${label}) ×${minBuy} pack added to cart`
-        : `${product.name} (${label}) added to cart`);
+      toast.success(isBoost
+        ? `${finalQty.toLocaleString()} ${label.toLowerCase()} added to cart`
+        : minBuy > 1
+          ? `${product.name} (${label}) ×${minBuy} pack added to cart`
+          : `${product.name} (${label}) added to cart`);
       return [
         ...prev,
         {
@@ -51,11 +58,11 @@ export function CartProvider({ children }) {
             min_buy: minBuy,
             kind: product.kind || "cheat",
             platform: product.platform || null,
-            boost_type: product.boost_type || null,
           },
           duration,
           duration_label: label,
-          qty: minBuy,
+          qty: finalQty,
+          min_units: isBoost ? minUnits : null,
           price: product.prices[duration],
         },
       ];
@@ -65,8 +72,10 @@ export function CartProvider({ children }) {
   const setQty = useCallback((idx, qty) => {
     setItems((prev) => prev.map((it, i) => {
       if (i !== idx) return it;
-      const min = Math.max(1, it.product.min_buy || 1);
-      return { ...it, qty: Math.max(min, Math.min(100, qty)) };
+      const isBoost = it.product.kind === "boost";
+      const min = it.min_units || Math.max(1, it.product.min_buy || 1);
+      const max = isBoost ? 10000000 : 100;
+      return { ...it, qty: Math.max(min, Math.min(max, parseInt(qty) || min)) };
     }));
   }, []);
 
