@@ -432,7 +432,7 @@ async def send_lookup_code_email(email: str, code: str) -> None:
         'background:#050B18;border:1px solid #1E2D4A;border-radius:8px;padding:16px;text-align:center;margin:12px 0">'
         + escape(code) + '</div>'
         '<p style="color:#94A3B8;font-size:13px;margin:0">Enter it on the My Orders page to view your '
-        'purchases. It expires in 10 minutes. If you did not request this code, you can ignore this email.</p>'
+        'purchases. It expires in 15 minutes. If you did not request this code, you can ignore this email.</p>'
     )
     await send_email(
         to=email,

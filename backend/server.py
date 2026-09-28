@@ -222,7 +222,7 @@ class VerifyCodeIn(BaseModel):
 
 # ---------- buyer OTP (My Orders access) ----------
 
-OTP_TTL_MINUTES = 10
+OTP_TTL_MINUTES = 15
 OTP_RESEND_SECONDS = 60
 OTP_MAX_ATTEMPTS = 5
 LOOKUP_TOKEN_HOURS = 2  # browser-session access window

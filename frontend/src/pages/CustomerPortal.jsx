@@ -317,7 +317,7 @@ export default function CustomerPortal() {
           {stage === "code" && (
             <div data-testid="otp-code-step">
               <div className="text-xs text-slate-400 mb-3">
-                We emailed a 6-digit code to <span className="text-slate-200">{email.trim().toLowerCase()}</span>. It expires in 10 minutes.
+                We emailed a 6-digit code to <span className="text-slate-200">{email.trim().toLowerCase()}</span>. It expires in 15 minutes.
               </div>
               <div className="flex gap-3">
                 <Input
