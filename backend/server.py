@@ -489,7 +489,10 @@ async def admin_reorder_categories(body: CategoryReorderIn, admin: dict = Depend
 
 @api_router.get("/status")
 async def status_matrix():
-    docs = await db.products.find({}, {"_id": 0, "id": 1, "name": 1, "game": 1, "status": 1, "anticheat": 1, "updated_at": 1}).sort("sort_order", 1).to_list(200)
+    docs = await db.products.find(
+        {"$or": [{"kind": "cheat"}, {"kind": {"$exists": False}}]},
+        {"_id": 0, "id": 1, "name": 1, "game": 1, "status": 1, "anticheat": 1, "updated_at": 1},
+    ).sort("sort_order", 1).to_list(200)
     return docs
 
 

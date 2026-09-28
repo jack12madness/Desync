@@ -11,6 +11,10 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-28 — Status page: account products removed
+- GET /api/status now returns only kind=cheat (or legacy kindless) products — account products no longer show detection statuses. Verified: only SPECTRE, PHANTOM, Generator listed
+
+
 ### 2026-09-26 — Round 2: form simplification, category drag, sysreq/troubleshooting, wheel-scroll fix, product coupons, live promo banner, 3-day duration
 - Account-type selector removed from product form; keystock parser now auto-detects ALL formats by labels/shape (rockstar by 2FA labels, steam by Steam/Webmail labels, discord colon format, email:password, raw fallback) — account_type ignored
 - Categories drag-to-reorder (CategoriesTab, POST /api/admin/categories/reorder, full-set validation); storefront collections follow
