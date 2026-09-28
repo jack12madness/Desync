@@ -157,31 +157,46 @@ def test_boost_link_and_status_flow(admin_headers, boost_product):
     assert reset["likes"]["status"] == "pending"
 
 
-def test_boost_bulk_tiers_bigger_discount_wins(admin_headers):
-    """Qty-based bulk % applies automatically; only the bigger of bulk vs coupon applies."""
+def test_boost_bulk_tiers_per_type_and_bigger_discount_wins(admin_headers):
+    """Per-type bulk % applies automatically; only the bigger of bulk vs coupon applies."""
     r = requests.post(f"{API}/admin/products", json={
         "game": "FiveM", "name": f"TEST-Bulk-{uuid.uuid4().hex[:6]}", "kind": "boost",
-        "platform": "instagram", "min_spend": 5.0,
+        "platform": "instagram", "min_spend": 5.0, "min_qty": 100,
         "prices": {"followers": UNIT, "likes": UNIT, "views": UNIT},
         "duration_labels": {"followers": "Followers", "likes": "Likes", "views": "Views"},
-        "bulk_tiers": [{"min_qty": 10000, "percent": 5}, {"min_qty": 50000, "percent": 15}],
+        "bulk_tiers": {
+            "likes": [{"min_qty": 10000, "percent": 5}, {"min_qty": 50000, "percent": 15}],
+            "followers": [{"min_qty": 10000, "percent": 20}],
+        },
         "image_url": "https://example.com/b.png",
     }, headers=admin_headers, timeout=15)
     assert r.status_code == 200, r.text
     pid = r.json()["id"]
     try:
         email = f"bulk-{uuid.uuid4().hex[:6]}@resend.dev"
-        # 5,000 -> no tier: 5,000 x 0.2c = A$10.00
+        # below min buy: 50 units rejected even though A$0.10 < min spend would also fail
+        r = requests.post(f"{API}/payments/bank-transfer", json={
+            "email": email, "items": [{"product_id": pid, "duration": "likes", "qty": 50}], "origin_url": BASE,
+        }, timeout=30)
+        assert r.status_code == 400 and "minimum purchase of 100" in r.json()["detail"]
+        # 5,000 likes -> no tier: A$10.00
         oid = _buy_and_pay(admin_headers, email, [{"product_id": pid, "duration": "likes", "qty": 5000}])
         assert requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["total"] == 10.0
-        # 10,000 -> 5% tier: A$20.00 -> A$19.00
+        # 10,000 likes -> 5% tier: A$20.00 -> A$19.00
         oid = _buy_and_pay(admin_headers, email, [{"product_id": pid, "duration": "likes", "qty": 10000}])
         order = requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()
         assert order["total"] == 19.0 and order["items"][0]["bulk_percent"] == 5
-        # 50,000 -> 15% tier: A$100.00 -> A$85.00
+        # 10,000 followers -> DIFFERENT tier: 20% off -> A$16.00
+        oid = _buy_and_pay(admin_headers, email, [{"product_id": pid, "duration": "followers", "qty": 10000}])
+        order = requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()
+        assert order["total"] == 16.0 and order["items"][0]["bulk_percent"] == 20
+        # 10,000 views -> no views tiers: full price A$20.00
+        oid = _buy_and_pay(admin_headers, email, [{"product_id": pid, "duration": "views", "qty": 10000}])
+        assert requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["total"] == 20.0
+        # 50,000 likes -> 15% tier: A$100.00 -> A$85.00
         oid = _buy_and_pay(admin_headers, email, [{"product_id": pid, "duration": "likes", "qty": 50000}])
         assert requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["total"] == 85.0
-        # coupon DESYNC10 (10%) vs bulk 5% on 10,000 -> coupon wins: A$18.00, no stacking
+        # coupon DESYNC10 (10%) vs bulk 5% on 10,000 likes -> coupon wins: A$18.00, no stacking
         r = requests.post(f"{API}/payments/bank-transfer", json={
             "email": email, "items": [{"product_id": pid, "duration": "likes", "qty": 10000}],
             "coupon": "DESYNC10", "origin_url": BASE,
@@ -198,6 +213,26 @@ def test_boost_bulk_tiers_bigger_discount_wins(admin_headers):
         oid = r.json()["order_id"]
         requests.post(f"{API}/admin/orders/{oid}/mark-paid", headers=admin_headers, timeout=30)
         assert requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["total"] == 85.0
+    finally:
+        requests.delete(f"{API}/admin/products/{pid}", headers=admin_headers, timeout=15)
+
+
+def test_boost_legacy_flat_bulk_tiers_still_work(admin_headers):
+    """A flat bulk_tiers list (older format) applies to every type."""
+    r = requests.post(f"{API}/admin/products", json={
+        "game": "FiveM", "name": f"TEST-BulkLegacy-{uuid.uuid4().hex[:6]}", "kind": "boost",
+        "platform": "tiktok", "min_spend": 5.0,
+        "prices": {"followers": UNIT, "likes": UNIT, "views": UNIT},
+        "duration_labels": {"followers": "Followers", "likes": "Likes", "views": "Views"},
+        "bulk_tiers": [{"min_qty": 10000, "percent": 10}],
+        "image_url": "https://example.com/b.png",
+    }, headers=admin_headers, timeout=15)
+    assert r.status_code == 200, r.text
+    pid = r.json()["id"]
+    try:
+        email = f"legacy-{uuid.uuid4().hex[:6]}@resend.dev"
+        oid = _buy_and_pay(admin_headers, email, [{"product_id": pid, "duration": "views", "qty": 10000}])
+        assert requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["total"] == 18.0
     finally:
         requests.delete(f"{API}/admin/products/{pid}", headers=admin_headers, timeout=15)
 

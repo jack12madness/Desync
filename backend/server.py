@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional, Dict
+from typing import Any, List, Optional, Dict
 import time, uuid, logging, secrets, string, asyncio, hashlib, hmac
 import html, json, re
 from datetime import datetime, timezone, timedelta
@@ -212,7 +212,8 @@ class ProductIn(BaseModel):
     platform: Optional[str] = None  # for kind=boost: "tiktok" | "instagram"
     boost_type: Optional[str] = None  # legacy — buyers now pick the type at purchase time
     min_spend: Optional[float] = None  # for kind=boost: minimum order value for the boost line
-    bulk_tiers: Optional[List[BulkTier]] = None  # for kind=boost: qty-based % discounts, e.g. 10,000+ = 5% off
+    min_qty: Optional[int] = None  # for kind=boost: minimum amount per purchase (e.g. 100)
+    bulk_tiers: Optional[Any] = None  # for kind=boost: {"followers": [{min_qty, percent}], ...} or a flat list (applies to all types)
     duration_labels: Optional[Dict[str, str]] = None  # custom price-key labels, e.g. {"2-weeks": "2 Weeks"}
     delivery: str = "stock"  # "stock" (limited keys) or "ticket" (infinite, claim via Discord ticket)
     ticket_url: Optional[str] = None
@@ -450,7 +451,8 @@ async def list_products():
     docs = await db.products.find({"active": True}, {"_id": 0}).sort("sort_order", 1).to_list(200)
     stock = await _available_stock_map()
     for d in docs:
-        d["stock"] = stock.get(d["id"], {})
+        # boosts are unit-priced and never stocked — never report stock for them
+        d["stock"] = {} if d.get("kind") == "boost" else stock.get(d["id"], {})
         d["has_loader"] = bool(d.pop("loader", None))
     return docs
 
@@ -615,21 +617,32 @@ async def admin_list_products(admin: dict = Depends(get_admin)):
     return await db.products.find({}, {"_id": 0}).sort("sort_order", 1).to_list(500)
 
 
+def _tiers_for(product: dict, duration: str) -> list:
+    """Bulk tiers for a boost type. Supports per-type dict and legacy flat list (all types)."""
+    bt = product.get("bulk_tiers") or []
+    if isinstance(bt, dict):
+        return bt.get(duration) or []
+    return bt
+
+
 def _validate_boost(body: ProductIn):
     if body.kind == "boost":
         if body.platform not in BOOST_PLATFORMS:
             raise HTTPException(400, "Boost products need a platform: tiktok or instagram")
         if not body.prices:
             raise HTTPException(400, "Boost products need a unit price")
-        for t in (body.bulk_tiers or []):
-            if t.min_qty < 1 or not (0 < t.percent <= 90):
-                raise HTTPException(400, "Bulk tiers need an amount of at least 1 and a percent between 0 and 90")
+        tiers = body.bulk_tiers or []
+        flat = list(tiers.values()) if isinstance(tiers, dict) else [tiers]
+        for group in flat:
+            for t in group:
+                if int(t.get("min_qty") or 0) < 1 or not (0 < float(t.get("percent") or 0) <= 90):
+                    raise HTTPException(400, "Bulk tiers need an amount of at least 1 and a percent between 0 and 90")
 
 
-def _bulk_pct(product: dict, qty: int) -> float:
-    """Best quantity-based bulk discount percent for a boost product."""
+def _bulk_pct(product: dict, duration: str, qty: int) -> float:
+    """Best quantity-based bulk discount percent for a boost type."""
     best = 0.0
-    for t in (product.get("bulk_tiers") or []):
+    for t in _tiers_for(product, duration):
         if qty >= int(t.get("min_qty") or 0):
             best = max(best, float(t.get("percent") or 0))
     return best
@@ -2062,11 +2075,14 @@ async def _price_cart(items: List[CartItemIn], coupon: Optional[str]):
         applies = not coupon_product_id or product["id"] == coupon_product_id
         if product.get("kind") == "boost":
             # unit pricing: qty = number of followers/likes/views, type = the chosen option
+            min_units = int(product.get("min_qty") or 1)
+            if qty < min_units:
+                raise HTTPException(400, f"{product['name']} has a minimum purchase of {min_units:,}")
             gross_cents = int(round(float(price) * qty * 100))
             min_spend = float(product.get("min_spend") or 0)
             if min_spend and gross_cents < int(round(min_spend * 100)):
                 raise HTTPException(400, f"{product['name']} has a minimum spend of A${min_spend:.2f}")
-            bulk_pct = _bulk_pct(product, qty)
+            bulk_pct = _bulk_pct(product, item.duration, qty)
             coupon_pct = discount_pct if applies else 0.0
             eff_pct = max(bulk_pct, coupon_pct)  # bigger discount wins — no stacking
             line_cents = int(round(gross_cents * (1 - eff_pct / 100)))

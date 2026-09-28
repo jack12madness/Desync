@@ -106,9 +106,13 @@ export default function ProductModal({ product, onClose }) {
   const [qtyInput, setQtyInput] = useState("");
   const unit = product && selected ? Number(product.prices[selected]) || 0 : 0;
   const minSpend = Number(product?.min_spend) || 0;
-  const minUnits = isBoost && unit > 0 && minSpend > 0 ? Math.ceil(minSpend / unit) : 1;
+  const minQty = parseInt(product?.min_qty) || 1;
+  const spendUnits = isBoost && unit > 0 && minSpend > 0 ? Math.ceil(minSpend / unit) : 1;
+  const minUnits = Math.max(spendUnits, isBoost ? minQty : 1);
   const boostQty = Math.max(minUnits, parseInt(qtyInput) || 0);
-  const bulkTiers = Array.isArray(product?.bulk_tiers) ? [...product.bulk_tiers].sort((a, b) => a.min_qty - b.min_qty) : [];
+  const rawTiers = product?.bulk_tiers;
+  const typeTiers = Array.isArray(rawTiers) ? rawTiers : (rawTiers && rawTiers[selected]) || [];
+  const bulkTiers = [...typeTiers].sort((a, b) => a.min_qty - b.min_qty);
   const bulkPct = bulkTiers.reduce((best, t) => (boostQty >= (t.min_qty || 0) ? Math.max(best, t.percent || 0) : best), 0);
   const boostTotal = unit * boostQty * (1 - bulkPct / 100);
   const soldOut = product
@@ -263,13 +267,12 @@ export default function ProductModal({ product, onClose }) {
                     {aud(boostTotal)}
                   </span>
                 </div>
-                {minSpend > 0 && (
-                  <div className="mt-2 text-[11px] text-slate-500">
-                    Minimum spend {aud(minSpend)} (= {minUnits.toLocaleString()} at this price). After payment you'll paste your{" "}
-                    {product.platform === "tiktok" ? "TikTok" : "Instagram"}{" "}
-                    {selected === "followers" ? "page link" : "video/post link"} — our team starts the boost manually and you can track it in the Customer Portal.
-                  </div>
-                )}
+                <div className="mt-2 text-[11px] text-slate-500">
+                  Minimum {minUnits.toLocaleString()} {durLabel(product, selected).toLowerCase()}
+                  {minSpend > 0 && spendUnits >= minQty ? ` (minimum spend ${aud(minSpend)})` : ""}.
+                  After payment you'll paste your {product.platform === "tiktok" ? "TikTok" : "Instagram"}{" "}
+                  {selected === "followers" ? "page link" : "video/post link"} — our team starts the boost manually and you can track it in the Customer Portal.
+                </div>
               </div>
             )}
 

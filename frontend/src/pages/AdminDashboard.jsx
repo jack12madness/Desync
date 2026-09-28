@@ -24,7 +24,7 @@ const EMPTY_PRODUCT = {
   features: [], anticheat: "", prices: { day: "", "3d": "", week: "", month: "", lifetime: "" },
   min_buy: 1, kind: "cheat", account_type: null, delivery: "stock", ticket_url: "", loader_link: "",
   discord_url: "", instructions: "", system_requirements: "", troubleshooting: [], active: true, sort_order: 0,
-  platform: "", boost_type: "", duration_labels: {}, min_spend: "",
+  platform: "", boost_type: "", duration_labels: {}, min_spend: "", min_qty: "",
   boost_prices: { followers: "", likes: "", views: "" },
 };
 
@@ -46,6 +46,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
         views: bp.views != null ? String(bp.views) : "",
       },
       min_spend: initial.min_spend != null ? String(initial.min_spend) : "",
+      min_qty: initial.min_qty != null ? String(initial.min_qty) : "",
     };
   });
   // custom price options: custom durations for cheats/accounts (boosts use unit pricing instead)
@@ -56,9 +57,17 @@ function ProductForm({ initial, categories, onSave, onClose }) {
       .filter((k) => !FIXED_DURATIONS.includes(k))
       .map((k) => ({ label: labels[k] || k, price: String(initial.prices[k]) }));
   });
-  const [bulkRows, setBulkRows] = useState(() =>
-    (initial?.bulk_tiers || []).map((t) => ({ min_qty: String(t.min_qty), percent: String(t.percent) }))
-  );
+  const [bulkRows, setBulkRows] = useState(() => {
+    const bt = initial?.bulk_tiers;
+    if (!bt) return [];
+    if (Array.isArray(bt)) {
+      // legacy flat list applied to all types
+      return bt.map((t) => ({ type: "all", min_qty: String(t.min_qty), percent: String(t.percent) }));
+    }
+    return Object.entries(bt).flatMap(([type, tiers]) =>
+      (tiers || []).map((t) => ({ type, min_qty: String(t.min_qty), percent: String(t.percent) }))
+    );
+  });
   const [loaderFile, setLoaderFile] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [removeLoader, setRemoveLoader] = useState(false);
@@ -119,10 +128,23 @@ function ProductForm({ initial, categories, onSave, onClose }) {
       platform: isBoost ? form.platform : null,
       boost_type: null,
       min_spend: isBoost && form.min_spend !== "" && !isNaN(parseFloat(form.min_spend)) ? parseFloat(form.min_spend) : null,
+      min_qty: isBoost && form.min_qty !== "" && !isNaN(parseInt(form.min_qty)) ? parseInt(form.min_qty) : null,
       bulk_tiers: isBoost
-        ? bulkRows
-            .map((r) => ({ min_qty: parseInt(r.min_qty), percent: parseFloat(r.percent) }))
-            .filter((r) => !isNaN(r.min_qty) && r.min_qty > 0 && !isNaN(r.percent) && r.percent > 0)
+        ? (() => {
+            const valid = bulkRows
+              .map((r) => ({ type: r.type, min_qty: parseInt(r.min_qty), percent: parseFloat(r.percent) }))
+              .filter((r) => !isNaN(r.min_qty) && r.min_qty > 0 && !isNaN(r.percent) && r.percent > 0);
+            if (!valid.length) return null;
+            const out = {};
+            for (const r of valid) {
+              const types = r.type === "all" ? Object.keys(prices) : [r.type];
+              for (const t of types) {
+                if (!prices[t]) continue;
+                out[t] = [...(out[t] || []), { min_qty: r.min_qty, percent: r.percent }];
+              }
+            }
+            return Object.keys(out).length ? out : null;
+          })()
         : null,
       duration_labels: Object.keys(duration_labels).length ? duration_labels : null,
       loader_link: form.loader_link?.trim() || null,
@@ -181,11 +203,27 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             <Input type="number" step="0.50" min="0" value={form.min_spend} onChange={(e) => set("min_spend", e.target.value)} placeholder="7.50" data-testid="product-form-min-spend" className={fieldCls} />
             <div className="text-[10px] font-mono text-slate-600 mt-1">At 0.2c each, A$7.50 = 3,750 minimum</div>
           </div>
+          <div>
+            <label className={labelCls}>Minimum amount per purchase</label>
+            <Input type="number" min="1" step="50" value={form.min_qty} onChange={(e) => set("min_qty", e.target.value)} placeholder="100" data-testid="product-form-min-qty" className={fieldCls} />
+            <div className="text-[10px] font-mono text-slate-600 mt-1">Buyers can't purchase fewer than this many — e.g. 100</div>
+          </div>
           <div className="sm:col-span-3">
-            <label className={labelCls}>Bulk discounts (optional) — bigger orders get % off</label>
+            <label className={labelCls}>Bulk discounts (optional) — per type, bigger orders get % off</label>
             <div className="space-y-2" data-testid="bulk-tiers-editor">
               {bulkRows.map((row, i) => (
                 <div key={i} className="flex gap-2 items-center" data-testid={`bulk-tier-row-${i}`}>
+                  <Select value={row.type} onValueChange={(v) => setBulkRow(i, "type", v)}>
+                    <SelectTrigger data-testid={`bulk-tier-type-${i}`} className={`${fieldCls} w-36 shrink-0`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
+                      <SelectItem value="all">All types</SelectItem>
+                      <SelectItem value="followers">Followers</SelectItem>
+                      <SelectItem value="likes">Likes</SelectItem>
+                      <SelectItem value="views">Views</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Input
                     type="number" min="1" step="500"
                     value={row.min_qty}
@@ -216,7 +254,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
               ))}
               <button
                 type="button"
-                onClick={() => setBulkRows((rows) => [...rows, { min_qty: "", percent: "" }])}
+                onClick={() => setBulkRows((rows) => [...rows, { type: "all", min_qty: "", percent: "" }])}
                 data-testid="bulk-tier-add"
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#1E2D4A] text-xs font-mono uppercase tracking-widest text-slate-300 hover:border-blue-400/50 hover:text-white transition-all"
               >

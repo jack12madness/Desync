@@ -11,6 +11,13 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-28 (later) — Boost refinements: per-type prices, per-type bulk tiers, min buy
+- Separate unit price per type (followers/likes/views); blank = hidden from buyers (product-form-price-followers/likes/views)
+- bulk_tiers now per-type dict {"followers": [...], "likes": [...]} with "All types" option in admin form; legacy flat list still honored (_tiers_for)
+- min_qty per boost product (e.g. 100) — enforced in _price_cart and modal/cart minimums; effective min = max(min_qty, ceil(min_spend/unit))
+- /products stock map now returns {} for boost products (stock is meaningless for them) — this also un-breaks older tests when real boost products exist
+- Test helpers across all suites skip kind=boost when picking products; 61 passed 2 skipped
+
 ### 2026-09-28 — Social media boosts + custom durations + bulk discounts
 - Boost products (kind "boost"): ONE product per platform (tiktok/instagram); buyer picks Followers/Likes/Views inside it, enters an amount, pays amount × per-type unit price; min_spend enforced (e.g. A$7.50); blank type price = hidden from buyers; never sold out, no keys
 - Bulk tiers per boost product: [{"min_qty": 10000, "percent": 5}] — auto-applied; bigger of bulk vs coupon wins per line (NO stacking, user decision); shown in modal, cart, and charged in _price_cart

@@ -124,6 +124,8 @@ def test_old_5pct_coupon_gone():
 def _find_product_with_stock():
     products = requests.get(f"{API}/products", timeout=15).json()
     for p in products:
+        if p.get("kind") == "boost":
+            continue  # boosts are unit-priced, never stocked
         for d, count in (p.get("stock") or {}).items():
             if count > 0 and d in (p.get("prices") or {}):
                 return p, d

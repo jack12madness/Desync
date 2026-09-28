@@ -335,7 +335,7 @@ def test_standard_tier_over_10_aud_stays_1_per_hour(admin_headers, products):
     """A paid order over A$10 (no Generator key) grants lifetime 1/type/hr."""
     email = f"std-{uuid.uuid4().hex[:6]}@resend.dev"
     prods = requests.get(f"{API}/admin/products", headers=admin_headers, timeout=15).json()
-    cheat = next(p for p in prods if p.get("kind") != "account" and "generator" not in p["name"].lower())
+    cheat = next(p for p in prods if p.get("kind") not in ("account", "boost") and "generator" not in p["name"].lower())
     # pick a duration priced over A$10, else buy qty to push total over 10
     dur = next((d for d, pr in cheat["prices"].items() if float(pr) > 10), None)
     if dur:

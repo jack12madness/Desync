@@ -24,8 +24,10 @@ export default function CartDrawer() {
 
   // bulk tiers (boost lines) vs coupon: the bigger discount wins per line — no stacking
   const bulkPct = (i) => {
-    if (i.product.kind !== "boost" || !Array.isArray(i.product.bulk_tiers)) return 0;
-    return i.product.bulk_tiers.reduce((best, t) => ((i.qty || 1) >= (t.min_qty || 0) ? Math.max(best, t.percent || 0) : best), 0);
+    if (i.product.kind !== "boost") return 0;
+    const bt = i.product.bulk_tiers;
+    const tiers = Array.isArray(bt) ? bt : (bt && bt[i.duration]) || [];
+    return tiers.reduce((best, t) => ((i.qty || 1) >= (t.min_qty || 0) ? Math.max(best, t.percent || 0) : best), 0);
   };
   const couponPct = (i) => {
     if (!coupon) return 0;

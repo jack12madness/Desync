@@ -73,6 +73,8 @@ def ensure_stock(admin_headers):
 def _in_stock_product(prices_dur=None):
     prods = requests.get(f"{API}/products", timeout=15).json()
     for p in prods:
+        if p.get("kind") == "boost":
+            continue  # boosts are unit-priced, never stocked
         for d, cnt in (p.get("stock") or {}).items():
             if cnt > 0 and d in (p.get("prices") or {}):
                 if prices_dur is None or d == prices_dur:

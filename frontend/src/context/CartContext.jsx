@@ -66,7 +66,8 @@ export function CartProvider({ children }) {
       const minBuy = Math.max(1, product.min_buy || 1);
       const unit = Number(product.prices[duration]) || 0;
       const minSpend = Number(product.min_spend) || 0;
-      const minUnits = isBoost && unit > 0 && minSpend > 0 ? Math.ceil(minSpend / unit) : minBuy;
+      const spendUnits = unit > 0 && minSpend > 0 ? Math.ceil(minSpend / unit) : 1;
+      const minUnits = isBoost ? Math.max(spendUnits, parseInt(product.min_qty) || 1) : minBuy;
       const finalQty = isBoost ? Math.max(minUnits, parseInt(qty) || 0) : minBuy;
       const label = durLabel(product, duration);
       toast.success(isBoost
