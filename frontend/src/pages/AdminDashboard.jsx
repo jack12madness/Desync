@@ -24,35 +24,73 @@ const EMPTY_PRODUCT = {
   features: [], anticheat: "", prices: { day: "", "3d": "", week: "", month: "", lifetime: "" },
   min_buy: 1, kind: "cheat", account_type: null, delivery: "stock", ticket_url: "", loader_link: "",
   discord_url: "", instructions: "", system_requirements: "", troubleshooting: [], active: true, sort_order: 0,
+  platform: "", boost_type: "", duration_labels: {},
 };
+
+const FIXED_DURATIONS = ["day", "3d", "week", "month", "lifetime"];
+const slugify = (s) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 function ProductForm({ initial, categories, onSave, onClose }) {
   const [form, setForm] = useState(() => {
     if (!initial) return EMPTY_PRODUCT;
     return {
+      ...EMPTY_PRODUCT,
       ...initial,
       prices: { day: "", "3d": "", week: "", month: "", lifetime: "", ...initial.prices },
       features: (initial.features || []).join(", "),
     };
+  });
+  // custom price options: custom durations for cheats/accounts, amount tiers for boosts
+  const [customRows, setCustomRows] = useState(() => {
+    if (!initial) return [];
+    const labels = initial.duration_labels || {};
+    return Object.keys(initial.prices || {})
+      .filter((k) => !FIXED_DURATIONS.includes(k))
+      .map((k) => ({ label: labels[k] || k, price: String(initial.prices[k]) }));
   });
   const [loaderFile, setLoaderFile] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [removeLoader, setRemoveLoader] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setPrice = (k, v) => setForm((f) => ({ ...f, prices: { ...f.prices, [k]: v } }));
+  const setRow = (i, k, v) => setCustomRows((rows) => rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  const isBoost = form.kind === "boost";
 
   const save = () => {
     const prices = {};
-    for (const [k, v] of Object.entries(form.prices)) {
-      if (v !== "" && v != null && !isNaN(parseFloat(v))) prices[k] = parseFloat(v);
+    const duration_labels = {};
+    if (!isBoost) {
+      for (const [k, v] of Object.entries(form.prices)) {
+        if (FIXED_DURATIONS.includes(k) && v !== "" && v != null && !isNaN(parseFloat(v))) prices[k] = parseFloat(v);
+      }
+    }
+    const seenSlugs = new Set(Object.keys(prices));
+    for (const row of customRows) {
+      const label = (row.label || "").trim();
+      const slug = slugify(label);
+      if (!slug || row.price === "" || row.price == null || isNaN(parseFloat(row.price))) continue;
+      if (seenSlugs.has(slug)) {
+        toast.error(`Duplicate option: ${label}`);
+        return;
+      }
+      seenSlugs.add(slug);
+      prices[slug] = parseFloat(row.price);
+      duration_labels[slug] = label;
     }
     if (!form.game || !form.name || Object.keys(prices).length === 0) {
-      toast.error("Game, name and at least one price are required");
+      toast.error(isBoost ? "Category, name and at least one amount tier are required" : "Game, name and at least one price are required");
+      return;
+    }
+    if (isBoost && (!form.platform || !form.boost_type)) {
+      toast.error("Pick a platform and a boost type");
       return;
     }
     onSave({
       game: form.game, name: form.name, description: form.description,
       image_url: form.image_url, status: form.status, anticheat: form.anticheat, kind: form.kind || "cheat",
+      platform: isBoost ? form.platform : null,
+      boost_type: isBoost ? form.boost_type : null,
+      duration_labels: Object.keys(duration_labels).length ? duration_labels : null,
       loader_link: form.loader_link?.trim() || null,
       discord_url: form.discord_url?.trim() || null,
       instructions: form.instructions?.trim() || null,
@@ -73,8 +111,37 @@ function ProductForm({ initial, categories, onSave, onClose }) {
   return (
     <ScrollModal onClose={onClose} testid="product-form-modal" className="max-w-2xl">
       <h2 className="font-display text-xl font-bold uppercase tracking-tight mb-4">
-        {initial?.id ? "Edit Product" : form.kind === "account" ? "New Discord Account" : "New Cheat"}
+        {initial?.id ? "Edit Product" : form.kind === "account" ? "New Discord Account" : isBoost ? "New Social Boost" : "New Cheat"}
       </h2>
+      {isBoost && (
+        <div className="grid sm:grid-cols-2 gap-4 mt-2" data-testid="boost-fields">
+          <div>
+            <label className={labelCls}>Platform</label>
+            <Select value={form.platform} onValueChange={(v) => set("platform", v)}>
+              <SelectTrigger data-testid="product-form-platform" className={fieldCls}>
+                <SelectValue placeholder="Pick a platform" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
+                <SelectItem value="tiktok" data-testid="platform-tiktok">TikTok</SelectItem>
+                <SelectItem value="instagram" data-testid="platform-instagram">Instagram</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className={labelCls}>Boost type</label>
+            <Select value={form.boost_type} onValueChange={(v) => set("boost_type", v)}>
+              <SelectTrigger data-testid="product-form-boost-type" className={fieldCls}>
+                <SelectValue placeholder="Pick a type" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
+                <SelectItem value="followers" data-testid="boost-type-followers">Followers (buyer gives page link)</SelectItem>
+                <SelectItem value="likes" data-testid="boost-type-likes">Likes (buyer gives video link)</SelectItem>
+                <SelectItem value="views" data-testid="boost-type-views">Views (buyer gives video link)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
       <div className="grid sm:grid-cols-2 gap-4 mt-2">
           <div>
             <label className={labelCls}>Category</label>
@@ -136,7 +203,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
               Uploaded files are stored on Desync storage — Discord links expire after a few days
             </div>
           </div>
-          {form.kind !== "account" && (
+          {form.kind === "cheat" && (
             <>
               <div>
                 <label className={labelCls}>Status</label>
@@ -162,7 +229,7 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             <label className={labelCls}>Features (comma separated)</label>
             <Input value={form.features} onChange={(e) => set("features", e.target.value)} placeholder="Aimbot, ESP, Stream Proof" data-testid="product-form-features" className={fieldCls} />
           </div>
-          {form.kind !== "account" && (
+          {form.kind === "cheat" && (
           <div className="sm:col-span-2">
             <label className={labelCls}>Loader — upload a file (.exe/.zip) or paste a download link</label>
             {initial?.loader && !removeLoader ? (
@@ -211,32 +278,83 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             )}
           </div>
           )}
-          {["day", "3d", "week", "month", "lifetime"].map((d) => (
+          {!isBoost && ["day", "3d", "week", "month", "lifetime"].map((d) => (
             <div key={d}>
               <label className={labelCls}>{DURATION_LABELS[d]} Price (AUD) — blank to hide</label>
               <Input type="number" step="0.01" value={form.prices[d]} onChange={(e) => setPrice(d, e.target.value)} data-testid={`product-form-price-${d}`} className={fieldCls} />
             </div>
           ))}
+          <div className="sm:col-span-2">
+            <label className={labelCls}>
+              {isBoost ? "Amount tiers — what the buyer picks (e.g. 500 Followers)" : "Custom durations (optional) — e.g. 2 Weeks"}
+            </label>
+            <div className="space-y-2" data-testid="custom-options-editor">
+              {customRows.map((row, i) => (
+                <div key={i} className="flex gap-2 items-start" data-testid={`custom-option-row-${i}`}>
+                  <Input
+                    value={row.label}
+                    onChange={(e) => setRow(i, "label", e.target.value)}
+                    placeholder={isBoost ? "Label — e.g. 1,000 Followers" : "Label — e.g. 2 Weeks"}
+                    data-testid={`custom-option-label-${i}`}
+                    className={fieldCls}
+                  />
+                  <Input
+                    type="number" step="0.01"
+                    value={row.price}
+                    onChange={(e) => setRow(i, "price", e.target.value)}
+                    placeholder="Price AUD"
+                    data-testid={`custom-option-price-${i}`}
+                    className={`${fieldCls} w-36 shrink-0`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCustomRows((rows) => rows.filter((_, j) => j !== i))}
+                    data-testid={`custom-option-remove-${i}`}
+                    className="p-2 border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 rounded transition-colors shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setCustomRows((rows) => [...rows, { label: "", price: "" }])}
+                data-testid="custom-option-add"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#1E2D4A] text-xs font-mono uppercase tracking-widest text-slate-300 hover:border-blue-400/50 hover:text-white transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" /> {isBoost ? "Add tier" : "Add custom duration"}
+              </button>
+            </div>
+            {isBoost && (
+              <div className="text-[10px] font-mono text-slate-500 mt-1.5">
+                Boosts never sell out and need no keys — after payment the buyer pastes their link and you fulfil it from the Orders tab
+              </div>
+            )}
+          </div>
           <div>
             <label className={labelCls}>Sort Order</label>
             <Input type="number" value={form.sort_order} onChange={(e) => set("sort_order", e.target.value)} data-testid="product-form-sort" className={fieldCls} />
           </div>
-          <div>
-            <label className={labelCls}>Min per purchase (e.g. 5 for account packs)</label>
-            <Input type="number" min="1" value={form.min_buy} onChange={(e) => set("min_buy", e.target.value)} data-testid="product-form-min-buy" className={fieldCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Delivery method</label>
-            <Select value={form.delivery || "stock"} onValueChange={(v) => set("delivery", v)}>
-              <SelectTrigger data-testid="product-form-delivery" className={fieldCls}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
-                <SelectItem value="stock">Stocked keys — limited inventory</SelectItem>
-                <SelectItem value="ticket">Discord ticket — infinite, never sold out</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {!isBoost && (
+            <>
+              <div>
+                <label className={labelCls}>Min per purchase (e.g. 5 for account packs)</label>
+                <Input type="number" min="1" value={form.min_buy} onChange={(e) => set("min_buy", e.target.value)} data-testid="product-form-min-buy" className={fieldCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Delivery method</label>
+                <Select value={form.delivery || "stock"} onValueChange={(v) => set("delivery", v)}>
+                  <SelectTrigger data-testid="product-form-delivery" className={fieldCls}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
+                    <SelectItem value="stock">Stocked keys — limited inventory</SelectItem>
+                    <SelectItem value="ticket">Discord ticket — infinite, never sold out</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
           <div className="sm:col-span-2">
             <label className={labelCls}>Discord link for this product (optional)</label>
             <Input value={form.discord_url || ""} onChange={(e) => set("discord_url", e.target.value)} placeholder="https://discord.gg/your-server" data-testid="product-form-discord-url" className={fieldCls} />
@@ -491,6 +609,16 @@ export default function AdminDashboard() {
     }
   };
 
+  const setBoostStatus = async (orderId, productId, status) => {
+    try {
+      await api.post(`/admin/orders/${orderId}/boost-status`, { product_id: productId, status });
+      toast.success(`Boost marked ${status}`);
+      loadOrders();
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
+
   const markPaid = async (orderId) => {
     try {
       await api.post(`/admin/orders/${orderId}/mark-paid`);
@@ -688,10 +816,42 @@ export default function AdminDashboard() {
                     {o.items.map((it, i) => (
                       <div key={i} className="text-xs font-mono text-slate-400">
                         {it.name} ({it.duration_label})
+                        {it.kind === "boost" && <span className="text-pink-300 ml-2 uppercase text-[10px] tracking-widest">boost</span>}
                         {it.license_key && <span className="text-blue-400 ml-2">{it.license_key}</span>}
                       </div>
                     ))}
                   </div>
+                  {(o.boost_details || []).length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-blue-900/40 space-y-2" data-testid={`boost-details-${o.id}`}>
+                      {o.boost_details.map((b) => (
+                        <div key={b.product_id} className="flex flex-wrap items-center gap-3 text-xs font-mono" data-testid={`boost-row-${o.id}-${b.product_id}`}>
+                          <span className="text-pink-300 uppercase tracking-widest text-[10px] shrink-0">
+                            {b.platform === "tiktok" ? "TikTok" : "Instagram"} {b.boost_type}
+                          </span>
+                          <span className="text-slate-300">{b.name} ({b.duration_label})</span>
+                          <a
+                            href={b.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            data-testid={`boost-link-${o.id}-${b.product_id}`}
+                            className="text-blue-300 hover:text-white underline truncate max-w-[260px]"
+                          >
+                            {b.link}
+                          </a>
+                          <Select value={b.status || "pending"} onValueChange={(v) => setBoostStatus(o.id, b.product_id, v)}>
+                            <SelectTrigger data-testid={`boost-status-select-${o.id}-${b.product_id}`} className="w-36 h-8 bg-[#050B18] border-[#1E2D4A] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
+                              <SelectItem value="pending" data-testid={`boost-status-pending-${o.id}-${b.product_id}`}>Pending</SelectItem>
+                              <SelectItem value="processing" data-testid={`boost-status-processing-${o.id}-${b.product_id}`}>Processing</SelectItem>
+                              <SelectItem value="completed" data-testid={`boost-status-completed-${o.id}-${b.product_id}`}>Completed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

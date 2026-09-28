@@ -11,6 +11,10 @@ export const DURATION_LABELS = {
   lifetime: "Lifetime",
 };
 
+// Label for a price key: staff custom label -> known duration -> raw key
+export const durLabel = (product, d) =>
+  (product && product.duration_labels && product.duration_labels[d]) || DURATION_LABELS[d] || d;
+
 export function CartProvider({ children }) {
   const [items, setItems] = useState(() => {
     try {
@@ -32,9 +36,10 @@ export function CartProvider({ children }) {
         return prev;
       }
       const minBuy = Math.max(1, product.min_buy || 1);
+      const label = durLabel(product, duration);
       toast.success(minBuy > 1
-        ? `${product.name} (${DURATION_LABELS[duration]}) ×${minBuy} pack added to cart`
-        : `${product.name} (${DURATION_LABELS[duration]}) added to cart`);
+        ? `${product.name} (${label}) ×${minBuy} pack added to cart`
+        : `${product.name} (${label}) added to cart`);
       return [
         ...prev,
         {
@@ -44,8 +49,12 @@ export function CartProvider({ children }) {
             game: product.game,
             image_url: product.image_url,
             min_buy: minBuy,
+            kind: product.kind || "cheat",
+            platform: product.platform || null,
+            boost_type: product.boost_type || null,
           },
           duration,
+          duration_label: label,
           qty: minBuy,
           price: product.prices[duration],
         },

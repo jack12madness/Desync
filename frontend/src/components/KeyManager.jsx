@@ -4,18 +4,21 @@ import ScrollModal from "@/components/ScrollModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api, apiError } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
-import { DURATION_LABELS } from "@/context/CartContext";
+import { durLabel } from "@/context/CartContext";
 
 const DURATIONS = ["day", "3d", "week", "month", "lifetime"];
+
+// canonical durations first, then any custom price keys
+const orderedDurations = (product) => {
+  const keys = Object.keys(product.prices || {});
+  return [...DURATIONS.filter((d) => keys.includes(d)), ...keys.filter((k) => !DURATIONS.includes(k))];
+};
 
 export default function KeyManager({ product, onClose, onChanged }) {
   const isAccountProduct = product.kind === "account";
   const [keys, setKeys] = useState(null);
   const [input, setInput] = useState("");
-  const [duration, setDuration] = useState(() => {
-    const ds = DURATIONS.filter((d) => product.prices && product.prices[d] != null);
-    return ds[0] || "day";
-  });
+  const [duration, setDuration] = useState(() => orderedDurations(product)[0] || "day");
   const [mode, setMode] = useState(isAccountProduct ? "accounts" : "keys");
   const [adding, setAdding] = useState(false);
   const [confirm, setConfirm] = useState(null); // {added, skipped, raw, duration}
@@ -85,7 +88,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
     setGenerating(true);
     try {
       const { data } = await api.post(`/admin/products/${product.id}/generate-keys`, { count: genCount, duration: dur });
-      toast.success(`${data.created} DSYNC keys generated into the ${DURATION_LABELS[dur]} pool`);
+      toast.success(`${data.created} DSYNC keys generated into the ${durLabel(product, dur)} pool`);
       load();
       onChanged && onChanged();
     } catch (e) {
@@ -151,7 +154,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
   };
 
   const countFor = (d) => (keys || []).filter((k) => k.status === "available" && k.duration === d).length;
-  const productDurations = DURATIONS.filter((d) => product.prices && product.prices[d] != null);
+  const productDurations = orderedDurations(product);
   const sorted = [...(keys || [])].sort((a, b) => (a.duration || "").localeCompare(b.duration || ""));
   const isTicket = product.delivery === "ticket";
   const [filter, setFilter] = useState("");
@@ -207,7 +210,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
               <span className="text-emerald-300 font-mono font-bold">{confirm.added}</span>{" "}
               {noun}{confirm.added === 1 ? "" : "s"} added to{" "}
               <span className="text-white font-semibold">{product.name}</span>{" "}
-              <span className="text-slate-500">({DURATION_LABELS[confirm.duration]} pool)</span>
+              <span className="text-slate-500">({durLabel(product, confirm.duration)} pool)</span>
             </div>
             {confirm.skipped > 0 && (
               <div className="text-xs text-amber-300">{confirm.skipped} duplicate{confirm.skipped === 1 ? "" : "s"} skipped</div>
@@ -267,7 +270,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
                   : "bg-amber-400/10 border-amber-400/30 text-amber-300"
               }`}
             >
-              {DURATION_LABELS[d]}: {countFor(d)}
+              {durLabel(product, d)}: {countFor(d)}
             </span>
           ))}
           <span className="text-xs text-slate-500 ml-1">One key per sale, first in first out</span>
@@ -309,7 +312,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
               </SelectTrigger>
               <SelectContent className="bg-[#0A1628] border-[#1E2D4A] text-slate-100">
                 {productDurations.map((d) => (
-                  <SelectItem key={d} value={d} data-testid={`keys-duration-${d}`}>{DURATION_LABELS[d]}</SelectItem>
+                  <SelectItem key={d} value={d} data-testid={`keys-duration-${d}`}>{durLabel(product, d)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -330,7 +333,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
             data-testid="keys-add-button"
             className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold disabled:opacity-40 transition-all duration-200 active:scale-95"
           >
-            <Plus className="w-4 h-4" /> {adding ? "Adding..." : `Add to ${DURATION_LABELS[duration]} pool`}
+            <Plus className="w-4 h-4" /> {adding ? "Adding..." : `Add to ${durLabel(product, duration)} pool`}
           </button>
         </div>
 
@@ -358,7 +361,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
                 </SelectTrigger>
                 <SelectContent className="bg-[#0A1628] border-slate-700 text-slate-100">
                   {productDurations.map((d) => (
-                    <SelectItem key={d} value={d}>{DURATION_LABELS[d] || d}</SelectItem>
+                    <SelectItem key={d} value={d}>{durLabel(product, d)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -491,7 +494,7 @@ export default function KeyManager({ product, onClose, onChanged }) {
               className="flex items-center gap-3 p-3 bg-[#050B18] border border-[#1E2D4A] rounded-lg"
             >
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#2E6BFF]/10 border border-[#2E6BFF]/30 text-[#8FB8E8] uppercase tracking-wider shrink-0">
-                {DURATION_LABELS[k.duration] || k.duration || "—"}
+                {durLabel(product, k.duration)}
               </span>
               {k.account && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-400/10 border border-violet-400/30 text-violet-300 uppercase tracking-wider shrink-0">

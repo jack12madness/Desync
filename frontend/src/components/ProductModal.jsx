@@ -2,11 +2,24 @@ import { useState } from "react";
 import { Check, ShoppingCart, Zap, ShieldCheck, Share2, ChevronDown, Cpu, Wrench } from "lucide-react";
 import ScrollModal from "@/components/ScrollModal";
 import StatusPill from "@/components/StatusPill";
-import { useCart, DURATION_LABELS } from "@/context/CartContext";
+import { useCart, durLabel } from "@/context/CartContext";
 import { aud, BASE_URL } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 
 const DURATION_ORDER = ["day", "3d", "week", "month", "lifetime"];
+
+// canonical durations first, then custom/boost tiers (numeric-aware)
+function orderedPriceKeys(product) {
+  const keys = Object.keys(product.prices || {});
+  const fixed = DURATION_ORDER.filter((d) => keys.includes(d));
+  const custom = keys.filter((k) => !DURATION_ORDER.includes(k));
+  const num = (k) => {
+    const m = k.replace(/[^0-9.]/g, "");
+    return m ? parseFloat(m) : Number.MAX_SAFE_INTEGER;
+  };
+  custom.sort((a, b) => num(a) - num(b) || a.localeCompare(b));
+  return [...fixed, ...custom];
+}
 
 function renderInline(text) {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
@@ -101,13 +114,12 @@ function TroubleItem({ issue, fix, index }) {
 
 export default function ProductModal({ product, onClose }) {
   const { addItem, openCart } = useCart();
-  const durations = product
-    ? DURATION_ORDER.filter((d) => product.prices && product.prices[d] != null)
-    : [];
+  const durations = product ? orderedPriceKeys(product) : [];
   const [duration, setDuration] = useState(null);
   const selected = duration && durations.includes(duration) ? duration : durations[0];
+  const isBoost = product?.kind === "boost";
   const soldOut = product
-    ? product.delivery !== "ticket" && durations.length > 0 && durations.every((d) => !(product.stock?.[d] > 0))
+    ? !isBoost && product.delivery !== "ticket" && durations.length > 0 && durations.every((d) => !(product.stock?.[d] > 0))
     : false;
 
   if (!product) return null;
@@ -130,6 +142,13 @@ export default function ProductModal({ product, onClose }) {
                     className="px-2.5 py-1 rounded-md bg-violet-400/15 border border-violet-400/40 text-violet-300 text-[10px] font-mono font-bold uppercase tracking-[0.2em]"
                   >
                     Discord Account
+                  </span>
+                ) : isBoost ? (
+                  <span
+                    data-testid="modal-status-badge"
+                    className="px-2.5 py-1 rounded-md bg-pink-500/15 border border-pink-400/40 text-pink-300 text-[10px] font-mono font-bold uppercase tracking-[0.2em]"
+                  >
+                    {product.platform === "tiktok" ? "TikTok" : "Instagram"} Boost
                   </span>
                 ) : (
                   <StatusPill status={product.status} testid="modal-status-badge" />
@@ -164,13 +183,15 @@ export default function ProductModal({ product, onClose }) {
               </button>
             </div>
 
-            <div className="mt-4 flex items-center gap-2 text-sm text-slate-400">
-              <ShieldCheck className="w-4 h-4 text-[#5B8CFF]" />
-              Works against <span className="text-slate-200">{product.anticheat || "Universal"}</span>
-            </div>
+            {!isBoost && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-slate-400">
+                <ShieldCheck className="w-4 h-4 text-[#5B8CFF]" />
+                Works against <span className="text-slate-200">{product.anticheat || "Universal"}</span>
+              </div>
+            )}
 
             <div className="mt-6">
-              <div className="text-sm font-medium text-slate-300 mb-2.5">Choose duration</div>
+              <div className="text-sm font-medium text-slate-300 mb-2.5">{isBoost ? "Choose amount" : "Choose duration"}</div>
               <div className="grid grid-cols-2 gap-2.5">
                 {durations.map((d) => (
                   <button
@@ -183,7 +204,7 @@ export default function ProductModal({ product, onClose }) {
                         : "border-[#1E2D4A] bg-[#050B18] hover:border-[#2E6BFF]/40"
                     }`}
                   >
-                    <div className="text-xs text-slate-400">{DURATION_LABELS[d]}</div>
+                    <div className="text-xs text-slate-400">{durLabel(product, d)}</div>
                     <div className={`font-mono font-bold mt-0.5 ${selected === d ? "text-[#8FB8E8]" : "text-slate-100"}`}>
                       {aud(product.prices[d])}
                     </div>
@@ -191,6 +212,13 @@ export default function ProductModal({ product, onClose }) {
                 ))}
               </div>
             </div>
+
+            {isBoost && (
+              <div className="mt-4 p-3 rounded-lg bg-pink-500/10 border border-pink-400/30 text-xs text-pink-200 leading-relaxed" data-testid="modal-boost-note">
+                After payment you'll paste your {product.platform === "tiktok" ? "TikTok" : "Instagram"}{" "}
+                {product.boost_type === "followers" ? "page link" : "video/post link"} — our team starts the boost manually and you can track it in the Customer Portal.
+              </div>
+            )}
 
             <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-2">
               {(product.features || []).map((f) => (

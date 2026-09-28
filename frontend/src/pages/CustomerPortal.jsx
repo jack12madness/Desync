@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Search, KeyRound, Copy, Check, Download, MessageSquare, Eye, EyeOff, Star, Zap } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import BoostIntake from "@/components/BoostIntake";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -455,9 +456,19 @@ export default function CustomerPortal() {
                           </div>
                         </div>
                         <div className="space-y-2">
-                          {o.items.map((item) => (
-                            <KeyRow key={`${item.product_id}-${item.duration}`} item={item} />
-                          ))}
+                          {o.items.map((item) =>
+                            item.kind === "boost" ? (
+                              <BoostIntake
+                                key={`${item.product_id}-${item.duration}`}
+                                orderId={o.id}
+                                item={item}
+                                detail={(o.boost_details || []).find((d) => d.product_id === item.product_id)}
+                                onSaved={() => loadPortal(token)}
+                              />
+                            ) : (
+                              <KeyRow key={`${item.product_id}-${item.duration}`} item={item} />
+                            )
+                          )}
                         </div>
                       </div>
                     ))}

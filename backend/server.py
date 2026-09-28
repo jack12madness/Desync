@@ -47,6 +47,27 @@ DURATIONS = {
     "lifetime": "Lifetime",
 }
 STATUSES = {"undetected", "updating", "detected", "testing"}
+BOOST_PLATFORMS = ("tiktok", "instagram")
+BOOST_TYPES = ("followers", "likes", "views")
+BOOST_STATUSES = ("pending", "processing", "completed")
+
+
+def _dur_label(product: Optional[dict], duration: str) -> str:
+    """Label for a price key: staff-defined custom label -> known duration -> raw key."""
+    custom = ((product or {}).get("duration_labels") or {})
+    return custom.get(duration) or DURATIONS.get(duration) or duration
+
+
+def _ordered_price_keys(product: dict) -> list:
+    """Canonical duration order first, then custom/boost tiers (numeric-aware)."""
+    keys = list((product.get("prices") or {}).keys())
+    fixed = [d for d in DURATIONS if d in keys]
+    custom = [k for k in keys if k not in DURATIONS]
+    def _num(k):
+        m = re.sub(r"[^0-9.]", "", k)
+        return (0, float(m)) if m else (1, 0)
+    custom.sort(key=lambda k: (_num(k), k))
+    return fixed + custom
 
 
 # ---------- helpers ----------
@@ -168,8 +189,11 @@ class ProductIn(BaseModel):
     anticheat: str = ""
     prices: Dict[str, float] = {}
     min_buy: int = 1
-    kind: str = "cheat"  # "cheat" or "account"
+    kind: str = "cheat"  # "cheat", "account" or "boost"
     account_type: Optional[str] = None  # for kind=account: "discord" | "steam" | "rockstar"
+    platform: Optional[str] = None  # for kind=boost: "tiktok" | "instagram"
+    boost_type: Optional[str] = None  # for kind=boost: "followers" | "likes" | "views"
+    duration_labels: Optional[Dict[str, str]] = None  # custom price-key labels, e.g. {"2-weeks": "2 Weeks"}
     delivery: str = "stock"  # "stock" (limited keys) or "ticket" (infinite, claim via Discord ticket)
     ticket_url: Optional[str] = None
     loader_link: Optional[str] = None  # external download URL instead of an uploaded file
@@ -571,10 +595,19 @@ async def admin_list_products(admin: dict = Depends(get_admin)):
     return await db.products.find({}, {"_id": 0}).sort("sort_order", 1).to_list(500)
 
 
+def _validate_boost(body: ProductIn):
+    if body.kind == "boost":
+        if body.platform not in BOOST_PLATFORMS:
+            raise HTTPException(400, "Boost products need a platform: tiktok or instagram")
+        if body.boost_type not in BOOST_TYPES:
+            raise HTTPException(400, "Boost products need a type: followers, likes or views")
+
+
 @api_router.post("/admin/products")
 async def admin_create_product(body: ProductIn, admin: dict = Depends(get_admin)):
     if body.status not in STATUSES:
         raise HTTPException(400, "Invalid status")
+    _validate_boost(body)
     now = datetime.now(timezone.utc).isoformat()
     doc = body.model_dump()
     if doc.get("discord_url") and not doc["discord_url"].startswith("https://"):
@@ -593,6 +626,7 @@ async def admin_create_product(body: ProductIn, admin: dict = Depends(get_admin)
 async def admin_update_product(product_id: str, body: ProductIn, admin: dict = Depends(get_admin)):
     if body.status not in STATUSES:
         raise HTTPException(400, "Invalid status")
+    _validate_boost(body)
     doc = body.model_dump()
     if doc.get("discord_url") and not doc["discord_url"].startswith("https://"):
         raise HTTPException(400, "Discord URL must start with https://")
@@ -880,10 +914,10 @@ async def keystock_list(product_id: str, admin: dict = Depends(get_admin)):
 
 @api_router.post("/admin/keystock")
 async def keystock_add(body: KeyStockIn, admin: dict = Depends(get_admin)):
-    product = await db.products.find_one({"id": body.product_id}, {"_id": 0, "id": 1})
+    product = await db.products.find_one({"id": body.product_id}, {"_id": 0, "id": 1, "prices": 1})
     if not product:
         raise HTTPException(404, "Product not found")
-    if body.duration not in DURATIONS:
+    if body.duration not in DURATIONS and body.duration not in (product.get("prices") or {}):
         raise HTTPException(400, "Invalid duration")
     lines = [k.strip() for k in body.keys.replace("\r", "").split("\n")]
     lines = [k for k in lines if k]
@@ -1161,11 +1195,11 @@ async def admin_restock_announce(product_id: str, body: RestockAnnounceIn, admin
     stock = await _available_stock_map()
     pstock = stock.get(product_id, {})
     fields = []
-    for d in ("day", "week", "month", "lifetime"):
+    for d in _ordered_price_keys(product):
         price = (product.get("prices") or {}).get(d)
         if price is None:
             continue
-        label = DURATIONS[d] + (f" · +{body.added} new" if d == body.duration and body.added else "")
+        label = _dur_label(product, d) + (f" · +{body.added} new" if d == body.duration and body.added else "")
         fields.append({"name": "Variant", "value": label, "inline": True})
         fields.append({"name": "Price", "value": f"A${float(price):.2f}", "inline": True})
         fields.append({"name": "Stock", "value": str(pstock.get(d, 0)), "inline": True})
@@ -1644,7 +1678,7 @@ async def admin_send_key(body: SendKeyIn, admin: dict = Depends(get_admin)):
     product = await db.products.find_one({"id": body.product_id}, {"_id": 0})
     if not product:
         raise HTTPException(404, "Product not found")
-    if body.duration not in DURATIONS or product.get("prices", {}).get(body.duration) is None:
+    if product.get("prices", {}).get(body.duration) is None:
         raise HTTPException(400, "Duration not available for this product")
     qty = max(1, min(100, int(body.qty or 1)))
     in_stock = await db.keystock.count_documents(
@@ -1669,7 +1703,7 @@ async def admin_send_key(body: SendKeyIn, admin: dict = Depends(get_admin)):
     now = datetime.now(timezone.utc).isoformat()
     item = {
         "product_id": product["id"], "name": product["name"], "game": product["game"],
-        "duration": body.duration, "duration_label": DURATIONS[body.duration],
+        "duration": body.duration, "duration_label": _dur_label(product, body.duration),
         "unit_price": 0.0, "qty": qty, "deliverables": deliverables,
         "license_key": deliverables[0]["license_key"],
         "account": deliverables[0].get("account"),
@@ -1872,6 +1906,11 @@ async def _fulfill_order(where: dict) -> Optional[dict]:
     for item in items:
         qty = max(1, int(item.get("qty") or 1))
         deliverables = item.get("deliverables") or []
+        if item.get("kind") == "boost":
+            # boosts are fulfilled manually by staff after the buyer submits their link
+            item["key_pending"] = False
+            item["boost_pending"] = True
+            continue
         prod = await db.products.find_one(
             {"id": item["product_id"]}, {"_id": 0, "delivery": 1, "ticket_url": 1, "discord_url": 1}
         )
@@ -1911,14 +1950,14 @@ async def _fulfill_order(where: dict) -> Optional[dict]:
                 if notify:
                     try:
                         await send_low_stock_email(
-                            notify, item["name"], DURATIONS[item["duration"]], remaining
+                            notify, item["name"], DURATIONS.get(item["duration"], item["duration"]), remaining
                         )
                     except Exception as e:
                         logger.error("Low stock email failed: %s", e)
                 await _discord_alert(
                     "low_stock",
                     "Out of stock" if remaining == 0 else "Low stock",
-                    f"**{item['name']}** ({DURATIONS[item['duration']]}) has **{remaining}** left.",
+                    f"**{item['name']}** ({DURATIONS.get(item['duration'], item['duration'])}) has **{remaining}** left.",
                     color=0xEF4444 if remaining == 0 else 0xF5C158,
                 )
         if deliverables:
@@ -1980,33 +2019,34 @@ async def _price_cart(items: List[CartItemIn], coupon: Optional[str]):
     total_cents = 0
     subtotal_cents = 0
     for item in items:
-        if item.duration not in DURATIONS:
-            raise HTTPException(400, f"Invalid duration: {item.duration}")
         product = await db.products.find_one({"id": item.product_id, "active": True}, {"_id": 0})
         if not product:
             raise HTTPException(404, "Product not found")
         price = product.get("prices", {}).get(item.duration)
         if price is None:
-            raise HTTPException(400, f"Duration not available for {product['name']}")
+            raise HTTPException(400, f"Option not available for {product['name']}")
+        label = _dur_label(product, item.duration)
         min_buy = max(1, int(product.get("min_buy") or 1))
         qty = max(1, int(getattr(item, "qty", 1) or 1))
         if qty < min_buy:
             raise HTTPException(400, f"{product['name']} has a minimum purchase of {min_buy}")
-        if product.get("delivery") != "ticket":
+        if product.get("kind") != "boost" and product.get("delivery") != "ticket":
             in_stock = await db.keystock.count_documents(
                 {"product_id": product["id"], "duration": item.duration, "status": "available"}
             )
             if in_stock == 0:
-                raise HTTPException(400, f"{product['name']} ({DURATIONS[item.duration]}) is sold out")
+                raise HTTPException(400, f"{product['name']} ({label}) is sold out")
             if in_stock < qty:
-                raise HTTPException(400, f"Only {in_stock} left of {product['name']} ({DURATIONS[item.duration]})")
+                raise HTTPException(400, f"Only {in_stock} left of {product['name']} ({label})")
         applies = not coupon_product_id or product["id"] == coupon_product_id
         unit_cents = int(round(float(price) * 100 * (1 - (discount_pct if applies else 0) / 100)))
         subtotal_cents += int(round(float(price) * 100)) * qty
         total_cents += unit_cents * qty
         order_items.append({
             "product_id": product["id"], "name": product["name"], "game": product["game"],
-            "duration": item.duration, "duration_label": DURATIONS[item.duration],
+            "duration": item.duration, "duration_label": label,
+            "kind": product.get("kind") or "cheat",
+            "platform": product.get("platform"), "boost_type": product.get("boost_type"),
             "unit_price": unit_cents / 100.0, "license_key": None, "qty": qty,
         })
     return order_items, subtotal_cents, total_cents, discount_pct, coupon_code
@@ -2356,6 +2396,90 @@ async def order_by_id(order_id: str):
     await _attach_loader_links(order)
     order.pop("download_token", None)
     return order
+
+
+# ---------- social media boosts ----------
+
+class BoostDetailIn(BaseModel):
+    product_id: str
+    link: str
+
+
+class BoostDetailsIn(BaseModel):
+    details: List[BoostDetailIn]
+
+
+@api_router.post("/orders/by-id/{order_id}/boost-details")
+async def submit_boost_details(order_id: str, body: BoostDetailsIn):
+    """Buyer submits the page/video link(s) for boost items on a paid order.
+    Public like /orders/by-id — the order id itself is the secret."""
+    order = await db.orders.find_one({"id": order_id, "payment_status": "paid"})
+    if not order:
+        raise HTTPException(404, "Order not found")
+    boost_items = {i["product_id"]: i for i in order.get("items", []) if i.get("kind") == "boost"}
+    if not boost_items:
+        raise HTTPException(400, "This order has no boost products")
+    if not body.details:
+        raise HTTPException(400, "Nothing to submit")
+    existing = {d["product_id"]: d for d in (order.get("boost_details") or [])}
+    now = datetime.now(timezone.utc).isoformat()
+    changed = []
+    for d in body.details:
+        if d.product_id not in boost_items:
+            raise HTTPException(400, "That product is not a boost on this order")
+        link = d.link.strip()
+        if not re.match(r"^https?://\S+$", link):
+            raise HTTPException(400, "Link must start with http:// or https://")
+        prev = existing.get(d.product_id)
+        # a changed link resets to pending; an unchanged resubmit keeps its status
+        status = prev.get("status", "pending") if prev and prev.get("link") == link else "pending"
+        entry = {
+            "product_id": d.product_id, "link": link, "status": status,
+            "submitted_at": now,
+            "platform": boost_items[d.product_id].get("platform"),
+            "boost_type": boost_items[d.product_id].get("boost_type"),
+            "duration_label": boost_items[d.product_id].get("duration_label"),
+            "name": boost_items[d.product_id].get("name"),
+        }
+        existing[d.product_id] = entry
+        changed.append(entry)
+    await db.orders.update_one(
+        {"id": order_id},
+        {"$set": {"boost_details": list(existing.values()), "updated_at": now}},
+    )
+    try:
+        fields = [
+            {"name": e["name"] or e["product_id"], "value": e["link"], "inline": False}
+            for e in changed
+        ]
+        await _discord_alert(
+            "orders", "Boost details submitted",
+            f"Order `{order_id[:8].upper()}` ({order['email']}) submitted boost link(s).",
+            fields=fields, color=0xE1306C,
+        )
+    except Exception as e:
+        logger.error("Boost alert failed: %s", e)
+    return {"boost_details": list(existing.values())}
+
+
+class BoostStatusIn(BaseModel):
+    product_id: str
+    status: str
+
+
+@api_router.post("/admin/orders/{order_id}/boost-status")
+async def admin_set_boost_status(order_id: str, body: BoostStatusIn, admin: dict = Depends(get_admin)):
+    if body.status not in BOOST_STATUSES:
+        raise HTTPException(400, f"Status must be one of: {', '.join(BOOST_STATUSES)}")
+    res = await db.orders.update_one(
+        {"id": order_id, "boost_details.product_id": body.product_id},
+        {"$set": {"boost_details.$.status": body.status,
+                  "boost_details.$.status_updated_at": datetime.now(timezone.utc).isoformat(),
+                  "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Boost entry not found on this order")
+    return {"ok": True, "status": body.status}
 
 
 # ---------- customer portal, generator entitlements & reviews ----------

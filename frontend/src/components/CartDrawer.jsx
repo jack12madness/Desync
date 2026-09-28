@@ -171,7 +171,7 @@ export default function CartDrawer() {
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold truncate text-white">{item.product.name}</div>
                 <div className="text-xs text-slate-500">
-                  {item.product.game} · {DURATION_LABELS[item.duration]}
+                  {item.product.game} · {item.duration_label || DURATION_LABELS[item.duration] || item.duration}
                   {(item.qty || 1) > 1 && <span className="text-[#8FB8E8]"> × {item.qty}</span>}
                 </div>
                 <div className="flex items-center gap-1.5 mt-1.5" data-testid={`qty-stepper-${item.product.id}`}>

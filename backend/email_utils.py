@@ -211,7 +211,26 @@ def _ticket_box(ticket_url: str) -> str:
     )
 
 
+def _boost_box(it: dict) -> str:
+    platform = (it.get("platform") or "social").capitalize()
+    btype = it.get("boost_type") or "boost"
+    target = "page link" if btype == "followers" else "video/post link"
+    portal = (STORE_URL + "/portal") if STORE_URL else "your Customer Portal"
+    return (
+        '<div style="background:#0A1628;border:1px solid #E1306C;border-radius:8px;'
+        'padding:12px 16px;margin:10px 0">'
+        '<div style="color:#F1F5F9;font-size:14px;font-weight:600;margin-bottom:6px">Action needed — submit your '
+        + escape(platform) + ' ' + escape(target) + '</div>'
+        '<div style="color:#94A3B8;font-size:12px;margin-bottom:10px">Open your payment success page or '
+        '<a href="' + escape(portal) + '" style="color:#8FB8E8">Customer Portal</a> and paste the link for this boost. '
+        'Our team starts it as soon as your link is in — you can track the status in the portal.</div>'
+        '</div>'
+    )
+
+
 def _deliverables_html(it: dict) -> str:
+    if it.get("kind") == "boost":
+        return _boost_box(it)
     if it.get("ticket_url"):
         return _ticket_box(it["ticket_url"])
     dels = it.get("deliverables") or []

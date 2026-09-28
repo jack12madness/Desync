@@ -3,7 +3,7 @@ import { Plus, Pencil, Trash2, ArrowLeft, GripVertical, FolderOpen } from "lucid
 import StatusPill from "@/components/StatusPill";
 import { api, apiError, aud } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
-import { DURATION_LABELS } from "@/context/CartContext";
+import { durLabel } from "@/context/CartContext";
 
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
@@ -123,6 +123,13 @@ export default function ProductsTab({ products, categories, stockCounts, onAdd, 
           >
             <Plus className="w-4 h-4" /> Add Account
           </button>
+          <button
+            onClick={() => onAdd("boost", selectedCat)}
+            data-testid="admin-add-boost-button"
+            className="rounded-lg inline-flex items-center gap-2 px-4 py-2 bg-pink-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-pink-300 transition-all"
+          >
+            <Plus className="w-4 h-4" /> Add Boost
+          </button>
         </div>
       </div>
       <div className="space-y-3" data-testid="admin-products-list">
@@ -154,7 +161,7 @@ export default function ProductsTab({ products, categories, stockCounts, onAdd, 
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-slate-100">{p.name}</div>
                 <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
-                  {p.game} // {Object.entries(p.prices || {}).map(([k, v]) => `${DURATION_LABELS[k]} ${aud(v)}`).join(" · ")}
+                  {p.game} // {Object.entries(p.prices || {}).map(([k, v]) => `${durLabel(p, k)} ${aud(v)}`).join(" · ")}
                   {!p.active && <span className="text-rose-400 ml-2">HIDDEN</span>}
                 </div>
               </div>
@@ -163,20 +170,26 @@ export default function ProductsTab({ products, categories, stockCounts, onAdd, 
               <span className="text-[10px] px-2 py-1 rounded-full bg-violet-400/10 border border-violet-400/40 text-violet-300 font-mono uppercase tracking-widest" data-testid={`admin-product-kind-${p.id}`}>
                 Account
               </span>
+            ) : p.kind === "boost" ? (
+              <span className="text-[10px] px-2 py-1 rounded-full bg-pink-400/10 border border-pink-400/40 text-pink-300 font-mono uppercase tracking-widest" data-testid={`admin-product-kind-${p.id}`}>
+                {p.platform === "tiktok" ? "TikTok" : "Instagram"} Boost
+              </span>
             ) : (
               <StatusPill status={p.status} testid={`admin-product-status-${p.id}`} />
             )}
-            <button
-              onClick={() => onKeys(p)}
-              data-testid={`admin-keys-button-${p.id}`}
-              className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                (stockCounts[p.id]?.total || 0) > 0
-                  ? "border-[#1E2D4A] text-slate-300 hover:border-[#2E6BFF]/50 hover:text-white"
-                  : "border-amber-400/40 text-amber-300 hover:border-amber-400"
-              }`}
-            >
-              {stockCounts[p.id]?.total || 0} keys · Manage
-            </button>
+            {p.kind !== "boost" && (
+              <button
+                onClick={() => onKeys(p)}
+                data-testid={`admin-keys-button-${p.id}`}
+                className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                  (stockCounts[p.id]?.total || 0) > 0
+                    ? "border-[#1E2D4A] text-slate-300 hover:border-[#2E6BFF]/50 hover:text-white"
+                    : "border-amber-400/40 text-amber-300 hover:border-amber-400"
+                }`}
+              >
+                {stockCounts[p.id]?.total || 0} keys · Manage
+              </button>
+            )}
             <div className="flex gap-2">
               <button onClick={() => onEdit(p)} data-testid={`admin-edit-product-${p.id}`} className="p-2 border border-blue-500/30 text-blue-300 hover:bg-blue-400/10 rounded transition-colors">
                 <Pencil className="w-4 h-4" />

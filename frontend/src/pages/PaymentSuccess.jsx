@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CheckCircle2, Loader2, ArrowRight, Mail } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import BoostIntake from "@/components/BoostIntake";
 import { KeyRow } from "@/pages/CustomerPortal";
 import { api, aud } from "@/lib/api";
 import { useCart } from "@/context/CartContext";
@@ -77,7 +78,7 @@ export default function PaymentSuccess() {
                 </h1>
                 <p className="text-sm text-slate-400 mt-3 flex items-center justify-center gap-2">
                   <Mail className="w-4 h-4 text-[#5B8CFF]" />
-                  Keys emailed to <span className="text-slate-200">{state.order.email}</span>
+                  {state.order.items.every((i) => i.kind === "boost") ? "Receipt emailed to" : "Keys emailed to"} <span className="text-slate-200">{state.order.email}</span>
                 </p>
               </div>
 
@@ -87,12 +88,29 @@ export default function PaymentSuccess() {
                   <span className="text-white font-mono font-semibold">{aud(state.order.total)}</span>
                 </div>
                 <div className="space-y-3">
-                  {state.order.items.map((item) => (
-                    <KeyRow key={`${item.product_id}-${item.duration}`} item={item} />
-                  ))}
+                  {state.order.items.map((item) =>
+                    item.kind === "boost" ? (
+                      <BoostIntake
+                        key={`${item.product_id}-${item.duration}`}
+                        orderId={state.order.id}
+                        item={item}
+                        detail={(state.order.boost_details || []).find((d) => d.product_id === item.product_id)}
+                        onSaved={(details) => setState((s) => ({ ...s, order: { ...s.order, boost_details: details } }))}
+                      />
+                    ) : (
+                      <KeyRow key={`${item.product_id}-${item.duration}`} item={item} />
+                    )
+                  )}
                 </div>
                 <div className="mt-6 p-4 border border-dashed border-[#2E6BFF]/30 rounded-lg text-sm text-slate-400 leading-relaxed">
-                  {state.order.items.some((i) => i.ticket_url) ? (
+                  {state.order.items.some((i) => i.kind === "boost") ? (
+                    <>
+                      <span className="text-white font-semibold block mb-2">One last step for your boost</span>
+                      1. Paste your {state.order.items.find((i) => i.kind === "boost")?.platform === "tiktok" ? "TikTok" : "Instagram"} link above and hit Submit.
+                      2. Our team starts the boost manually — usually within hours.
+                      3. Track the status anytime in your Customer Portal. Closed this page? The same form is waiting there.
+                    </>
+                  ) : state.order.items.some((i) => i.ticket_url) ? (
                     <>
                       <span className="text-white font-semibold block mb-2">Claim via Discord ticket</span>
                       1. Click "Open a ticket in Discord" next to your product above.

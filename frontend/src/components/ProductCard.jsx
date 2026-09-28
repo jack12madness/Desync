@@ -7,7 +7,8 @@ export default function ProductCard({ product, index, onSelect }) {
   const prices = Object.values(product.prices || {});
   const minPrice = prices.length ? Math.min(...prices) : 0;
   const durations = Object.keys(product.prices || {});
-  const soldOut = product.delivery !== "ticket" && durations.length > 0 && durations.every((d) => !(product.stock?.[d] > 0));
+  const isBoost = product.kind === "boost";
+  const soldOut = !isBoost && product.delivery !== "ticket" && durations.length > 0 && durations.every((d) => !(product.stock?.[d] > 0));
 
   return (
     <motion.article
@@ -34,6 +35,13 @@ export default function ProductCard({ product, index, onSelect }) {
               className="px-2.5 py-1 rounded-md bg-violet-400/15 border border-violet-400/40 text-violet-300 text-[10px] font-mono font-bold uppercase tracking-[0.2em]"
             >
               {soldOut ? "Discord Accounts" : `${durations.reduce((s, d) => s + (product.stock?.[d] || 0), 0)} in stock`}
+            </span>
+          ) : isBoost ? (
+            <span
+              data-testid={`product-stock-badge-${product.id}`}
+              className="px-2.5 py-1 rounded-md bg-pink-500/15 border border-pink-400/40 text-pink-300 text-[10px] font-mono font-bold uppercase tracking-[0.2em]"
+            >
+              {product.platform === "tiktok" ? "TikTok" : "Instagram"} Boost
             </span>
           ) : (
             <StatusPill status={product.status} testid={`product-status-badge-${product.id}`} />
