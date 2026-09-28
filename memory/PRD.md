@@ -11,6 +11,13 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-28 — ROOT CAUSE of live OTP "invalid/expired": axios interceptor clobbered buyer token
+- Deployer RCA (multi-pod theory disproven — same-pod verify 200 → /portal/me 401 pairs, identical JWT_SECRET across replicas): lib/api.js request interceptor unconditionally overwrote Authorization with the admin token (localStorage void_admin_token). Owner's browser (logged into admin) sent admin token to /portal/me → backend requires type buyer_lookup → 401 → misleading "expired" toast. Pure customers unaffected
+- Fix: interceptor now skips attaching the admin token when the caller already set Authorization (api.js)
+- Bonus hardening (same batch, CustomerPortal.jsx): stale saved session now auto-requests a fresh code instead of dead-ending; fresh-token 401 retries once; clearer error copy
+- Verified E2E on preview: Playwright with real admin token in localStorage → request code → verify → portal dashboard loads (was the exact failing scenario before)
+- NOTE: needs Deploy to reach live; earlier 15-min TTL + out-of-order fixes already live and confirmed working server-side
+
 ### 2026-07-10 — Generator tiers: redeemed key = 3/3/3, >A$10 = lifetime 1/1/1
 - User-confirmed rules: redeemed DSYNC key (paid lifetime) → 3 Steam/Discord/Rockstar per hr; any paid order over A$10 (no key) → lifetime 1/type/hr; manual grants stay 3/hr; higher rate wins; same limits on portal AND desktop app API (shared _entitlement_state)
 - server.py _entitlement_state: tier3 = purchase|manual|key_redeemed; standard >A$10 alone stays STANDARD_LIMIT 1

@@ -6,6 +6,11 @@ export const BASE_URL = process.env.REACT_APP_BACKEND_URL;
 export const api = axios.create({ baseURL: API });
 
 api.interceptors.request.use((config) => {
+  // Never clobber a caller-provided Authorization header (e.g. the customer
+  // portal's buyer token) with the admin token.
+  if (config.headers && config.headers.Authorization) {
+    return config;
+  }
   const token = localStorage.getItem("void_admin_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
