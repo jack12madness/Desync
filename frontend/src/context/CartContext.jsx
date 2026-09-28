@@ -15,6 +15,33 @@ export const DURATION_LABELS = {
 export const durLabel = (product, d) =>
   (product && product.duration_labels && product.duration_labels[d]) || DURATION_LABELS[d] || d;
 
+const DURATION_DAYS = { day: 1, "3d": 3, week: 7, month: 30, lifetime: 999999 };
+const BOOST_TYPE_ORDER = ["followers", "likes", "views"];
+
+// Approximate length in days for any price key, parsing custom labels like "2 Weeks" / "2w"
+export const durationDays = (product, key) => {
+  if (DURATION_DAYS[key] != null) return DURATION_DAYS[key];
+  const label = (((product && product.duration_labels) || {})[key] || key).toLowerCase();
+  const m = label.match(/(\d+(?:\.\d+)?)\s*(days?|d|weeks?|w|months?|mo|m)\b/);
+  if (!m) return 999998; // unparseable customs: after known durations, before lifetime
+  const n = parseFloat(m[1]);
+  const unit = m[2][0];
+  return n * (unit === "d" ? 1 : unit === "w" ? 7 : 30);
+};
+
+// Price keys in display order: cheats/accounts by duration length (custom slots in naturally),
+// boost products keep followers/likes/views order
+export const orderedPriceKeys = (product) => {
+  const keys = Object.keys((product && product.prices) || {});
+  if (product && product.kind === "boost") {
+    return [
+      ...BOOST_TYPE_ORDER.filter((k) => keys.includes(k)),
+      ...keys.filter((k) => !BOOST_TYPE_ORDER.includes(k)),
+    ];
+  }
+  return keys.sort((a, b) => durationDays(product, a) - durationDays(product, b) || a.localeCompare(b));
+};
+
 export function CartProvider({ children }) {
   const [items, setItems] = useState(() => {
     try {
@@ -58,6 +85,7 @@ export function CartProvider({ children }) {
             min_buy: minBuy,
             kind: product.kind || "cheat",
             platform: product.platform || null,
+            bulk_tiers: product.bulk_tiers || null,
           },
           duration,
           duration_label: label,

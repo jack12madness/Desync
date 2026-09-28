@@ -165,6 +165,8 @@ def test_checkout_sold_out_duration_rejected():
     products = requests.get(f"{API}/products", timeout=15).json()
     target = None
     for p in products:
+        if p.get("kind") == "boost":
+            continue  # boosts never sell out by design
         prices = p.get("prices") or {}
         stock = p.get("stock") or {}
         for d in prices:

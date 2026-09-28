@@ -51,12 +51,16 @@ function ProductForm({ initial, categories, onSave, onClose }) {
       .filter((k) => !FIXED_DURATIONS.includes(k))
       .map((k) => ({ label: labels[k] || k, price: String(initial.prices[k]) }));
   });
+  const [bulkRows, setBulkRows] = useState(() =>
+    (initial?.bulk_tiers || []).map((t) => ({ min_qty: String(t.min_qty), percent: String(t.percent) }))
+  );
   const [loaderFile, setLoaderFile] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [removeLoader, setRemoveLoader] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setPrice = (k, v) => setForm((f) => ({ ...f, prices: { ...f.prices, [k]: v } }));
   const setRow = (i, k, v) => setCustomRows((rows) => rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  const setBulkRow = (i, k, v) => setBulkRows((rows) => rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
   const isBoost = form.kind === "boost";
 
   const save = () => {
@@ -104,6 +108,11 @@ function ProductForm({ initial, categories, onSave, onClose }) {
       platform: isBoost ? form.platform : null,
       boost_type: null,
       min_spend: isBoost && form.min_spend !== "" && !isNaN(parseFloat(form.min_spend)) ? parseFloat(form.min_spend) : null,
+      bulk_tiers: isBoost
+        ? bulkRows
+            .map((r) => ({ min_qty: parseInt(r.min_qty), percent: parseFloat(r.percent) }))
+            .filter((r) => !isNaN(r.min_qty) && r.min_qty > 0 && !isNaN(r.percent) && r.percent > 0)
+        : null,
       duration_labels: Object.keys(duration_labels).length ? duration_labels : null,
       loader_link: form.loader_link?.trim() || null,
       discord_url: form.discord_url?.trim() || null,
@@ -150,6 +159,52 @@ function ProductForm({ initial, categories, onSave, onClose }) {
             <label className={labelCls}>Minimum spend (AUD)</label>
             <Input type="number" step="0.50" min="0" value={form.min_spend} onChange={(e) => set("min_spend", e.target.value)} placeholder="7.50" data-testid="product-form-min-spend" className={fieldCls} />
             <div className="text-[10px] font-mono text-slate-600 mt-1">At 0.2c each, A$7.50 = 3,750 minimum</div>
+          </div>
+          <div className="sm:col-span-3">
+            <label className={labelCls}>Bulk discounts (optional) — bigger orders get % off</label>
+            <div className="space-y-2" data-testid="bulk-tiers-editor">
+              {bulkRows.map((row, i) => (
+                <div key={i} className="flex gap-2 items-center" data-testid={`bulk-tier-row-${i}`}>
+                  <Input
+                    type="number" min="1" step="500"
+                    value={row.min_qty}
+                    onChange={(e) => setBulkRow(i, "min_qty", e.target.value)}
+                    placeholder="Amount — e.g. 10000"
+                    data-testid={`bulk-tier-min-${i}`}
+                    className={fieldCls}
+                  />
+                  <span className="text-xs font-mono text-slate-500 shrink-0">+ get</span>
+                  <Input
+                    type="number" min="1" max="90" step="1"
+                    value={row.percent}
+                    onChange={(e) => setBulkRow(i, "percent", e.target.value)}
+                    placeholder="% off"
+                    data-testid={`bulk-tier-pct-${i}`}
+                    className={`${fieldCls} w-28 shrink-0`}
+                  />
+                  <span className="text-xs font-mono text-slate-500 shrink-0">% off</span>
+                  <button
+                    type="button"
+                    onClick={() => setBulkRows((rows) => rows.filter((_, j) => j !== i))}
+                    data-testid={`bulk-tier-remove-${i}`}
+                    className="p-2 border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 rounded transition-colors shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setBulkRows((rows) => [...rows, { min_qty: "", percent: "" }])}
+                data-testid="bulk-tier-add"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#1E2D4A] text-xs font-mono uppercase tracking-widest text-slate-300 hover:border-blue-400/50 hover:text-white transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add bulk tier
+              </button>
+            </div>
+            <div className="text-[10px] font-mono text-slate-600 mt-1.5">
+              Only the bigger discount applies — if a coupon beats the bulk rate, the coupon wins (no stacking)
+            </div>
           </div>
         </div>
       )}

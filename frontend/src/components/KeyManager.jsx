@@ -4,15 +4,10 @@ import ScrollModal from "@/components/ScrollModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api, apiError } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
-import { durLabel } from "@/context/CartContext";
+import { durLabel, orderedPriceKeys } from "@/context/CartContext";
 
-const DURATIONS = ["day", "3d", "week", "month", "lifetime"];
-
-// canonical durations first, then any custom price keys
-const orderedDurations = (product) => {
-  const keys = Object.keys(product.prices || {});
-  return [...DURATIONS.filter((d) => keys.includes(d)), ...keys.filter((k) => !DURATIONS.includes(k))];
-};
+// price keys ordered by duration length (custom durations slot in naturally)
+const orderedDurations = (product) => orderedPriceKeys(product);
 
 export default function KeyManager({ product, onClose, onChanged }) {
   const isAccountProduct = product.kind === "account";

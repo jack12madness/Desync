@@ -22,12 +22,20 @@ export default function CartDrawer() {
   const [checking, setChecking] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // product-tied codes discount only that product's lines; store-wide codes discount everything
-  const discountable = coupon?.product_id
-    ? items.reduce((s, i) => (i.product.id === coupon.product_id ? s + i.price * (i.qty || 1) : s), 0)
-    : total;
-  const discount = coupon ? (discountable * coupon.percent) / 100 : 0;
-  const payable = Math.max(0, total - discount);
+  // bulk tiers (boost lines) vs coupon: the bigger discount wins per line — no stacking
+  const bulkPct = (i) => {
+    if (i.product.kind !== "boost" || !Array.isArray(i.product.bulk_tiers)) return 0;
+    return i.product.bulk_tiers.reduce((best, t) => ((i.qty || 1) >= (t.min_qty || 0) ? Math.max(best, t.percent || 0) : best), 0);
+  };
+  const couponPct = (i) => {
+    if (!coupon) return 0;
+    if (coupon.product_id && coupon.product_id !== i.product.id) return 0;
+    return coupon.percent;
+  };
+  const lineGross = (i) => i.price * (i.qty || 1);
+  const bulkSavings = items.reduce((s, i) => (bulkPct(i) > couponPct(i) ? s + (lineGross(i) * bulkPct(i)) / 100 : s), 0);
+  const couponSavings = items.reduce((s, i) => (couponPct(i) >= bulkPct(i) ? s + (lineGross(i) * couponPct(i)) / 100 : s), 0);
+  const payable = Math.max(0, total - bulkSavings - couponSavings);
 
   const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
   const cartPayload = () => ({
@@ -208,7 +216,16 @@ export default function CartDrawer() {
                   </div>
                 )}
               </div>
-              <div className="font-mono text-sm font-bold text-[#8FB8E8]">{aud(item.price * (item.qty || 1))}</div>
+              <div className="text-right">
+                <div className="font-mono text-sm font-bold text-[#8FB8E8]">
+                  {aud(lineGross(item) * (1 - Math.max(bulkPct(item), couponPct(item)) / 100))}
+                </div>
+                {bulkPct(item) > 0 && (
+                  <div className="text-[10px] font-mono text-emerald-300" data-testid={`bulk-tag-${item.product.id}`}>
+                    bulk −{bulkPct(item)}%
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => removeItem(idx)}
                 data-testid={`cart-remove-${item.product.id}`}
@@ -259,10 +276,16 @@ export default function CartDrawer() {
               <span className="text-sm text-slate-400">Subtotal</span>
               <span className="font-mono text-sm text-slate-300" data-testid="cart-subtotal">{aud(total)}</span>
             </div>
-            {coupon && (
+            {bulkSavings > 0 && (
+              <div className="flex items-center justify-between" data-testid="cart-bulk-discount-line">
+                <span className="text-sm text-emerald-300">Bulk discount</span>
+                <span className="font-mono text-sm text-emerald-300">-{aud(bulkSavings)}</span>
+              </div>
+            )}
+            {coupon && couponSavings > 0 && (
               <div className="flex items-center justify-between" data-testid="cart-discount-line">
                 <span className="text-sm text-emerald-300">Discount ({coupon.code})</span>
-                <span className="font-mono text-sm text-emerald-300">-{aud(discount)}</span>
+                <span className="font-mono text-sm text-emerald-300">-{aud(couponSavings)}</span>
               </div>
             )}
             <div className="flex items-center justify-between pt-1.5 border-t border-[#1E2D4A]">

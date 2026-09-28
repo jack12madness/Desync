@@ -83,6 +83,8 @@ def _in_stock_product(prices_dur=None):
 def _out_of_stock_duration():
     prods = requests.get(f"{API}/products", timeout=15).json()
     for p in prods:
+        if p.get("kind") == "boost":
+            continue  # boosts never sell out by design
         for d in (p.get("prices") or {}):
             if (p.get("stock") or {}).get(d, 0) == 0:
                 return p, d

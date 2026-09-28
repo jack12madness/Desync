@@ -2,24 +2,9 @@ import { useState } from "react";
 import { Check, ShoppingCart, Zap, ShieldCheck, Share2, ChevronDown, Cpu, Wrench } from "lucide-react";
 import ScrollModal from "@/components/ScrollModal";
 import StatusPill from "@/components/StatusPill";
-import { useCart, durLabel } from "@/context/CartContext";
+import { useCart, durLabel, orderedPriceKeys } from "@/context/CartContext";
 import { aud, BASE_URL } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
-
-const DURATION_ORDER = ["day", "3d", "week", "month", "lifetime"];
-
-// canonical durations first, then custom/boost tiers (numeric-aware)
-function orderedPriceKeys(product) {
-  const keys = Object.keys(product.prices || {});
-  const fixed = DURATION_ORDER.filter((d) => keys.includes(d));
-  const custom = keys.filter((k) => !DURATION_ORDER.includes(k));
-  const num = (k) => {
-    const m = k.replace(/[^0-9.]/g, "");
-    return m ? parseFloat(m) : Number.MAX_SAFE_INTEGER;
-  };
-  custom.sort((a, b) => num(a) - num(b) || a.localeCompare(b));
-  return [...fixed, ...custom];
-}
 
 function renderInline(text) {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
@@ -123,7 +108,9 @@ export default function ProductModal({ product, onClose }) {
   const minSpend = Number(product?.min_spend) || 0;
   const minUnits = isBoost && unit > 0 && minSpend > 0 ? Math.ceil(minSpend / unit) : 1;
   const boostQty = Math.max(minUnits, parseInt(qtyInput) || 0);
-  const boostTotal = unit * boostQty;
+  const bulkTiers = Array.isArray(product?.bulk_tiers) ? [...product.bulk_tiers].sort((a, b) => a.min_qty - b.min_qty) : [];
+  const bulkPct = bulkTiers.reduce((best, t) => (boostQty >= (t.min_qty || 0) ? Math.max(best, t.percent || 0) : best), 0);
+  const boostTotal = unit * boostQty * (1 - bulkPct / 100);
   const soldOut = product
     ? !isBoost && product.delivery !== "ticket" && durations.length > 0 && durations.every((d) => !(product.stock?.[d] > 0))
     : false;
@@ -249,9 +236,32 @@ export default function ProductModal({ product, onClose }) {
                     </button>
                   ))}
                 </div>
+                {bulkTiers.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3" data-testid="boost-bulk-tiers">
+                    {bulkTiers.map((t) => (
+                      <span
+                        key={t.min_qty}
+                        data-testid={`bulk-tier-${t.min_qty}`}
+                        className={`px-2.5 py-1 rounded-full border text-[10px] font-mono transition-colors ${
+                          bulkPct >= t.percent && boostQty >= t.min_qty
+                            ? "border-emerald-400/50 text-emerald-300 bg-emerald-400/10"
+                            : "border-[#1E2D4A] text-slate-500"
+                        }`}
+                      >
+                        {t.min_qty.toLocaleString()}+ = {t.percent}% off
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="mt-3 flex items-center justify-between p-3 rounded-lg bg-pink-500/10 border border-pink-400/30">
-                  <span className="text-xs text-pink-200">{boostQty.toLocaleString()} {durLabel(product, selected).toLowerCase()}</span>
-                  <span className="font-mono font-bold text-lg text-pink-100" data-testid="boost-total">{aud(boostTotal)}</span>
+                  <span className="text-xs text-pink-200">
+                    {boostQty.toLocaleString()} {durLabel(product, selected).toLowerCase()}
+                    {bulkPct > 0 && <span className="text-emerald-300 ml-2" data-testid="boost-bulk-applied">bulk −{bulkPct}%</span>}
+                  </span>
+                  <span className="font-mono font-bold text-lg text-pink-100" data-testid="boost-total">
+                    {bulkPct > 0 && <span className="text-xs text-slate-500 line-through mr-2">{aud(unit * boostQty)}</span>}
+                    {aud(boostTotal)}
+                  </span>
                 </div>
                 {minSpend > 0 && (
                   <div className="mt-2 text-[11px] text-slate-500">

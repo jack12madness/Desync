@@ -157,6 +157,51 @@ def test_boost_link_and_status_flow(admin_headers, boost_product):
     assert reset["likes"]["status"] == "pending"
 
 
+def test_boost_bulk_tiers_bigger_discount_wins(admin_headers):
+    """Qty-based bulk % applies automatically; only the bigger of bulk vs coupon applies."""
+    r = requests.post(f"{API}/admin/products", json={
+        "game": "FiveM", "name": f"TEST-Bulk-{uuid.uuid4().hex[:6]}", "kind": "boost",
+        "platform": "instagram", "min_spend": 5.0,
+        "prices": {"followers": UNIT, "likes": UNIT, "views": UNIT},
+        "duration_labels": {"followers": "Followers", "likes": "Likes", "views": "Views"},
+        "bulk_tiers": [{"min_qty": 10000, "percent": 5}, {"min_qty": 50000, "percent": 15}],
+        "image_url": "https://example.com/b.png",
+    }, headers=admin_headers, timeout=15)
+    assert r.status_code == 200, r.text
+    pid = r.json()["id"]
+    try:
+        email = f"bulk-{uuid.uuid4().hex[:6]}@resend.dev"
+        # 5,000 -> no tier: 5,000 x 0.2c = A$10.00
+        oid = _buy_and_pay(admin_headers, email, [{"product_id": pid, "duration": "likes", "qty": 5000}])
+        assert requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["total"] == 10.0
+        # 10,000 -> 5% tier: A$20.00 -> A$19.00
+        oid = _buy_and_pay(admin_headers, email, [{"product_id": pid, "duration": "likes", "qty": 10000}])
+        order = requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()
+        assert order["total"] == 19.0 and order["items"][0]["bulk_percent"] == 5
+        # 50,000 -> 15% tier: A$100.00 -> A$85.00
+        oid = _buy_and_pay(admin_headers, email, [{"product_id": pid, "duration": "likes", "qty": 50000}])
+        assert requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["total"] == 85.0
+        # coupon DESYNC10 (10%) vs bulk 5% on 10,000 -> coupon wins: A$18.00, no stacking
+        r = requests.post(f"{API}/payments/bank-transfer", json={
+            "email": email, "items": [{"product_id": pid, "duration": "likes", "qty": 10000}],
+            "coupon": "DESYNC10", "origin_url": BASE,
+        }, timeout=30)
+        assert r.status_code == 200, r.text
+        oid = r.json()["order_id"]
+        requests.post(f"{API}/admin/orders/{oid}/mark-paid", headers=admin_headers, timeout=30)
+        assert requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["total"] == 18.0
+        # coupon 10% vs bulk 15% on 50,000 -> bulk wins: A$85.00
+        r = requests.post(f"{API}/payments/bank-transfer", json={
+            "email": email, "items": [{"product_id": pid, "duration": "likes", "qty": 50000}],
+            "coupon": "DESYNC10", "origin_url": BASE,
+        }, timeout=30)
+        oid = r.json()["order_id"]
+        requests.post(f"{API}/admin/orders/{oid}/mark-paid", headers=admin_headers, timeout=30)
+        assert requests.get(f"{API}/orders/by-id/{oid}", timeout=15).json()["total"] == 85.0
+    finally:
+        requests.delete(f"{API}/admin/products/{pid}", headers=admin_headers, timeout=15)
+
+
 def test_custom_cheat_duration_end_to_end(admin_headers):
     """Staff-defined duration ("2 Weeks") flows through pricing, stock and checkout."""
     r = requests.post(f"{API}/admin/products", json={

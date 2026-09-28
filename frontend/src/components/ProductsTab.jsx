@@ -3,7 +3,7 @@ import { Plus, Pencil, Trash2, ArrowLeft, GripVertical, FolderOpen } from "lucid
 import StatusPill from "@/components/StatusPill";
 import { api, apiError, aud } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
-import { durLabel } from "@/context/CartContext";
+import { durLabel, orderedPriceKeys } from "@/context/CartContext";
 
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
@@ -161,7 +161,7 @@ export default function ProductsTab({ products, categories, stockCounts, onAdd, 
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-slate-100">{p.name}</div>
                 <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
-                  {p.game} // {Object.entries(p.prices || {}).map(([k, v]) => `${durLabel(p, k)} ${aud(v)}`).join(" · ")}
+                  {p.game} // {orderedPriceKeys(p).map((k) => `${durLabel(p, k)} ${aud(p.prices[k])}`).join(" · ")}
                   {!p.active && <span className="text-rose-400 ml-2">HIDDEN</span>}
                 </div>
               </div>

@@ -58,16 +58,29 @@ def _dur_label(product: Optional[dict], duration: str) -> str:
     return custom.get(duration) or DURATIONS.get(duration) or duration
 
 
+_DURATION_DAYS = {"day": 1, "3d": 3, "week": 7, "month": 30, "lifetime": 999999}
+_BOOST_TYPE_ORDER = ("followers", "likes", "views")
+
+
+def _duration_days(product: dict, key: str) -> float:
+    """Approximate length in days for a price key; parses custom labels like '2 Weeks'."""
+    if key in _DURATION_DAYS:
+        return _DURATION_DAYS[key]
+    label = ((product.get("duration_labels") or {}).get(key) or key).lower()
+    m = re.search(r"(\d+(?:\.\d+)?)\s*(days?|d|weeks?|w|months?|mo|m)\b", label)
+    if not m:
+        return 999998  # unparseable customs: after known durations, before lifetime
+    n = float(m.group(1))
+    unit = m.group(2)[0]
+    return n * (1 if unit == "d" else 7 if unit == "w" else 30)
+
+
 def _ordered_price_keys(product: dict) -> list:
-    """Canonical duration order first, then custom/boost tiers (numeric-aware)."""
+    """Display order: cheats/accounts by duration length; boosts keep followers/likes/views."""
     keys = list((product.get("prices") or {}).keys())
-    fixed = [d for d in DURATIONS if d in keys]
-    custom = [k for k in keys if k not in DURATIONS]
-    def _num(k):
-        m = re.sub(r"[^0-9.]", "", k)
-        return (0, float(m)) if m else (1, 0)
-    custom.sort(key=lambda k: (_num(k), k))
-    return fixed + custom
+    if product.get("kind") == "boost":
+        return [k for k in _BOOST_TYPE_ORDER if k in keys] + [k for k in keys if k not in _BOOST_TYPE_ORDER]
+    return sorted(keys, key=lambda k: (_duration_days(product, k), k))
 
 
 # ---------- helpers ----------
@@ -179,6 +192,11 @@ def get_object(path: str) -> tuple:
 
 # ---------- models ----------
 
+class BulkTier(BaseModel):
+    min_qty: int
+    percent: float
+
+
 class ProductIn(BaseModel):
     game: str
     name: str
@@ -194,6 +212,7 @@ class ProductIn(BaseModel):
     platform: Optional[str] = None  # for kind=boost: "tiktok" | "instagram"
     boost_type: Optional[str] = None  # legacy — buyers now pick the type at purchase time
     min_spend: Optional[float] = None  # for kind=boost: minimum order value for the boost line
+    bulk_tiers: Optional[List[BulkTier]] = None  # for kind=boost: qty-based % discounts, e.g. 10,000+ = 5% off
     duration_labels: Optional[Dict[str, str]] = None  # custom price-key labels, e.g. {"2-weeks": "2 Weeks"}
     delivery: str = "stock"  # "stock" (limited keys) or "ticket" (infinite, claim via Discord ticket)
     ticket_url: Optional[str] = None
@@ -602,6 +621,18 @@ def _validate_boost(body: ProductIn):
             raise HTTPException(400, "Boost products need a platform: tiktok or instagram")
         if not body.prices:
             raise HTTPException(400, "Boost products need a unit price")
+        for t in (body.bulk_tiers or []):
+            if t.min_qty < 1 or not (0 < t.percent <= 90):
+                raise HTTPException(400, "Bulk tiers need an amount of at least 1 and a percent between 0 and 90")
+
+
+def _bulk_pct(product: dict, qty: int) -> float:
+    """Best quantity-based bulk discount percent for a boost product."""
+    best = 0.0
+    for t in (product.get("bulk_tiers") or []):
+        if qty >= int(t.get("min_qty") or 0):
+            best = max(best, float(t.get("percent") or 0))
+    return best
 
 
 @api_router.post("/admin/products")
@@ -2035,7 +2066,10 @@ async def _price_cart(items: List[CartItemIn], coupon: Optional[str]):
             min_spend = float(product.get("min_spend") or 0)
             if min_spend and gross_cents < int(round(min_spend * 100)):
                 raise HTTPException(400, f"{product['name']} has a minimum spend of A${min_spend:.2f}")
-            line_cents = int(round(gross_cents * (1 - (discount_pct if applies else 0) / 100)))
+            bulk_pct = _bulk_pct(product, qty)
+            coupon_pct = discount_pct if applies else 0.0
+            eff_pct = max(bulk_pct, coupon_pct)  # bigger discount wins — no stacking
+            line_cents = int(round(gross_cents * (1 - eff_pct / 100)))
             subtotal_cents += gross_cents
             total_cents += line_cents
             order_items.append({
@@ -2043,7 +2077,7 @@ async def _price_cart(items: List[CartItemIn], coupon: Optional[str]):
                 "duration": item.duration, "duration_label": label,
                 "kind": "boost", "platform": product.get("platform"), "boost_type": item.duration,
                 "unit_price": float(price), "license_key": None, "qty": qty,
-                "line_cents": line_cents,
+                "line_cents": line_cents, "bulk_percent": bulk_pct or None,
             })
             continue
         min_buy = max(1, int(product.get("min_buy") or 1))
