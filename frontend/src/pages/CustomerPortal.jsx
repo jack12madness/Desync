@@ -229,7 +229,7 @@ export default function CustomerPortal() {
     setData(d);
   };
 
-  const lookupWithToken = async (em, tok) => {
+  const lookupWithToken = async (em, tok, { saved = false, retried = false } = {}) => {
     setLoading(true);
     try {
       await loadPortal(tok);
@@ -238,8 +238,18 @@ export default function CustomerPortal() {
     } catch (e) {
       if (e?.response?.status === 401) {
         sessionStorage.removeItem(`desync_lookup_${em}`);
-        setStage("code");
-        toast.error("Verification expired — enter the latest code from your inbox");
+        if (saved) {
+          // stale saved session — automatically send a fresh code instead of dead-ending
+          await requestCode(em);
+        } else if (!retried) {
+          // fresh token rejected (e.g. server mid-restart) — retry once before giving up
+          await new Promise((r) => setTimeout(r, 1500));
+          await lookupWithToken(em, tok, { retried: true });
+        } else {
+          setStage("code");
+          setCode("");
+          toast.error("Your code was accepted but the session couldn't start — please enter it again");
+        }
       } else {
         toast.error(apiError(e));
       }
@@ -267,7 +277,7 @@ export default function CustomerPortal() {
     if (!em) return;
     const saved = sessionStorage.getItem(`desync_lookup_${em}`);
     if (saved) {
-      await lookupWithToken(em, saved);
+      await lookupWithToken(em, saved, { saved: true });
       return;
     }
     await requestCode(em);
