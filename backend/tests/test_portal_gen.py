@@ -276,7 +276,7 @@ def test_reviews_flow(admin_headers, products):
 
 def test_generator_keys_redeem_and_portal_generation(admin_headers):
     """Staff generate DSYNC keys into stock -> customer redeems in portal -> lifetime
-    1/hr access -> generates on the website -> hourly limit enforced."""
+    3/hr access -> generates on the website -> hourly limit enforced."""
     db = _db()
     gen_pid = None
     prods = requests.get(f"{API}/admin/products", headers=admin_headers, timeout=15).json()
@@ -305,7 +305,7 @@ def test_generator_keys_redeem_and_portal_generation(admin_headers):
     r = requests.post(f"{API}/portal/gen/redeem", json={"code": keys[0]}, headers=h, timeout=15)
     assert r.status_code == 200, r.text
     me = requests.get(f"{API}/portal/me", headers=h, timeout=20).json()["generator"]
-    assert me["access"] is True and me["tier3"] is False and me["limits"]["steam"] == 1
+    assert me["access"] is True and me["tier3"] is True and me["limits"]["steam"] == 3
     assert me["key"] and me["key"].startswith("DSYNC-")
 
     # redeemed key is consumed from stock
@@ -315,12 +315,13 @@ def test_generator_keys_redeem_and_portal_generation(admin_headers):
     # bogus + someone else's key
     assert requests.post(f"{API}/portal/gen/redeem", json={"code": "DSYNC-0000-0000-0000"}, headers=h, timeout=15).status_code == 404
 
-    # generate on the website
-    g1 = requests.post(f"{API}/portal/gen/generate", json={"type": "steam"}, headers=h, timeout=15)
-    assert g1.status_code == 200, g1.text
-    assert g1.json()["raw"]
+    # generate on the website — 3/hr for key-redeemed customers
+    for i in range(3):
+        gi = requests.post(f"{API}/portal/gen/generate", json={"type": "steam"}, headers=h, timeout=15)
+        assert gi.status_code == 200, gi.text
+        assert gi.json()["raw"]
     g2 = requests.post(f"{API}/portal/gen/generate", json={"type": "steam"}, headers=h, timeout=15)
-    assert g2.status_code == 429  # 1/hr for key-redeemed customers
+    assert g2.status_code == 429  # 3/hr exhausted for key-redeemed customers
 
     # other type still available
     g3 = requests.post(f"{API}/portal/gen/generate", json={"type": "discord"}, headers=h, timeout=15)
@@ -328,3 +329,37 @@ def test_generator_keys_redeem_and_portal_generation(admin_headers):
 
     # portal generate requires auth
     assert requests.post(f"{API}/portal/gen/generate", json={"type": "steam"}, timeout=15).status_code == 401
+
+
+def test_standard_tier_over_10_aud_stays_1_per_hour(admin_headers, products):
+    """A paid order over A$10 (no Generator key) grants lifetime 1/type/hr."""
+    email = f"std-{uuid.uuid4().hex[:6]}@resend.dev"
+    prods = requests.get(f"{API}/admin/products", headers=admin_headers, timeout=15).json()
+    cheat = next(p for p in prods if p.get("kind") != "account" and "generator" not in p["name"].lower())
+    # pick a duration priced over A$10, else buy qty to push total over 10
+    dur = next((d for d, pr in cheat["prices"].items() if float(pr) > 10), None)
+    if dur:
+        items = [{"product_id": cheat["id"], "duration": dur, "qty": 1}]
+    else:
+        dur, pr = next(iter(cheat["prices"].items()))
+        qty = int(11 // float(pr)) + 1
+        items = [{"product_id": cheat["id"], "duration": dur, "qty": qty}]
+    u = uuid.uuid4().hex[:6]
+    requests.post(f"{API}/admin/keystock",
+                  json={"product_id": cheat["id"], "duration": dur,
+                        "keys": "\n".join(f"STDKEY-{u}-{i}" for i in range(10))},
+                  headers=admin_headers, timeout=20)
+    _buy(admin_headers, email, items)
+
+    token = _buyer_token(email)
+    h = {"Authorization": f"Bearer {token}"}
+    g = requests.get(f"{API}/portal/me", headers=h, timeout=20).json()["generator"]
+    assert g["has_standard"] is True
+    assert g["tier3"] is False and g["key_redeemed"] is False
+    assert g["limits"] == {"steam": 1, "discord": 1, "rockstar": 1}
+
+    g1 = requests.post(f"{API}/portal/gen/generate", json={"type": "steam"}, headers=h, timeout=15)
+    assert g1.status_code in (200, 409), g1.text  # 409 only if pool empty
+    if g1.status_code == 200:
+        g2 = requests.post(f"{API}/portal/gen/generate", json={"type": "steam"}, headers=h, timeout=15)
+        assert g2.status_code == 429  # standard tier = 1/hr

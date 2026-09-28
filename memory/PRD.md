@@ -11,12 +11,18 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-07-10 — Generator tiers: redeemed key = 3/3/3, >A$10 = lifetime 1/1/1
+- User-confirmed rules: redeemed DSYNC key (paid lifetime) → 3 Steam/Discord/Rockstar per hr; any paid order over A$10 (no key) → lifetime 1/type/hr; manual grants stay 3/hr; higher rate wins; same limits on portal AND desktop app API (shared _entitlement_state)
+- server.py _entitlement_state: tier3 = purchase|manual|key_redeemed; standard >A$10 alone stays STANDARD_LIMIT 1
+- CustomerPortal copy updated (redeem toast, redeem blurb, locked-state explainer)
+- Tests: test_portal_gen.py redeem test updated (tier3 True, 3× steam then 429); NEW test_standard_tier_over_10_aud_stays_1_per_hour locks 1/1/1; full suite 55 passed, 2 skipped
+
 ### 2026-09-28 — Generator keys: staff generation, portal redemption, on-site generation
 - POST /admin/products/{id}/generate-keys {count, duration} — generator product only, creates DSYNC-XXXX-XXXX-XXXX into a price pool (KeyManager "Generator keys" card with count + pool picker)
 - Generator product flipped ticket → stock delivery so purchases deliver a DSYNC key automatically
-- POST /portal/gen/redeem {code}: available key → claimed; order-owned key → re-activatable; grants lifetime access at STANDARD rate (1/type/hr), source "key" (survives refunds — lifetime per user). tier3 (3/hr) = purchase or manual admin grant
+- POST /portal/gen/redeem {code}: available key → claimed; order-owned key → re-activatable; grants lifetime access at FULL rate (3/type/hr, updated 2026-07-10), source "key" (survives refunds — lifetime per user)
 - POST /portal/gen/generate {type}: generate accounts on the website (shared _perform_generation core with the app API); result panel with raw line + copy
-- _entitlement_state: tier3 = purchase|manual; key_redeemed or >A$10 = 1/hr; portal payload exposes tier3/key_redeemed
+- _entitlement_state: tier3 = purchase|manual|key_redeemed (3/hr); >A$10 alone = 1/hr; portal payload exposes tier3/key_redeemed
 - Verified E2E: generate→redeem→limits 1/1/1→portal generate→429 cap→idempotent re-redeem; UI screenshots of staff card + portal tab; 54 tests pass (2 env skips). Preview has generated test DSYNC keys in the day pool
 
 

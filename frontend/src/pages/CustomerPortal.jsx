@@ -199,7 +199,7 @@ export default function CustomerPortal() {
     setRedeeming(true);
     try {
       await api.post("/portal/gen/redeem", { code: redeemCode.trim() }, { headers: { Authorization: `Bearer ${token}` } });
-      toast.success("Generator activated — lifetime access, 1 of each type per hour");
+      toast.success("Generator activated — lifetime access, 3 of each type per hour");
       setRedeemCode("");
       await loadPortal(token);
     } catch (e) {
@@ -486,7 +486,7 @@ export default function CustomerPortal() {
                   {!gen.access && (
                     <div className="p-5 bg-[#0A1628] border border-violet-400/30 rounded-xl mb-4" data-testid="gen-redeem-card">
                       <div className="text-sm font-semibold text-white mb-1">Have a Generator key?</div>
-                      <div className="text-xs text-slate-500 mb-3">Redeem a DSYNC key for lifetime Generator access — 1 of each type per hour.</div>
+                      <div className="text-xs text-slate-500 mb-3">Redeem a DSYNC key for lifetime Generator access — 3 of each type per hour.</div>
                       <div className="flex gap-2">
                         <Input
                           value={redeemCode}
@@ -512,7 +512,7 @@ export default function CustomerPortal() {
                       <Zap className="w-8 h-8 text-slate-600 mx-auto mb-3" />
                       <div className="text-sm text-slate-300 font-semibold mb-1">Generator not active</div>
                       <div className="text-xs text-slate-500 max-w-md mx-auto">
-                        Get the FiveM Account Generator for full access (3 of each type per hour), redeem a key above for lifetime standard access, or place any order over A$10 for the standard allowance (1 of each per hour).
+                        Get the FiveM Account Generator or redeem a key above for full lifetime access (3 of each type per hour), or place any order over A$10 for the standard allowance (1 of each per hour).
                       </div>
                     </div>
                   ) : (

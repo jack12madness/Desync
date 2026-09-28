@@ -2402,10 +2402,10 @@ async def _entitlement_state(email: str) -> dict:
     cust = await db.customers.find_one({"email": email}, {"_id": 0})
     manual = bool(cust and cust.get("gen_access_manual"))
     key_redeemed = bool(cust and cust.get("gen_key_redeemed"))
-    tier3 = has_generator or manual                       # full rate
-    gen_access = tier3 or key_redeemed                    # key redemption = lifetime, standard rate
+    tier3 = has_generator or manual or key_redeemed       # paid Generator = full rate
+    gen_access = tier3                                    # key redemption = lifetime, full rate
     limits = {
-        t: (GENERATOR_LIMIT if tier3 else STANDARD_LIMIT if (key_redeemed or has_standard) else 0)
+        t: (GENERATOR_LIMIT if tier3 else STANDARD_LIMIT if has_standard else 0)
         for t in GEN_TYPES
     }
     return {
