@@ -147,7 +147,7 @@ h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: v
 .list-sub { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pill { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 3px 8px; border-radius: 20px; flex-shrink: 0; }
 .pill-paid { background: rgba(52,211,153,.12); color: var(--green); }
-.pill-pending, .pill-pending_bank { background: rgba(251,191,36,.12); color: var(--amber); }
+.pill-pending, .pill-pending_bank, .pill-awaiting_payment { background: rgba(251,191,36,.12); color: var(--amber); }
 .pill-cancelled, .pill-refunded { background: rgba(248,113,113,.12); color: var(--red); }
 .pill-boost { background: rgba(236,72,153,.14); color: var(--pink); }
 .pill-out { background: rgba(248,113,113,.14); color: var(--red); }
@@ -162,6 +162,29 @@ h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: v
 }
 #app-footer { padding: 8px 18px; border-top: 1px solid var(--border); flex-shrink: 0; }
 #footer-info { font-size: 10px; color: var(--muted); font-family: Consolas, monospace; }
+
+.update-banner {
+  position: fixed; left: 50%; bottom: 46px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(46,107,255,.15); border: 1px solid var(--blue); color: var(--blue-light);
+  padding: 8px 14px; border-radius: 9px; font-size: 12px; z-index: 40;
+  box-shadow: 0 8px 30px rgba(0,0,0,.5); white-space: nowrap;
+}
+
+.restock { display: flex; flex-direction: column; gap: 8px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.select { appearance: none; cursor: pointer; }
+.textarea { resize: vertical; font-size: 12px; line-height: 1.6; }
+.status-select {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: 7px; padding: 5px 8px; font-size: 11px; font-family: inherit; cursor: pointer; flex-shrink: 0;
+}
+.action-btn {
+  padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
+  border: 1px solid rgba(52,211,153,.5); background: rgba(52,211,153,.1); color: var(--green);
+  font-family: inherit; flex-shrink: 0;
+}
+.action-btn:hover { background: rgba(52,211,153,.2); }
+.action-btn[disabled] { opacity: .4; cursor: not-allowed; }
 
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }

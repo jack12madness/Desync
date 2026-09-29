@@ -13,9 +13,18 @@
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8"
   },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
   "build": {
     "appId": "gg.desync.desktop",
     "productName": "Desync Desktop",
+    "publish": [
+      {
+        "provider": "github",
+        "releaseType": "release"
+      }
+    ],
     "files": [
       "main.js",
       "preload.js",

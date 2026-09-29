@@ -11,6 +11,22 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-29 — Desktop phase 2: admin actions, auto-update, tray, download section
+- Desktop app: mark-paid button on bank-pending orders, boost status dropdowns, restock form (product+duration+keys) — all via existing admin endpoints
+- Auto-update: electron-updater + workflow now publishes a real GitHub Release (GH_TOKEN, contents:write) — app checks on launch + every 4h, footer banner offers "Restart" to install
+- Tray: minimize-to-tray on close, tray menu Open/Quit, new-order polling every 60s for staff (beep via WebAudio + window flash + tray tooltip)
+- Storefront: DesktopAppSection ("Get the Windows app") shows when desktop_download_url is set in Admin → Alerts; public GET /config endpoint; icons generated (build/icon.png, tray.png)
+- Verified in browser harness: mark-paid flips order to paid, restock adds keys, boost selects render, download section renders desktop+mobile
+
+### 2026-09-29 — Discord link at checkout: auto-join + customer role on payment- OAuth2 link flow: cart "Link your Discord account" (POST /discord/link-url {origin} → authorize URL scopes identify+guilds.join, origin allowlist desync.website/emergentagent/localhost) → GET /discord/callback exchanges code, stores discord_links doc (state token, user id/username, access+refresh tokens, TTL 60min) → redirects back to /?discord_linked=1&link_token=..&discord_name=.. → Home.jsx saves to localStorage, reopens cart, shows "Linked as @name" badge with change option
+- Checkout requires a valid single-use link token when configured (all card/bank/crypto paths; link consumed via find_one_and_update before any external payment call); orders carry discord_user_id/username/tokens
+- Fulfillment (_grant_discord_role in _fulfill_order): bot PUT guilds/{id}/members/{uid} with user access_token (auto-join; 201/204), then PUT roles/{role_id}; on 401 refreshes OAuth token once and retries; result stored as order.discord_role_status granted/failed + note; Discord alert to staff on failure; PaymentSuccess shows the role line
+- Config lives in admin settings (Alerts tab → "Discord customer role": client_id/secret, bot token, server ID, role ID) — integration activates only when all five are set; /config exposes discord_link_required + desktop_download_url
+- Settings PUT switched to exclude_unset so nulls CLEAR fields (was exclude_none — discord config and download URL could never be turned off; real bug fixed)
+- When unconfigured, checkout keeps the old free-text Discord username field
+- Tests: tests/test_discord_link.py (3 pass): URL/state/origin-validation, required-when-configured incl. single-use tokens + order identity + graceful role-grant failure (fake bot → Discord 401 → order still fulfills, status failed), normal checkout when off
+- USER SETUP REQUIRED (live): Discord Developer Portal app + bot (Manage Roles, role above customer role), redirect URLs https://desync.website/api/discord/callback (+ preview URL), paste 5 values in Admin → Alerts. Real OAuth/role grant untested without real creds
+
 ### 2026-09-29 — Desync Desktop (Windows app, phase 1)
 - Electron app in /app/desktop: 420×720 dark Desync-themed window; all network via main-process IPC proxy (API base hardcoded https://desync.website, DESYNC_API_URL env override for dev); JSON store in userData (key/token/history)
 - Customer side: DSYNC key login (POST /gen/validate), tier display (Full 3/hr vs Standard 1/hr), per-type used/limit bars, Generate buttons (POST /gen/generate with uuid request_id), live "refills in Xm Ys" countdowns from resets[], copy buttons, local history (50 entries)

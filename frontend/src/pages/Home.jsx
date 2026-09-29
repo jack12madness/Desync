@@ -8,7 +8,10 @@ import ProductCard from "@/components/ProductCard";
 import ProductModal from "@/components/ProductModal";
 import Faq from "@/components/Faq";
 import ReviewsSection from "@/components/ReviewsSection";
+import DesktopAppSection from "@/components/DesktopAppSection";
 import Footer from "@/components/Footer";
+import { useCart } from "@/context/CartContext";
+import { toast } from "@/components/ui/sonner";
 import { api, aud } from "@/lib/api";
 
 const FALLBACK_IMG = "/images/og-banner.png";
@@ -66,6 +69,26 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [activeCat, setActiveCat] = useState(null);
   const [selected, setSelected] = useState(null);
+  const { openCart } = useCart();
+
+  // returning from the Discord link flow — save the link and reopen the cart
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("discord_linked") === "1") {
+      const token = params.get("link_token");
+      const name = params.get("discord_name") || "Discord user";
+      if (token) {
+        localStorage.setItem("desync_discord_link", JSON.stringify({ token, name }));
+        toast.success(`Discord linked as ${name} — finish your order to get your customer role`);
+      }
+      window.history.replaceState({}, "", "/");
+      openCart();
+    } else if (params.get("discord_error") === "1") {
+      toast.error("Discord linking didn't finish — try again from the cart");
+      window.history.replaceState({}, "", "/");
+      openCart();
+    }
+  }, []);
 
   useEffect(() => {
     api.get("/products")
@@ -170,6 +193,7 @@ export default function Home() {
         </div>
       </section>
 
+      <DesktopAppSection />
       <ReviewsSection />
       <Faq />
       <Footer />

@@ -246,6 +246,7 @@ class CartItemIn(BaseModel):
 class CheckoutIn(BaseModel):
     email: EmailStr
     discord_username: Optional[str] = None
+    discord_link_token: Optional[str] = None  # from the OAuth link flow — required when Discord integration is configured
     items: List[CartItemIn]
     coupon: Optional[str] = None
     origin_url: str
@@ -409,6 +410,7 @@ async def startup():
     await db.expenses.create_index("id", unique=True)
     await db.lookup_codes.create_index("expires_dt", expireAfterSeconds=0)
     await db.lookup_codes.create_index("email")
+    await db.discord_links.create_index("created_at", expireAfterSeconds=DISCORD_LINK_TTL_MINUTES * 60)
     await db.gen_usage.create_index([("key", 1), ("request_id", 1)])
     await db.gen_usage.create_index([("email", 1), ("ts", -1)])
     await db.customers.create_index("gen_key", sparse=True)
@@ -1168,6 +1170,8 @@ class SettingsIn(BaseModel):
     discord_webhooks: Optional[Dict[str, str]] = None
     gen_pools: Optional[Dict[str, str]] = None  # {"steam": product_id, "discord": ..., "rockstar": ...}
     generator_product_id: Optional[str] = None
+    desktop_download_url: Optional[str] = None  # public "Get the Windows app" link on the storefront
+    discord_integration: Optional[Dict[str, str]] = None  # client_id, client_secret, bot_token, guild_id, role_id
 
 
 @api_router.get("/admin/settings")
@@ -1178,7 +1182,8 @@ async def get_settings(admin: dict = Depends(get_admin)):
 
 @api_router.put("/admin/settings")
 async def put_settings(body: SettingsIn, admin: dict = Depends(get_admin)):
-    updates = body.model_dump(exclude_none=True)
+    # exclude_unset (not exclude_none): fields the caller sends as null are cleared
+    updates = body.model_dump(exclude_unset=True)
     if "drop_date" in updates and updates["drop_date"] == "":
         updates.pop("drop_date")
     hooks = updates.get("discord_webhooks")
@@ -1195,6 +1200,197 @@ async def put_settings(body: SettingsIn, admin: dict = Depends(get_admin)):
         upsert=True,
     )
     return await db.settings.find_one({"id": "main"}, {"_id": 0})
+
+
+@api_router.get("/config")
+async def public_config():
+    """Tiny public config for the storefront — app download link + whether Discord linking is on."""
+    doc = await db.settings.find_one({"id": "main"}, {"_id": 0, "desktop_download_url": 1, "discord_integration": 1})
+    cfg = (doc or {}).get("discord_integration") or {}
+    enabled = all(cfg.get(k) for k in ("client_id", "client_secret", "bot_token", "guild_id", "role_id"))
+    return {
+        "desktop_download_url": (doc or {}).get("desktop_download_url") or None,
+        "discord_link_required": bool(enabled),
+    }
+
+
+# ---------- discord: link account at checkout, auto-join + customer role on payment ----------
+
+DISCORD_API = "https://discord.com/api/v10"
+DISCORD_LINK_TTL_MINUTES = 60
+
+
+async def _discord_cfg() -> Optional[dict]:
+    s = await _get_settings_doc()
+    cfg = s.get("discord_integration") or {}
+    if all(cfg.get(k) for k in ("client_id", "client_secret", "bot_token", "guild_id", "role_id")):
+        return cfg
+    return None
+
+
+def _allowed_origin(origin: str) -> str:
+    o = (origin or "").rstrip("/")
+    if re.match(r"^https://([a-z0-9-]+\.)*desync\.website$", o) or \
+       re.match(r"^https://[a-z0-9-]+\.emergentagent\.com$", o) or \
+       o.startswith("http://localhost"):
+        return o
+    return "https://desync.website"
+
+
+class DiscordLinkUrlIn(BaseModel):
+    origin: str
+
+
+@api_router.post("/discord/link-url")
+async def discord_link_url(body: DiscordLinkUrlIn):
+    """Start the Discord link flow: create a state token and return the authorize URL."""
+    cfg = await _discord_cfg()
+    if not cfg:
+        raise HTTPException(503, "Discord linking is not configured")
+    origin = _allowed_origin(body.origin)
+    state = secrets.token_urlsafe(24)
+    await db.discord_links.insert_one({
+        "id": state, "origin": origin, "status": "awaiting_oauth",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    from urllib.parse import urlencode
+    params = urlencode({
+        "client_id": cfg["client_id"],
+        "redirect_uri": f"{origin}/api/discord/callback",
+        "response_type": "code",
+        "scope": "identify guilds.join",
+        "state": state,
+        "prompt": "consent",
+    })
+    return {"url": f"https://discord.com/oauth2/authorize?{params}"}
+
+
+@api_router.get("/discord/callback")
+async def discord_callback(code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
+    """OAuth2 callback: exchange the code, fetch the identity, send the buyer back to the store."""
+    doc = await db.discord_links.find_one({"id": state or "", "status": "awaiting_oauth"})
+    if not doc:
+        raise HTTPException(400, "Link session expired — start again from the cart")
+    origin = doc.get("origin") or "https://desync.website"
+    if error or not code:
+        return RedirectResponse(f"{origin}/?discord_error=1")
+    cfg = await _discord_cfg()
+    redirect_uri = f"{origin}/api/discord/callback"
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            tr = await client.post(f"{DISCORD_API}/oauth2/token", data={
+                "client_id": cfg["client_id"], "client_secret": cfg["client_secret"],
+                "grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri,
+            }, headers={"Content-Type": "application/x-www-form-urlencoded"})
+            if tr.status_code != 200:
+                logger.error("Discord token exchange failed: %s %s", tr.status_code, tr.text[:300])
+                return RedirectResponse(f"{origin}/?discord_error=1")
+            td = tr.json()
+            ur = await client.get(f"{DISCORD_API}/users/@me",
+                                  headers={"Authorization": f"Bearer {td['access_token']}"})
+            if ur.status_code != 200:
+                return RedirectResponse(f"{origin}/?discord_error=1")
+            user = ur.json()
+    except Exception as e:
+        logger.error("Discord callback error: %s", e)
+        return RedirectResponse(f"{origin}/?discord_error=1")
+    username = user.get("global_name") or user.get("username") or "Discord user"
+    await db.discord_links.update_one({"id": state}, {"$set": {
+        "status": "linked", "discord_user_id": user["id"], "discord_username": username,
+        "avatar": user.get("avatar"),
+        "access_token": td["access_token"], "refresh_token": td.get("refresh_token"),
+        "linked_at": datetime.now(timezone.utc).isoformat(),
+    }})
+    logger.info("Discord linked: %s (%s)", username, user["id"])
+    return RedirectResponse(f"{origin}/?discord_linked=1&link_token={state}&discord_name={username}")
+
+
+@api_router.get("/discord/link-status/{token}")
+async def discord_link_status(token: str):
+    doc = await db.discord_links.find_one(
+        {"id": token, "status": "linked"}, {"_id": 0, "discord_username": 1})
+    if not doc:
+        raise HTTPException(404, "Not linked")
+    return {"linked": True, "username": doc["discord_username"]}
+
+
+async def _consume_discord_link(token: Optional[str]) -> Optional[dict]:
+    """At checkout: when the integration is configured, a valid fresh link is required.
+    Returns the discord fields to store on the order, or None when not configured."""
+    cfg = await _discord_cfg()
+    if not cfg:
+        return None
+    if not token:
+        raise HTTPException(400, "Link your Discord account before paying — your customer role depends on it")
+    res = await db.discord_links.find_one_and_update(
+        {"id": token, "status": "linked"},
+        {"$set": {"status": "used", "used_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    if not res or not res.get("discord_user_id"):
+        raise HTTPException(400, "Discord link expired or already used — link again from the cart")
+    return {
+        "discord_user_id": res["discord_user_id"],
+        "discord_username": res.get("discord_username"),
+        "discord_access_token": res.get("access_token"),
+        "discord_refresh_token": res.get("refresh_token"),
+    }
+
+
+async def _grant_discord_role(order: dict):
+    """On payment: join the buyer to the guild (if needed) and grant the customer role."""
+    if not order.get("discord_user_id"):
+        return
+    cfg = await _discord_cfg()
+    if not cfg:
+        return
+    uid = order["discord_user_id"]
+    headers = {"Authorization": f"Bot {cfg['bot_token']}"}
+    status, note = "granted", None
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            access = order.get("discord_access_token")
+            jr = await client.put(f"{DISCORD_API}/guilds/{cfg['guild_id']}/members/{uid}",
+                                  headers=headers, json={"access_token": access})
+            if jr.status_code == 401 and order.get("discord_refresh_token"):
+                # token expired (e.g. bank transfer confirmed later) — refresh and retry once
+                tr = await client.post(f"{DISCORD_API}/oauth2/token", data={
+                    "client_id": cfg["client_id"], "client_secret": cfg["client_secret"],
+                    "grant_type": "refresh_token", "refresh_token": order["discord_refresh_token"],
+                }, headers={"Content-Type": "application/x-www-form-urlencoded"})
+                if tr.status_code == 200:
+                    td = tr.json()
+                    access = td["access_token"]
+                    await db.orders.update_one({"id": order["id"]}, {"$set": {
+                        "discord_access_token": td["access_token"],
+                        "discord_refresh_token": td.get("refresh_token", order["discord_refresh_token"]),
+                    }})
+                    jr = await client.put(f"{DISCORD_API}/guilds/{cfg['guild_id']}/members/{uid}",
+                                          headers=headers, json={"access_token": access})
+            if jr.status_code not in (200, 201, 204):
+                status, note = "failed", f"join: {jr.status_code} {jr.text[:150]}"
+            else:
+                rr = await client.put(
+                    f"{DISCORD_API}/guilds/{cfg['guild_id']}/members/{uid}/roles/{cfg['role_id']}",
+                    headers=headers)
+                if rr.status_code not in (200, 204):
+                    status, note = "failed", f"role: {rr.status_code} {rr.text[:150]}"
+    except Exception as e:
+        status, note = "failed", str(e)[:150]
+    await db.orders.update_one({"id": order["id"]}, {"$set": {
+        "discord_role_status": status, "discord_role_note": note,
+    }})
+    if status == "granted":
+        logger.info("Discord customer role granted to %s (order %s)", order.get("discord_username"), order["id"][:8])
+    else:
+        logger.error("Discord role grant failed for order %s: %s", order["id"][:8], note)
+        try:
+            await _discord_alert(
+                "orders", "Discord role grant failed",
+                f"Order `{order['id'][:8].upper()}` ({order.get('discord_username')}) — {note}. Grant manually in Discord.",
+                color=0xEF4444)
+        except Exception:
+            pass
+
 
 
 class DiscordTestIn(BaseModel):
@@ -1369,6 +1565,7 @@ async def admin_app_summary(admin: dict = Depends(get_admin)):
                 pending_boosts.append({
                     "order_id": o["id"], "email": o.get("email"),
                     "name": b.get("name"), "platform": b.get("platform"), "boost_type": b.get("boost_type"),
+                    "product_id": b.get("product_id"), "duration": b.get("duration"), "status": b.get("status"),
                     "qty": b.get("qty"), "duration_label": b.get("duration_label"),
                     "link": b.get("link"), "submitted_at": b.get("submitted_at"),
                 })
@@ -1518,13 +1715,15 @@ async def bank_transfer_checkout(body: CheckoutIn):
     if not body.items:
         raise HTTPException(400, "Cart is empty")
     items, subtotal_cents, total_cents, discount_pct, coupon_code = await _price_cart(body.items, body.coupon)
+    discord = await _consume_discord_link(body.discord_link_token)
     total = total_cents / 100.0
     order_id = str(uuid.uuid4())
     reference = "DS-" + order_id[:8].upper()
     now = datetime.now(timezone.utc)
     order = {
         "id": order_id, "email": body.email.lower(), "items": items,
-        "discord_username": (body.discord_username or "").strip() or None,
+        "discord_username": (discord or {}).get("discord_username") or (body.discord_username or "").strip() or None,
+        **(discord or {}),
         "subtotal": subtotal_cents / 100.0, "total": total,
         "discount": round((subtotal_cents - total_cents) / 100.0, 2),
         "currency": "aud", "provider": "bank_transfer",
@@ -2086,6 +2285,10 @@ async def _fulfill_order(where: dict) -> Optional[dict]:
                 await _recompute_entitlements(updated["email"])
             except Exception as e:
                 logger.error("Entitlement recompute failed for %s: %s", updated.get("email"), e)
+        try:
+            await _grant_discord_role(updated)
+        except Exception as e:
+            logger.error("Discord role grant crashed for order %s: %s", updated.get("id"), e)
     return updated
 
 
@@ -2173,6 +2376,7 @@ async def create_checkout(body: CheckoutIn):
     order_items, subtotal_cents, total_cents, discount_pct, coupon_code = await _price_cart(
         body.items, body.coupon
     )
+    discord = await _consume_discord_link(body.discord_link_token)
     line_items = [
         {
             "price_data": {
@@ -2221,7 +2425,8 @@ async def create_checkout(body: CheckoutIn):
     now = datetime.now(timezone.utc).isoformat()
     new_order = {
         "id": order_id, "session_id": session.id, "email": email,
-        "discord_username": (body.discord_username or "").strip() or None,
+        "discord_username": (discord or {}).get("discord_username") or (body.discord_username or "").strip() or None,
+        **(discord or {}),
         "items": order_items, "total": total_cents / 100.0, "currency": "aud",
         "subtotal": subtotal_cents / 100.0, "discount_percent": discount_pct,
         "coupon_code": coupon_code,
@@ -2357,7 +2562,7 @@ async def paypal_create(body: PayPalCreateIn):
     await db.orders.insert_one({
         "id": order_id, "session_id": None, "paypal_order_id": pp["id"],
         "payment_provider": "paypal", "email": email,
-        "discord_username": (body.discord_username or "").strip() or None,
+        "discord_username": getattr(body, "discord_username", None) or None,
         "items": order_items, "total": total_cents / 100.0, "currency": "aud",
         "subtotal": subtotal_cents / 100.0, "discount_percent": discount_pct,
         "coupon_code": coupon_code,
@@ -2409,9 +2614,11 @@ async def crypto_checkout(body: CheckoutIn):
         raise HTTPException(400, "Total must be above zero")
     order_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
+    discord = await _consume_discord_link(body.discord_link_token)
     order = {
         "id": order_id, "session_id": None, "email": email,
-        "discord_username": (body.discord_username or "").strip() or None,
+        "discord_username": (discord or {}).get("discord_username") or (body.discord_username or "").strip() or None,
+        **(discord or {}),
         "items": order_items, "total": total_cents / 100.0, "currency": "aud",
         "subtotal": subtotal_cents / 100.0, "discount_percent": discount_pct,
         "coupon_code": coupon_code,

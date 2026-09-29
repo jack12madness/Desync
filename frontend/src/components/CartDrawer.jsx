@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, Lock, ArrowRight, Tag, Landmark, Minus, Plus, Bitcoin } from "lucide-react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
@@ -40,9 +40,34 @@ export default function CartDrawer() {
   const payable = Math.max(0, total - bulkSavings - couponSavings);
 
   const validEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+
+  // Discord account linking (required once staff configure the Discord integration)
+  const [discordRequired, setDiscordRequired] = useState(false);
+  const [discordLink, setDiscordLink] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("desync_discord_link")); } catch { return null; }
+  });
+  useEffect(() => {
+    api.get("/config").then(({ data }) => setDiscordRequired(!!data.discord_link_required)).catch(() => {});
+  }, []);
+  const discordReady = !discordRequired || !!discordLink;
+
+  const startDiscordLink = async () => {
+    try {
+      const { data } = await api.post("/discord/link-url", { origin: window.location.origin });
+      window.location.href = data.url;
+    } catch (e) {
+      toast.error(apiError(e));
+    }
+  };
+  const unlinkDiscord = () => {
+    localStorage.removeItem("desync_discord_link");
+    setDiscordLink(null);
+  };
+
   const cartPayload = () => ({
     email,
-    discord_username: discordUser.trim(),
+    discord_username: discordLink?.name || discordUser.trim(),
+    discord_link_token: discordLink?.token || null,
     items: items.map((i) => ({ product_id: i.product.id, duration: i.duration, qty: i.qty || 1 })),
     coupon: coupon ? coupon.code : null,
   });
@@ -71,7 +96,11 @@ export default function CartDrawer() {
       toast.error("Enter a valid email — your keys are delivered there");
       return;
     }
-    if (!discordUser.trim()) {
+    if (discordRequired && !discordLink) {
+      toast.error("Link your Discord account first — your customer role unlocks automatically");
+      return;
+    }
+    if (!discordRequired && !discordUser.trim()) {
       toast.error("Enter your Discord username");
       return;
     }
@@ -99,7 +128,11 @@ export default function CartDrawer() {
       toast.error("Enter a valid email — your keys are delivered there");
       return;
     }
-    if (!discordUser.trim()) {
+    if (discordRequired && !discordLink) {
+      toast.error("Link your Discord account first — your customer role unlocks automatically");
+      return;
+    }
+    if (!discordRequired && !discordUser.trim()) {
       toast.error("Enter your Discord username");
       return;
     }
@@ -129,7 +162,11 @@ export default function CartDrawer() {
       toast.error("Enter a valid email — your keys are delivered there");
       return;
     }
-    if (!discordUser.trim()) {
+    if (discordRequired && !discordLink) {
+      toast.error("Link your Discord account first — your customer role unlocks automatically");
+      return;
+    }
+    if (!discordRequired && !discordUser.trim()) {
       toast.error("Enter your Discord username");
       return;
     }
@@ -310,21 +347,48 @@ export default function CartDrawer() {
             />
           </div>
 
-          <div>
-            <label className="text-sm text-slate-300 block mb-2">
-              Discord username — for support & delivery
-            </label>
-            <Input
-              value={discordUser}
-              onChange={(e) => {
-                setDiscordUser(e.target.value);
-                localStorage.setItem("void_discord", e.target.value);
-              }}
-              placeholder="e.g. desyncuser"
-              data-testid="cart-discord-input"
-              className="bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] text-sm h-11"
-            />
-          </div>
+          {discordRequired ? (
+            <div data-testid="discord-link-block">
+              <label className="text-sm text-slate-300 block mb-2">
+                Discord account — you get your customer role automatically after payment
+              </label>
+              {discordLink ? (
+                <div className="flex items-center justify-between gap-3 px-4 h-11 rounded-md border border-emerald-500/40 bg-emerald-500/10" data-testid="discord-linked-badge">
+                  <span className="text-sm text-emerald-300 truncate">Linked as {discordLink.name}</span>
+                  <button onClick={unlinkDiscord} data-testid="discord-unlink" className="text-[11px] text-slate-400 hover:text-white shrink-0">
+                    change
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={startDiscordLink}
+                  data-testid="discord-link-button"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 h-11 rounded-md bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-semibold transition-colors"
+                >
+                  Link your Discord account
+                </button>
+              )}
+              <p className="text-[11px] text-slate-500 mt-1.5">
+                Not in our server yet? You'll join it automatically when you pay.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <label className="text-sm text-slate-300 block mb-2">
+                Discord username — for support & delivery
+              </label>
+              <Input
+                value={discordUser}
+                onChange={(e) => {
+                  setDiscordUser(e.target.value);
+                  localStorage.setItem("void_discord", e.target.value);
+                }}
+                placeholder="e.g. desyncuser"
+                data-testid="cart-discord-input"
+                className="bg-[#050B18] border-[#1E2D4A] focus-visible:ring-[#2E6BFF] text-sm h-11"
+              />
+            </div>
+          )}
 
           <label className="flex items-start gap-3 cursor-pointer select-none" data-testid="terms-agree-label">
             <input
@@ -349,7 +413,7 @@ export default function CartDrawer() {
 
           <button
             onClick={checkout}
-            disabled={loading || items.length === 0 || !agreed || !discordUser.trim()}
+            disabled={loading || items.length === 0 || !agreed || !discordReady || (!discordRequired && !discordUser.trim())}
             data-testid="cart-checkout-button"
             className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg bg-[#2E6BFF] hover:bg-[#1D55E0] text-white text-sm font-semibold shadow-[0_8px_24px_rgba(46,107,255,0.35)] disabled:opacity-40 disabled:pointer-events-none transition-all duration-200 active:scale-95"
           >
@@ -360,7 +424,7 @@ export default function CartDrawer() {
 
           <button
             onClick={bankCheckout}
-            disabled={loading || items.length === 0 || !agreed || !discordUser.trim()}
+            disabled={loading || items.length === 0 || !agreed || !discordReady || (!discordRequired && !discordUser.trim())}
             data-testid="cart-bank-transfer-button"
             className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg border border-[#2E6BFF]/40 text-[#8FB8E8] text-sm font-semibold hover:bg-[#2E6BFF]/10 disabled:opacity-40 disabled:pointer-events-none transition-all duration-200"
           >
@@ -373,7 +437,7 @@ export default function CartDrawer() {
 
           <button
             onClick={cryptoCheckout}
-            disabled={loading || items.length === 0 || !agreed || !discordUser.trim()}
+            disabled={loading || items.length === 0 || !agreed || !discordReady || (!discordRequired && !discordUser.trim())}
             data-testid="cart-crypto-button"
             className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg border border-[#F7931A]/40 text-[#F5B45E] text-sm font-semibold hover:bg-[#F7931A]/10 disabled:opacity-40 disabled:pointer-events-none transition-all duration-200"
           >

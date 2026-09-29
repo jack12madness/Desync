@@ -86,10 +86,23 @@
       <div id="admin-boosts" class="list"></div>
       <h3>Stock warnings</h3>
       <div id="admin-stock" class="list"></div>
+      <h3>Add keys to stock</h3>
+      <div class="restock" id="admin-restock">
+        <select id="restock-product" class="input select" data-testid="restock-product"></select>
+        <select id="restock-duration" class="input select" data-testid="restock-duration"></select>
+        <textarea id="restock-keys" class="input textarea mono" data-testid="restock-keys" placeholder="One key per line&#10;DSYNC-XXXX-XXXX-XXXX&#10;DSYNC-YYYY-YYYY-YYYY" rows="3"></textarea>
+        <button class="btn btn-primary" id="btn-restock" data-testid="restock-submit">
+          <span class="btn-title">Add to stock</span>
+        </button>
+      </div>
       <h3>Recent orders</h3>
       <div id="admin-orders" class="list"></div>
     </section>
 
+    <div id="update-banner" class="update-banner hidden" data-testid="update-banner">
+      <span id="update-text">Update available…</span>
+      <button class="copy-btn hidden" id="btn-update-restart" data-testid="update-restart">Restart</button>
+    </div>
     <div id="toast" class="toast hidden" data-testid="toast"></div>
     <footer id="app-footer"><span id="footer-info"></span></footer>
   </div>

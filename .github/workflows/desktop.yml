@@ -7,6 +7,9 @@ on:
       - "desktop/**"
       - ".github/workflows/desktop.yml"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -21,9 +24,15 @@ jobs:
         working-directory: desktop
         run: npm install
 
-      - name: Build NSIS installer
+      # Builds the NSIS installer AND publishes a GitHub Release (tag v<version>).
+      # The release is what powers in-app auto-updates and the public download link:
+      #   https://github.com/<owner>/<repo>/releases/latest/download/DesyncDesktop-Setup.exe
+      # electron-builder picks up owner/repo from the GITHUB_REPOSITORY env var.
+      - name: Build + publish installer
         working-directory: desktop
-        run: npx electron-builder --win nsis
+        run: npx electron-builder --win nsis --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4

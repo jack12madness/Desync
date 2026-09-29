@@ -85,14 +85,39 @@ function show(viewId) {
 
 async function logout() {
   await storeClear();
+  clearInterval(orderPollTimer);
+  lastOrderCount = null;
   state = { key: null, genData: null, adminToken: null };
   renderHistory([]);
   show("view-chooser");
 }
 
+const DURATION_LABELS = { day: "1 Day", "3d": "3 Days", week: "1 Week", month: "1 Month", lifetime: "Lifetime" };
+const durLabel = (product, d) => (product && product.duration_labels && product.duration_labels[d]) || DURATION_LABELS[d] || d;
+
+let audioCtx = null;
+function beep() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g);
+    g.connect(audioCtx.destination);
+    o.type = "sine";
+    o.frequency.value = 880;
+    g.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+    o.start();
+    o.stop(audioCtx.currentTime + 0.5);
+  } catch { /* audio unavailable */ }
+}
+
 // ---------- state ----------
 let state = { key: null, genData: null, adminToken: null };
 let countdownTimer = null;
+let orderPollTimer = null;
+let lastOrderCount = null;
+let adminProducts = [];
 
 // ---------- customer: key login + generator ----------
 async function keyLogin() {
@@ -269,12 +294,93 @@ async function staffLogin() {
   if (status === 200 && data && data.token) {
     state.adminToken = data.token;
     await storeSet("admin_token", data.token);
+    lastOrderCount = null;
     await renderAdmin();
+    startOrderPolling();
     show("view-admin");
   } else {
     errEl.textContent = (data && data.detail) || "Login failed";
     errEl.classList.remove("hidden");
   }
+}
+
+async function markPaid(orderId, btn) {
+  if (btn) btn.disabled = true;
+  const { status, data } = await api("POST", `/admin/orders/${orderId}/mark-paid`, null, state.adminToken);
+  if (status === 200) {
+    toast("Order marked paid — keys sent");
+    await renderAdmin();
+  } else {
+    toast((data && data.detail) || "Couldn't mark paid");
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function setBoostStatus(orderId, productId, duration, status, sel) {
+  const { status: code, data } = await api(
+    "POST", `/admin/orders/${orderId}/boost-status`,
+    { product_id: productId, duration, status }, state.adminToken
+  );
+  if (code === 200) toast(`Boost marked ${status}`);
+  else {
+    toast((data && data.detail) || "Couldn't update status");
+    if (sel) sel.value = sel.dataset.prev || "pending";
+  }
+}
+
+async function loadRestockProducts() {
+  const { status, data } = await api("GET", "/admin/products", null, state.adminToken);
+  if (status !== 200 || !Array.isArray(data)) return;
+  adminProducts = data.filter((p) => p.kind !== "boost");
+  const sel = $("restock-product");
+  sel.innerHTML = adminProducts
+    .map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`)
+    .join("");
+  updateRestockDurations();
+}
+
+function updateRestockDurations() {
+  const p = adminProducts.find((x) => x.id === $("restock-product").value);
+  const sel = $("restock-duration");
+  if (!p) { sel.innerHTML = ""; return; }
+  sel.innerHTML = Object.keys(p.prices || {})
+    .map((d) => `<option value="${esc(d)}">${esc(durLabel(p, d))}</option>`)
+    .join("");
+}
+
+async function restockSubmit() {
+  const productId = $("restock-product").value;
+  const duration = $("restock-duration").value;
+  const keys = $("restock-keys").value.trim();
+  if (!productId || !duration || !keys) { toast("Pick a product and paste at least one key"); return; }
+  const btn = $("btn-restock");
+  btn.disabled = true;
+  const { status, data } = await api("POST", "/admin/keystock", { product_id: productId, duration, keys }, state.adminToken);
+  btn.disabled = false;
+  if (status === 200 && data) {
+    toast(`${data.added ?? 0} key(s) added to stock`);
+    $("restock-keys").value = "";
+    await renderAdmin();
+  } else {
+    toast((data && data.detail) || "Couldn't add keys");
+  }
+}
+
+function startOrderPolling() {
+  clearInterval(orderPollTimer);
+  orderPollTimer = setInterval(async () => {
+    if (!state.adminToken) { clearInterval(orderPollTimer); return; }
+    const { status, data } = await api("GET", "/admin/app-summary", null, state.adminToken);
+    if (status !== 200 || !data) return;
+    const count = (data.today && data.today.orders) || 0;
+    if (lastOrderCount !== null && count > lastOrderCount) {
+      beep();
+      if (isElectron && window.desync.orderAlert) window.desync.orderAlert(count);
+      toast(`New order! ${count} in the last 24h`);
+      await renderAdmin();
+    }
+    lastOrderCount = count;
+  }, 60000);
 }
 
 async function renderAdmin() {
@@ -291,6 +397,8 @@ async function renderAdmin() {
     return;
   }
   const s = summary.data || {};
+  const todayOrders = (s.today && s.today.orders) || 0;
+  if (lastOrderCount === null) lastOrderCount = todayOrders;
   const stats = $("admin-stats");
   stats.innerHTML = "";
   for (const [key, label] of [["today", "Last 24h"], ["week", "Last 7 days"], ["month", "Last 30 days"]]) {
@@ -321,7 +429,16 @@ async function renderAdmin() {
         <div class="list-title">${esc(b.name || "Boost")} — ${esc(what)}</div>
         <div class="list-sub">${esc(b.platform === "tiktok" ? "TikTok" : "Instagram")} ${esc(b.boost_type || "")} · ${esc(b.email || "")}</div>
       </div>
-      <button class="copy-btn" data-testid="boost-copy">Copy link</button>`;
+      <button class="copy-btn" data-testid="boost-copy">Copy link</button>
+      <select class="status-select" data-testid="boost-status">
+        <option value="pending">Pending</option>
+        <option value="processing">Processing</option>
+        <option value="completed">Completed</option>
+      </select>`;
+    const sel = row.querySelector(".status-select");
+    sel.value = b.status || "pending";
+    sel.dataset.prev = sel.value;
+    sel.onchange = () => setBoostStatus(b.order_id, b.product_id, b.duration, sel.value, sel);
     row.querySelector(".copy-btn").onclick = (e) => copyText(b.link || "", e.target);
     boosts.appendChild(row);
   }
@@ -363,9 +480,19 @@ async function renderAdmin() {
         <div class="list-sub">${esc(o.email || "")} · ${aud(o.total)}</div>
       </div>
       ${hasBoost ? '<span class="pill pill-boost">boost</span>' : ""}
-      <span class="pill pill-${esc(o.payment_status || "pending")}">${esc(o.payment_status || "pending")}</span>`;
+      <span class="pill pill-${esc(o.payment_status || "pending")}">${esc(o.payment_status === "awaiting_payment" ? "bank pending" : o.payment_status || "pending")}</span>`;
+    if (o.payment_status === "awaiting_payment") {
+      const btn = document.createElement("button");
+      btn.className = "action-btn";
+      btn.dataset.testid = `mark-paid-${o.id}`;
+      btn.textContent = "Mark paid";
+      btn.onclick = () => markPaid(o.id, btn);
+      row.appendChild(btn);
+    }
     ordersEl.appendChild(row);
   }
+
+  loadRestockProducts();
 }
 
 // ---------- wiring ----------
@@ -380,6 +507,24 @@ function wire() {
   $("staff-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") staffLogin(); });
   $("btn-gen-refresh").onclick = refreshGenerator;
   $("btn-admin-refresh").onclick = renderAdmin;
+  $("restock-product").addEventListener("change", updateRestockDurations);
+  $("btn-restock").onclick = restockSubmit;
+  if (isElectron && window.desync.onUpdateStatus) {
+    window.desync.onUpdateStatus((info) => {
+      const banner = $("update-banner");
+      const text = $("update-text");
+      const restartBtn = $("btn-update-restart");
+      banner.classList.remove("hidden");
+      if (info.state === "available") {
+        text.textContent = `Downloading update v${info.version}…`;
+        restartBtn.classList.add("hidden");
+      } else if (info.state === "downloaded") {
+        text.textContent = `v${info.version} ready`;
+        restartBtn.classList.remove("hidden");
+        restartBtn.onclick = () => window.desync.restartUpdate();
+      }
+    });
+  }
 }
 
 async function init() {
@@ -403,8 +548,9 @@ async function init() {
   const savedToken = await storeGet("admin_token");
   if (savedToken) {
     state.adminToken = savedToken;
+    lastOrderCount = null;
     await renderAdmin();
-    if (state.adminToken) { show("view-admin"); return; }
+    if (state.adminToken) { startOrderPolling(); show("view-admin"); return; }
   }
   show("view-chooser");
 }

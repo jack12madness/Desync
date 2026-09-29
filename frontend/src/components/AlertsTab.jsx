@@ -39,6 +39,8 @@ const CHANNELS = [
 
 export default function AlertsTab() {
   const [hooks, setHooks] = useState({ orders: "", payments: "", bank: "", low_stock: "", restock: "" });
+  const [desktopUrl, setDesktopUrl] = useState("");
+  const [discordInt, setDiscordInt] = useState({ client_id: "", client_secret: "", bot_token: "", guild_id: "", role_id: "" });
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(null);
 
@@ -50,14 +52,26 @@ export default function AlertsTab() {
         bank: existing.bank || "", low_stock: existing.low_stock || "",
         restock: existing.restock || "",
       });
+      setDesktopUrl(data.desktop_download_url || "");
+      const di = data.discord_integration || {};
+      setDiscordInt({
+        client_id: di.client_id || "", client_secret: di.client_secret || "",
+        bot_token: di.bot_token || "", guild_id: di.guild_id || "", role_id: di.role_id || "",
+      });
     }).catch(() => {});
   }, []);
 
   const save = async () => {
     setSaving(true);
     try {
-      await api.put("/admin/settings", { discord_webhooks: hooks });
-      toast.success("Discord alerts saved");
+      const di = Object.fromEntries(Object.entries(discordInt).map(([k, v]) => [k, v.trim()]));
+      const anySet = Object.values(di).some(Boolean);
+      await api.put("/admin/settings", {
+        discord_webhooks: hooks,
+        desktop_download_url: desktopUrl.trim() || null,
+        discord_integration: anySet ? di : null,
+      });
+      toast.success("Settings saved");
     } catch (e) {
       toast.error(apiError(e));
     } finally {
@@ -123,13 +137,64 @@ export default function AlertsTab() {
         ))}
       </div>
 
+      <div className="p-5 bg-[#0F1F38] border border-blue-900/40 rounded-lg mt-6" data-testid="desktop-app-setting">
+        <div className="text-white font-semibold mb-2 text-sm">Windows app download link</div>
+        <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+          After the GitHub build publishes a release, paste its direct download URL here — the storefront
+          will show a "Get the Windows app" section. It looks like:{" "}
+          <code className="text-slate-400 text-[10px]">https://github.com/&lt;you&gt;/&lt;repo&gt;/releases/latest/download/DesyncDesktop-Setup.exe</code>.
+          Leave blank to hide the section.
+        </p>
+        <Input
+          value={desktopUrl}
+          onChange={(e) => setDesktopUrl(e.target.value)}
+          placeholder="https://github.com/you/repo/releases/latest/download/DesyncDesktop-Setup.exe"
+          data-testid="desktop-download-url-input"
+          className={fieldCls}
+        />
+      </div>
+
+      <div className="p-5 bg-[#0F1F38] border border-blue-900/40 rounded-lg mt-6" data-testid="discord-integration-setting">
+        <div className="text-white font-semibold mb-2 text-sm">Discord customer role (auto-join + auto-role on payment)</div>
+        <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+          Buyers link their Discord in the cart before paying; on payment the bot adds them to your server
+          (if they aren't in it) and gives them the customer role. Setup: Discord Developer Portal → New Application →
+          copy Client ID + Secret (OAuth2 tab) → add the redirect URL{" "}
+          <code className="text-slate-400 text-[10px]">https://desync.website/api/discord/callback</code>{" "}
+          (and the preview one while testing) → Bot tab → create bot, copy its token → invite the bot to your server with
+          Manage Roles → enable Developer Mode in Discord, right-click your server for the Server ID and the customer role for the Role ID.
+          The bot's role must sit ABOVE the customer role in Server Settings → Roles. Fill all five to switch it on; clear them to switch it off.
+        </p>
+        <div className="space-y-3">
+          {[
+            ["client_id", "Client ID", "e.g. 1234567890123456789"],
+            ["client_secret", "Client Secret", "OAuth2 → Client Secret"],
+            ["bot_token", "Bot Token", "Bot → Token (keep private)"],
+            ["guild_id", "Server ID", "Right-click your server → Copy Server ID"],
+            ["role_id", "Customer Role ID", "Server Settings → Roles → right-click role → Copy Role ID"],
+          ].map(([k, label, ph]) => (
+            <div key={k}>
+              <label className="text-[10px] font-mono uppercase tracking-widest text-slate-500 block mb-1">{label}</label>
+              <Input
+                type={k === "client_secret" || k === "bot_token" ? "password" : "text"}
+                value={discordInt[k]}
+                onChange={(e) => setDiscordInt({ ...discordInt, [k]: e.target.value })}
+                placeholder={ph}
+                data-testid={`discord-int-${k}`}
+                className={fieldCls}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
       <button
         onClick={save}
         disabled={saving}
         data-testid="alerts-save"
         className="mt-6 px-6 py-2.5 rounded-lg bg-blue-400 text-[#050B18] text-xs font-mono font-bold uppercase tracking-widest hover:bg-blue-300 disabled:opacity-40 transition-all"
       >
-        {saving ? "Saving..." : "Save webhooks"}
+        {saving ? "Saving..." : "Save settings"}
       </button>
     </div>
   );

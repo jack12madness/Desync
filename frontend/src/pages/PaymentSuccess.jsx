@@ -80,6 +80,17 @@ export default function PaymentSuccess() {
                   <Mail className="w-4 h-4 text-[#5B8CFF]" />
                   {state.order.items.every((i) => i.kind === "boost") ? "Receipt emailed to" : "Keys emailed to"} <span className="text-slate-200">{state.order.email}</span>
                 </p>
+                {state.order.discord_username && (
+                  <p className="text-sm mt-2 flex items-center justify-center gap-2" data-testid="discord-role-line">
+                    {state.order.discord_role_status === "granted" ? (
+                      <span className="text-emerald-300">Discord: customer role granted to {state.order.discord_username} — you're in the server</span>
+                    ) : state.order.discord_role_status === "failed" ? (
+                      <span className="text-amber-300">Discord linked as {state.order.discord_username} — role grant needs a manual check, staff were notified</span>
+                    ) : (
+                      <span className="text-slate-400">Discord linked as {state.order.discord_username} — granting your customer role…</span>
+                    )}
+                  </p>
+                )}
               </div>
 
               <div className="p-6 bg-[#0A1628] border border-[#2E6BFF]/30 rounded-xl shadow-[0_0_60px_rgba(46,107,255,0.1)]" data-testid="license-key-display">
