@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "Desync Desktop — Generator + admin snapshot for desync.website",
   "main": "main.js",
+  "author": "Desync",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jack12madness/Desync.git"
+  },
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
