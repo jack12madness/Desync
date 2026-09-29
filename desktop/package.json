@@ -40,7 +40,8 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "Desync"
+      "shortcutName": "Desync",
+      "artifactName": "DesyncDesktop-Setup.${ext}"
     }
   }
 }
