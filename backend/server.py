@@ -1332,6 +1332,50 @@ async def admin_stats(admin: dict = Depends(get_admin)):
     }
 
 
+@api_router.get("/admin/app-summary")
+async def admin_app_summary(admin: dict = Depends(get_admin)):
+    """Compact snapshot for the Desync Desktop app: time-bucketed sales, low stock, pending boosts."""
+    now = datetime.now(timezone.utc)
+    buckets = {
+        "today": now - timedelta(hours=24),
+        "week": now - timedelta(days=7),
+        "month": now - timedelta(days=30),
+    }
+    out = {}
+    for name, since in buckets.items():
+        rows = await db.orders.aggregate([
+            {"$match": {"payment_status": "paid", "created_at": {"$gte": since.isoformat()}}},
+            {"$group": {"_id": None, "revenue": {"$sum": "$total"}, "orders": {"$sum": 1}}},
+        ]).to_list(1)
+        out[name] = {"revenue": round(rows[0]["revenue"], 2), "orders": rows[0]["orders"]} if rows else {"revenue": 0.0, "orders": 0}
+
+    low_stock = []
+    stock = await _available_stock_map()
+    async for p in db.products.find({"active": True, "delivery": "stock", "kind": {"$ne": "boost"}},
+                                    {"_id": 0, "id": 1, "name": 1, "prices": 1, "duration_labels": 1}):
+        for d in (p.get("prices") or {}):
+            left = (stock.get(p["id"]) or {}).get(d, 0)
+            if left <= 3:
+                low_stock.append({"name": p["name"], "duration_label": _dur_label(p, d), "left": left})
+    low_stock.sort(key=lambda x: x["left"])
+
+    pending_boosts = []
+    async for o in db.orders.find(
+        {"payment_status": "paid", "boost_details.status": "pending"},
+        {"_id": 0, "id": 1, "email": 1, "boost_details": 1},
+    ).sort("created_at", 1).limit(50):
+        for b in o.get("boost_details") or []:
+            if b.get("status") == "pending":
+                pending_boosts.append({
+                    "order_id": o["id"], "email": o.get("email"),
+                    "name": b.get("name"), "platform": b.get("platform"), "boost_type": b.get("boost_type"),
+                    "qty": b.get("qty"), "duration_label": b.get("duration_label"),
+                    "link": b.get("link"), "submitted_at": b.get("submitted_at"),
+                })
+
+    return {**out, "low_stock": low_stock, "pending_boosts": pending_boosts}
+
+
 @api_router.post("/admin/orders/{order_id}/assign-keys")
 async def admin_assign_keys(order_id: str, admin: dict = Depends(get_admin)):
     order = await db.orders.find_one({"id": order_id})

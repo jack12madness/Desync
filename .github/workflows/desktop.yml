@@ -1,0 +1,33 @@
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "desktop/**"
+      - ".github/workflows/desktop.yml"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm install
+
+      - name: Build NSIS installer
+        working-directory: desktop
+        run: npx electron-builder --win nsis
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DesyncDesktop-Setup
+          path: desktop/dist/*.exe
+          if-no-files-found: error

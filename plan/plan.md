@@ -1,70 +1,68 @@
-# Desync Customer Portal, Generator Entitlements & Reviews
+# Desync Desktop — Windows app for the Generator + admin on the go
 
-A customer portal where buyers verify their email with a one-time code and see everything tied to their purchases — orders, licenses, Generator key, and hourly generation allowance — plus a secure Generator API the desktop app can call, admin customer management, and a moderated reviews system.
+A downloadable Windows app for Desync customers and staff. Customers log in with their DSYNC key and generate Steam, Discord and Rockstar accounts from their desktop; staff log in with their admin account to check sales, orders and stock from anywhere.
 
 ## Who it's for
-- Customers who bought anything from Desync (view orders, keys, entitlements, leave reviews)
-- Desync Generator owners (get a key, generate Steam/Discord/Rockstar accounts within hourly limits)
-- Store staff (manage customers, Generator keys, entitlements, reviews moderation)
+
+- **Customers** who bought the FiveM Account Generator (or redeemed a key) and want a dedicated app instead of the website portal
+- **The owner (and future staff)** who want to keep an eye on orders, sales and stock without opening the admin website
 
 ## Core features and experience
 
-**1. Customer Portal (replaces "My Orders")**
-- Navigation item "My Orders" becomes "Customer Portal".
-- Same email + one-time-code login already proven on My Orders: enter email, receive a 6-digit code (10-minute expiry, 60-second resend cooldown, 5-try limit, single use), enter code, in. No passwords. Verified access lasts for the browser session.
-- The customer only ever sees data tied to their verified email. One email = one customer, no duplicate accounts no matter how many orders exist.
-- Dashboard sections: **Overview** (email, customer since date, Generator status, live allowance counters), **Orders** (every order: ID, date, products, quantities, price paid, payment status, keys/accounts as they appear today), **Products** (licenses with download links and setup instructions), **Generator** (status, key with reveal/copy, per-type allowance with "X / 3 remaining" and a next-reset countdown, generation history), **Account** (email, member-since, review prompt).
-- Everything shown today in My Orders (keys, accounts, loader downloads, instructions, Discord links) keeps working inside the portal unchanged.
+**Generator (customer side)**
+- Key login screen: paste DSYNC key, app validates it against the live site and remembers it locally
+- Home screen shows the customer's tier and hourly allowance (3/3/3 for paid Generator keys, 1/1/1 for standard)
+- Three generate buttons — Steam, Discord, Rockstar — each producing an account instantly with one-click copy
+- Live "refills in X minutes" countdown per account type when the hourly limit is used up
+- Generation history inside the app so previously generated accounts are never lost
 
-**2. Generator entitlement system**
-- Buying the existing "FiveM Account Generator" product (any duration) automatically grants Generator access and issues a unique key in the format `DSYNC-XXXX-XXXX-XXXX`, visible in the portal.
-- Any order totalling **over A$10** (price actually paid, after discounts) grants the standard entitlement: **1 Steam + 1 Discord + 1 Rockstar per hour**. Orders of A$10 or less grant nothing. Multiple qualifying orders do not stack — the standard allowance stays 1 of each.
-- Owning the Generator overrides the standard allowance: **3 of each type per hour**.
-- Limits are rolling-hour, calculated server-side from recorded usage — never from anything the Generator app sends.
-- Generation pulls real accounts from the **shared shop stock pools** (the same account stock the store sells). Admin picks which product's pool feeds each type (defaults: the existing Steam/Discord/Rockstar account products). A generated account is consumed from stock so it can't be sold afterwards. If a pool is empty, generation for that type reports "out of stock" without consuming allowance... (allowance is only consumed on successful generation).
-- Refunded or cancelled orders revoke the entitlements they granted (Generator access off, key revoked); already-generated accounts are not clawed back.
+**Admin (staff side)**
+- Separate staff login (same username/password as the web admin)
+- Sales snapshot: today / week / month revenue and order counts
+- Recent orders list with statuses (paid, pending bank, boost orders flagged)
+- Low-stock and out-of-stock warnings so restocks never get missed
+- Pending boost submissions with their links, so fulfilment can start from the app
 
-**3. Generator API (for the desktop app)**
-- The app sends only the Generator key and the account type wanted. The server answers: key valid + active + not revoked, customer not disabled, allowance remaining, then performs the generation, records it (customer, key, type, timestamp, request ID, success/failure) and returns the account.
-- Replay protection: each request carries a unique request ID; duplicates are rejected.
-- No admin credentials, Stripe secrets or database access anywhere near the app — only the customer's own Generator key.
-
-**4. Admin customer management (new "Customers" upgrade + Generator section)**
-- Search customers by email, order ID, Generator key, or customer ID.
-- Customer profile: email, orders, products, Generator access + key + status, current hourly limits, usage this hour, generation history, account creation date.
-- Actions: grant/remove Generator access, generate/revoke/regenerate key, reset hourly usage, add/remove manual entitlements, disable/re-enable customer.
-- Migration tool: add an existing Generator customer by email → access on, key auto-generated, status active — no purchase needed. Existing Generator customers get imported this way before launch.
-- Every admin action is written to an audit log (who, what, when, which customer).
-
-**5. Reviews**
-- Only customers with a paid order can review (verified through their portal session). One review per order by default; admin can allow more. Submissions are rate-limited, text is sanitized, and emails are never shown publicly.
-- Review form: 1–5 stars, written review, optional product picker, optional display name (falls back to a neutral label, never the email).
-- Portal shows an "Enjoying your purchase? Leave us a review" prompt after a paid order.
-- All reviews start as **pending** — nothing goes public until an admin approves it in the new Admin Reviews section (view all, approve, hide/remove, filter by product or rating, see the submitting customer/order).
-- Public site gets a "What our customers say" section: average stars, total count, recent approved reviews (name, stars, text, product), and a Leave a Review button that sends people to the portal. Styled to match the existing dark-blue Desync look.
+**General**
+- Dark Desync look and feel (same blue/black theme as the store)
+- Remembers logins locally; log out button clears them
+- Talks to the live site (desync.website) — nothing is stored in the app except the login
+- Ships as a single Windows installer (.exe) anyone can download and run
 
 ## User flow
-- **Customer**: Portal → email → code → dashboard. Sees orders automatically, Generator key if entitled, allowance counters counting down within the hour, can submit a review for a paid order.
-- **Generator owner**: copies key from portal → pastes into the Generator app → app validates against the API → generates accounts until the hourly allowance is used → allowance refills as the hour rolls.
-- **Staff**: admin → Customers → search → open profile → grant access / regenerate key / reset usage / disable. Admin → Reviews → approve or hide. Admin → Customers → "Add existing Generator customer" for migration.
+
+1. Customer downloads and installs the app, opens it, pastes their DSYNC key
+2. App validates the key, shows their allowance, and they start generating accounts
+3. Staff open the same app, choose "Staff login", sign in, and land on the sales snapshot
+4. Staff check recent orders and stock warnings, and copy boost links to fulfil them
 
 ## UI/UX feel
-- Existing Desync dark-blue theme untouched: same fonts, borders, spacing, buttons.
-- Portal feels like the current My Orders page extended into a tabbed dashboard.
-- Generator allowance shown as bold counters (e.g. "Steam 2 / 3 remaining") with a live next-reset countdown.
-- Reviews section uses the site's existing card and typography style — star icons, quiet borders, no template look.
+
+Compact dark window (roughly phone-sized, ~420×720), Desync navy/black with blue accents and pink for boost items, big readable account cards with copy buttons, minimal chrome — feels like a purpose-built tool, not a wrapped webpage.
 
 ## Implementation phases
-- **Phase 1 (built now)**: everything above — Customer Portal with email-code login and all dashboard sections, entitlement engine (Generator product, >A$10 rule, refund revocation), Generator API with server-side limits and replay protection, shared-stock generation, admin customer management + migration + audit log, full reviews system (submit, moderate, public section).
-- **Phase 2 (later, optional)**: per-customer custom allowance overrides (e.g. 5/hour for a VIP), review replies from the store, export generation history.
-- **Phase 3 (later, optional)**: Generator access expiry tied to subscription duration, review photos, entitlement gifting/transfer.
+
+**Phase 1 — MVP (built now)**
+- Windows desktop app shell with customer key login and staff login
+- Full Generator: validate key, generate all three account types, hourly-limit countdowns, copy buttons, local history
+- Admin view: sales snapshot, recent orders, low-stock warnings, pending boost links
+- Automated build pipeline: pushing the code to GitHub produces a ready-to-download Windows installer
+
+**Phase 2 — later**
+- Admin actions from the app: mark bank orders paid, set boost statuses, add keys to stock
+- Auto-update so the app updates itself on launch
+- System tray icon and launch-at-startup option
+
+**Phase 3 — later**
+- Code-signed installer (removes the Windows SmartScreen warning)
+- New-order notifications
+- macOS/Linux builds if ever needed
 
 ## Assumptions
-- "FiveM Account Generator" (existing product) is the Generator; buying any duration of it grants access and a key. Generator access does not expire with the duration in Phase 1 (durations exist on that product but entitlement stays until revoked/refunded).
-- Shared stock: generation consumes accounts from the admin-designated source product pools (defaulting to the existing Steam/Discord/Rockstar account products); a consumed account is no longer sellable in the shop.
-- The >A$10 rule uses the paid order total (after discounts), in AUD.
-- Standard entitlement never stacks; owning the Generator replaces it (3/hour) rather than adding to it.
-- Existing buyers keep working: their orders appear in the portal by email with no action needed; existing Generator customers are imported manually via the admin migration tool.
-- Reviews are pending-by-default and require admin approval before showing publicly.
-- "Generator application" is a desktop app that talks to the public API with only the customer's key — no other credentials exist client-side.
-- The email verification flow reuses the proven My Orders OTP system (same security rules), extended to log into the portal.
+
+- The app talks to the live site at desync.website; preview is used during development
+- Generator rules stay exactly as they are on the website (same keys, same hourly limits, same stock pools) — the app is a second door into the same system, not a separate one
+- Windows only for now; installer is unsigned at first, so Windows may show a one-time "unknown publisher" warning on install (signing is phase 3)
+- The installer is produced by an automated GitHub build — the user publishes the code with the existing "Save to Github" feature and downloads the built installer from GitHub
+- The app is a compact custom-built interface, not a wrapper around the website
+- Customer key login and staff login live in the same app; customers never see the staff side without staff credentials

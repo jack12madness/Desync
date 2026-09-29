@@ -1,0 +1,37 @@
+{
+  "name": "desync-desktop",
+  "version": "1.0.0",
+  "description": "Desync Desktop — Generator + admin snapshot for desync.website",
+  "main": "main.js",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "gg.desync.desktop",
+    "productName": "Desync Desktop",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Desync"
+    }
+  }
+}

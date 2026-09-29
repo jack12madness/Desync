@@ -11,6 +11,15 @@ Full-stack storefront "Desync" for FiveM game-cheat products (future: other game
 - Key stock: per product + duration (day/week/month/lifetime); fulfillment assigns stocked key or marks keys_pending
 
 ## What's implemented (latest first)
+### 2026-09-29 — Desync Desktop (Windows app, phase 1)
+- Electron app in /app/desktop: 420×720 dark Desync-themed window; all network via main-process IPC proxy (API base hardcoded https://desync.website, DESYNC_API_URL env override for dev); JSON store in userData (key/token/history)
+- Customer side: DSYNC key login (POST /gen/validate), tier display (Full 3/hr vs Standard 1/hr), per-type used/limit bars, Generate buttons (POST /gen/generate with uuid request_id), live "refills in Xm Ys" countdowns from resets[], copy buttons, local history (50 entries)
+- Staff side: web-admin login, NEW backend GET /admin/app-summary (rolling 24h/7d/30d revenue+orders aggregation, low-stock ≤3 incl. out-of-stock, pending boost submissions with links), recent orders with status pills + boost flags, refresh, auto-logout on 401
+- Renderer also runs in a plain browser for dev (fetch fallback adapter, localStorage desync_api_base) — CSP allows connect-src https:
+- Build pipeline: .github/workflows/desktop.yml — push touching desktop/** (or manual dispatch) → windows-latest → electron-builder NSIS → downloadable artifact "DesyncDesktop-Setup". Unsigned (SmartScreen warning expected; signing = phase 3)
+- Verified: full generator flow in browser against live preview API (key login → generate steam → history → copy → counters), staff flow (login → stats/boosts/stock/orders/refresh/logout), Electron main process boots clean under Xvfb; node --check on all JS
+- NOT verified: actual Windows .exe build (runs on GitHub after user pushes via Save to Github)
+
 ### 2026-09-28 (later) — Boost refinements: per-type prices, per-type bulk tiers, min buy
 - Separate unit price per type (followers/likes/views); blank = hidden from buyers (product-form-price-followers/likes/views)
 - bulk_tiers now per-type dict {"followers": [...], "likes": [...]} with "All types" option in admin form; legacy flat list still honored (_tiers_for)
